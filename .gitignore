@@ -1,0 +1,11 @@
+*.ist
+*.pkl
+__pycache__
+*.pyc
+*.zip
+*ipynb_checkpoints*
+*.virtual_documents*
+
+database/raw_datasets/*/*.txt
+
+.env
