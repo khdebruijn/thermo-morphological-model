@@ -6,6 +6,7 @@ __pycache__
 *ipynb_checkpoints*
 *.virtual_documents*
 
-database/raw_datasets/*/*.txt
+database/raw_datasets/era5/*/*.nc
+database/raw_datasets/gibbs/*/*
 
 .env
