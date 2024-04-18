@@ -6,11 +6,7 @@ __pycache__
 *ipynb_checkpoints*
 *.virtual_documents*
 
-<<<<<<< Updated upstream
 database/raw_datasets/era5/*/*.nc
 database/raw_datasets/gibbs/*/*
-=======
-database/raw_datasets/*/*/*
->>>>>>> Stashed changes
 
 .env
