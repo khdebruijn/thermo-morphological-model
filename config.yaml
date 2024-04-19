@@ -9,7 +9,9 @@ model:
 
 # wrapper parameters:
 wrapper:
-  timestep: 1  # size of timesteps (in hours)
+  dir:  'runs/...'         # location of model run
+  timestep: 1              # size of timesteps (in hours)
+  call_xbeach_inter:  168  #  xbeach is called during inter-storm periods every X hours (default: 168, i.e. 1 week)
 
 # xbeach parameters
 xbeach:
@@ -21,3 +23,8 @@ thermal:
   with_longwave   : True  # include longwave radiation (incoming & outgoining) in thermal computation step
   with_convective : True  # include convective heat transfer in thermal computation step
   with_latent     : True  # include latent heat in thermal computation step
+
+# output
+output:
+  output_res  : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
+  output_var  : ["bath", "al_depth"]  # list of output variables

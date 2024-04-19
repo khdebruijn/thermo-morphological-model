@@ -1,3 +1,5 @@
+# This is a script by Kees Nederhoff
+
 # Run this in 'base'
 
 # Libraries needed
