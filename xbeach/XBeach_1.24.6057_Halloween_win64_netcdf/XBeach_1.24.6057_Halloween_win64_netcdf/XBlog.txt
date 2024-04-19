@@ -1,0 +1,15 @@
+  **********************************************************
+                     Welcome to XBeach
+ 
+  version 1.24.6057-Halloween
+               date2023/10/30 17:54:23
+     URL:https://svn.oss.deltares.nl/repos/xbeach/tags/2023-10-31-XBeach-v1.24.6
+ 057-Halloween_BETA/src/xbeachlibrary
+  **********************************************************
+ 
+  Simulation started: YYYYMMDD    hh:mm:ss     time zone (UTC)
+                      20240419  10:49:11     +0200
+ 
+  General Input Module
+  Reading input parameters:
+   File 'params.txt' not found. Terminating simulation
