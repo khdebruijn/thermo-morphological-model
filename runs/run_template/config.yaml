@@ -1,0 +1,44 @@
+# dataset parameters
+dataset_parameters:
+  database_folder: 'database/datasets'  # datasets location
+
+# model settings
+model:
+  nx: 100  # number of points in x-direction
+  ny: 0    # number of points in y-direction
+  len_x: 100  # length of the grid in x-direction (m)
+  len_y: 0    # length of the grid in y-direction (m)
+  time_start: -1  # starting time (if -1 take entire dataset)
+  time_stop : -1  # stopping time (if -1 take entire dataset)
+  timestep: 1              # size of timesteps (in hours)
+  call_xbeach_inter:  168  #  xbeach is called during inter-storm periods every X hours (default: 168, i.e. 1 week)
+
+# wrapper parameters:
+wrapper:
+  dir:  'runs/...'         # location of model run
+  
+# xbeach parameters
+xbeach:
+  # version: '1.24'  # version of xbeach used
+  xfile:   'x.grd'   # file used for the grid (x-direction)
+  yfile:   'y.grd'   # file used for the grid (y-direction)
+  depfile: 'bed.dep'  # file used for the bed
+  tstop:   '3600'    # length of xbeach simulation (in seconds), should be the same as model.timestep
+  thetamin: '-90'  # minimum angle
+  thetamax: '90'   # maximum angle
+  dtheta:   '15'     # bin width
+  wbctype: 'jons'   # type of wave boundary condition
+  bcfile:  'filelist.txt'  # file ocntaining the bc specifications
+
+# thermal moodel parameters
+thermal:
+  with_solar      : True  # include short wave solar radiation in thermal computation step
+  with_longwave   : True  # include longwave radiation (incoming & outgoining) in thermal computation step
+  with_convective : True  # include convective heat transfer in thermal computation step
+  with_latent     : True  # include latent heat in thermal computation step\
+  with_sea_ice    : True  # indicates whether or not the thermal component is run during the period in which the sea is covered with ice
+
+# output
+output:
+  output_res  : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
+  output_var  : ["bath", "al_depth"]  # list of output variables

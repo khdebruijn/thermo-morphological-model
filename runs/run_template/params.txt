@@ -1,0 +1,62 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% XBeach parameter settings input file                                %%%
+%%%                                                                     %%%
+%%% date: 01-Jan-2015 12:00                                             %%%
+%%% function: xb_write_params                                           %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% Grid parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+depfile = bed.dep
+posdwn = 0
+nx = 265
+ny = 0
+alfa = 0
+vardx = 1
+xfile = x.grd
+yfile = y.grd
+thetamin = -90
+thetamax = 90
+dtheta = 15
+thetanaut = 0
+
+%%% Model time %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+tstop = 3600
+
+%%% Physical constants %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+rho = 1025
+
+%%% Tide boundary conditions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+tideloc = 2
+zs0file = tide.txt
+
+%%% Wave boundary condition parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+wbctype = jons
+bcfile = filelist.txt
+
+%%% Physical processes %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+avalanching         = 1
+flow                = 1
+lwve                = 1
+morphology          = 1
+sedtrans            = 1
+swave               = 1
+swrunup             = 1
+viscosity           = 1
+wavemodel           = surfbeat
+wind                = 1
+
+%%% Output variables %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+outputformat = netcdf
+tint = 3600
+tstart = 0
+nglobalvar = 3
+zb
+zs
+H
+
