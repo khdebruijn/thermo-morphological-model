@@ -4,3 +4,7 @@ matplotlib
 threading
 geopandas
 xarray
+subprocess
+yaml
+pyyaml
+xbTools
