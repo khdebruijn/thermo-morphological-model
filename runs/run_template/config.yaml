@@ -6,16 +6,18 @@ dataset_parameters:
 model:
   nx: 100  # number of points in x-direction
   ny: 0    # number of points in y-direction
-  len_x: 100  # length of the grid in x-direction (m)
+  len_x: 4000  # length of the grid in x-direction (m), starting from the baseline (x=0)
   len_y: 0    # length of the grid in y-direction (m)
   time_start: '01-01-1981'  # DD-MM-YY starting time (if -1 take entire dataset)
-  time_stop : '01-01-1982' # DD-MM-YY stopping time (if -1 take entire dataset)
+  time_end : '01-01-1982' # DD-MM-YY stopping time (if -1 take entire dataset)
   timestep: 1              # size of timesteps (in hours)
   call_xbeach_inter:  168  #  xbeach is called during inter-storm periods every X hours (default: 168, i.e. 1 week)
 
 # wrapper parameters:
 wrapper:
   dir:  'runs/...'         # location of model run
+  bathy_path: "database/bathy.txt"  # path to initial bathymetry
+  bathy_grid_path: "database/bathy_grid.txt"  # path to grid corresponding to initial bathymetry
   
 # xbeach parameters
 xbeach:

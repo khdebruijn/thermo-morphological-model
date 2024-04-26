@@ -6,3 +6,5 @@ geopandas
 xarray
 subprocess
 yaml
+pyyaml
+xbTools
