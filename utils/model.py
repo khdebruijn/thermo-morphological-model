@@ -10,6 +10,7 @@ import pandas as pd
 import xbTools
 from xbTools.grid.creation import xgrid, ygrid
 from xbTools.xbeachtools import XBeachModelSetup
+from xbTools.general.executing_runs import xb_run_script_win
 
 class Simulation():
     def __init__(self, runid):
@@ -28,7 +29,7 @@ class Simulation():
         
         return None
     
-    def read_config(config_file):
+    def read_config(self, config_file):
         '''
         Creates configuration variables from file
         ------
@@ -45,7 +46,7 @@ class Simulation():
                 super(AttrDict, self).__init__(*args, **kwargs)
                 self.__dict__ = self
                     
-        with open(config_file) as f:
+        with open(os.join(self.cwd, config_file)) as f:
             cfg = yaml.safe_load(f)
             
         config = AttrDict(cfg)
@@ -61,6 +62,9 @@ class Simulation():
         
         # time indexing is easier for numerical models    
         self.T = np.arange(0, len(self.timestamps), 1) 
+        
+        # set time step
+        self.dt = dt
         
 
     def generate_initial_grid(self, nx, ny, len_x, len_y, 
@@ -79,14 +83,14 @@ class Simulation():
         note that the current version is 1D and does not implement a grid in y-direction
         """
         
-        if not bathy_path:
+        if bathy_path:
             self._load_bathy(
                 os.path.join(self.proj_dir, bathy_path)
             )
         else:
             self._load_bathy(os.path.join(self.cwd, "bed.dep"))
             
-        if not bathy_grid_path:
+        if bathy_grid_path:
             self._load_grid_bathy(
                 os.path.join(self.proj_dir, bathy_grid_path)
             )
@@ -96,11 +100,13 @@ class Simulation():
         self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2)
         self.zgr = np.interp(self.xgr, self.bath_grid, self.bathy_initial)
         
-        
         self.bathy_current = np.copy(self.zgr)
         self.bathy_timeseries = [self.zgr]
         
-        return self.xgr, self.zgr
+        # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
+        self.ne_layer = np.zeros(self.xgr.shape)
+        
+        return self.xgr, self.zgr, self.ne_layer
     
     # def export_grid(self):
     #     np.savetxt(self.config.xbeach.xfile, self.xgr)
@@ -114,22 +120,148 @@ class Simulation():
     def _load_grid_bathy(self, fp_bathy_grid):            
         with open(fp_bathy_grid) as f:
             self.bathy_grid = np.loadtxt(f)   
+            
+    def xbeach_setup(self, i):
+        """This function initializes an xbeach run, i.e., it writes all inputs to files
+        """
+        xb_setup = XBeachModelSetup(f"Run {self.directory}: timestep {i}")
+        
+        xb_setup.set_grid(self.xgr, None, self.zgr, posdwn=-1)
+        
+        xb_setup.set_waves('jonstable', {
+            "Hm0":self.conditions[i]["Hs(m)"],
+            "Tp":self.conditions[i]["Tp(s)"],
+            "mainang":self.conditions[i]["Dp(degree)"],  # relative to true north
+            "gammajsp": 1.3,  # placeholder
+            "s": 0.18,     # placeholder
+            "duration": self.dt,
+            "dtbc": 60, # placeholder
+        })
+        
+        xb_setup.set_params({
+            # bed composition parameters
+            "D50": 0.000245,  # placeholder
+            "D90": 0.000367,  # placeholder
+            
+            # flow boundary condition parameters
+            "left": "neumann",
+            "right": "neumann",
+            
+            #flow parameters
+            # -----
+            # general
+            "befriccoef":0.01,  # placeholder
+            
+            # grid parameters
+            # most already specified with xb_setup.set_grid(...)
+            "thetamin": -90,
+            "thetamax": 90,
+            "dtheta": 15,
+            "thetanaut": 0,
+            
+            # model time
+            "tstop":self.dt,
+            
+            # morphology parameters
+            "morfac": 1,
+            "morstart": 0,
+            "ne_layer": "ne_layer.txt",
+            
+            # physical constant
+            "rho": 1025,
+            
+            # physical processes
+            "avalanching": 1,  # Turn on avalanching
+            "flow": 1,  # Turn on flow calculation
+            "lwave": 1,  # Turn on short wave forcing on nlsw equations and boundary conditions
+            "morphology": 1,  # Turn on morphology
+            "sedtrans": 1,  # Turn on sediment transport
+            "swave": 1,  # Turn on short waves
+            "swrunup": 1,  # Turn on short wave runup
+            "viscosity": 1,  # Include viscosity in flow solver
+            "wind": 1,  # Include wind in flow solver
+
+            # tide boundary conditions
+            "tideloc": 0,
+            # "zs0file":
+            "zs0":self.conditions[i]["SS(m)"],
+
+            # wave boundary conditions
+            "wavemodel":"surfbeat",
+            "break":"roelvink1",
+            "alpha":"0",  # direction of x-axis relative to east (placeholder)
+            
+            # wind boundary condition
+            # "windfile": wind.txt
+            "windh": 5, # placeholder
+            
+            # output variables
+            "outputformat":"netcdf",
+            "tint":3600,
+            "tstart":0,
+            "nglobalvar":["zb","zs","H","runup","sedero"]
+        })
+        
+        print(xb_setup)
+        
+        xb_setup.write_model(self.cwd)
+        
+        return None
+    
+    @classmethod
+    def start_xbeach(xbeach_path, params_path):
+        """
+        Running this function starts the XBeach module as a subprocess.
+        --------------------------
+        xbeach_path: str
+            string containing the file path to the xbeach executible from the project directory
+        params_path: str
+            string containing the file path to the params.txt file from the project directory
+        --------------------------
+
+        returns boolean (True if process was a sucess, False if not)
+        """
+
+        # Command to run XBeach
+        command = [xbeach_path, params_path]
+
+        # Call XBeach using subprocess
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # Wait for the process to finish and get the return code
+        stdout, stderr = process.communicate()
+        return_code = process.returncode
+
+        return return_code == 0
+    
+    # def _generate_batch_file(self):
+    #     xb_run_script_win()  # not used yet (could develop in future)
                 
     def update_bed_sedero(self, fp_xbeach_output):
         # Read output file
-        cum_sedero = np.loadtxt(os.path.join(fp_xbeach_output, "..."))
+        cum_sedero = np.loadtxt(fp_xbeach_output)
         
         # update bed level
         self.bed_current += cum_sedero
         
         # save current bed
         self.bed_timeseries.append(self.bed_current)
+        
+        return self.bed_current
+        
+    def write_ne_layer(self, fp="ne_layer.txt"):
+        """This function is used to write the current non-erodible layer to a file to be used by xbeach
+        """
+
+        np.savetxt("ne_layer.txt", self.ne_layer)
+        
+        return None
     
-    def export_bed(self):
-        self.bed.to_csv("...")
+    # def export_bed(self):
+    #     self.bed.to_csv("...")
     
-    def initialize_erodible_layer(self, fp_active_layer):
-        pass
+    # def initialize_erodible_layer(self, fp_active_layer):
+    #     pass
     
     def load_tide_conditions(self, fp_wave):
         pass
@@ -143,15 +275,19 @@ class Simulation():
     def load_wind_conditions(self, fp_wind):
         pass
     
-    def timesteps_with_xbeach_active(self, fp_storm):
+    def timesteps_with_xbeach_active(self, fp_storm, from_projection=True):
         
-        self.storm_timing = self._when_storms(fp_storm)
+        if from_projection:
+            self.storm_timing = self._when_storms_projection(fp_storm)
+        else:
+            pass # not implemented yet
+        
         self.xbeach_no_storms = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
         self.xbeach_times = self.storm_timing + self.xbeach_no_storms
 
         return self.xbeach_times
         
-    def _when_storms(self, fp_storm):
+    def _when_storms_projection(self, fp_storm):
         
         # determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
         st = np.zeros(self.T.shape)  # array of the same shape as t (0 when no storm, 1 when storm)
@@ -169,9 +305,7 @@ class Simulation():
                 day = 0
                 
                 for hour in range(duration+1):
-                    
-                    
-                    
+                   
                     if hour >= 24:
                         
                         day += 1
@@ -213,31 +347,7 @@ class Simulation():
     
     
     
-    @classmethod
-    def start_xbeach(xbeach_path, params_path):
-        """
-        Running this function starts the XBeach module as a subprocess.
-        --------------------------
-        xbeach_path: str
-            string containing the file path to the xbeach executible from the project directory
-        params_path: str
-            string containing the file path to the params.txt file from the project directory
-        --------------------------
-
-        returns boolean (True if process was a sucess, False if not)
-        """
-
-        # Command to run XBeach
-        command = [xbeach_path, params_path]
-
-        # Call XBeach using subprocess
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # Wait for the process to finish and get the return code
-        stdout, stderr = process.communicate()
-        return_code = process.returncode
-
-        return return_code == 0
+    
 
 
     # def write_xbeach_output(self, output_path, save_path):

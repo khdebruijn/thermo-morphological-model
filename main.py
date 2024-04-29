@@ -1,4 +1,5 @@
 import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -29,9 +30,8 @@ def main(sim):
         os.join(sim.proj_dir, "database/raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv")
         )
     
-    
     # generate initial grid files and save them
-    xgr, zgr = sim.generate_initial_grid(
+    xgr, zgr, ne_layer = sim.generate_initial_grid(
         config.model.nx, 
         config.model.ny, 
         config.model.len_x, 
@@ -41,6 +41,7 @@ def main(sim):
     
     
     # generate thermal model 1D output model files
+    
 
     # loop through timesteps
     for i in range(len(sim.T)):
@@ -48,18 +49,22 @@ def main(sim):
 
         # call thermal update routine
         
+        
         # generate updated 'ne_layer' file
+        current_bath = sim.update_bed_sedero("sedero.txt")
 
         # check if xbeach is enabled for current timestep
         if xb_times[i]:
+            print(f"starting xbeach for timestep {sim.timestamps[i]}")
             t_end   = config.xbeach.tstop
             
-            
-            
-            # generate params.txt file (including: grid/bathymetry, waves input, flow, tide and surge input, water level, wind input, sediment input, 
-            #                                      avalanching, vegetation input, drifters ipnut, output selection)
-
-            # call xbeach
+             # generate params.txt file 
+             # (including: grid/bathymetry, waves input, flow, tide and surge,
+             # water level, wind input, sediment input, avalanching, vegetation, 
+             # drifters ipnut, output selection)
+            sim.xbeach_setup(i)
+                       
+            # call xbeach (could include batch file?)
             run_succesful = sim.start_xbeach(
                 os.path.join(sim.proj_dir, "xbeach/XBeach_1.24.6057_Halloween_win64_netcdf/xbeach.exe"),
                 sim.cwd
@@ -71,7 +76,7 @@ def main(sim):
                 print(f"xbeach failed to run for timestep {sim.timestamps[i]} to {sim.timestamp[i+1]}")
 
             # copy updated morphology to thermal module and to new output file
-    
+            updated_bed = sim.update_bed_sedero("sedero.txt")
     
     return 
 
@@ -79,7 +84,7 @@ def main(sim):
 if __name__ == '__main__':
 
     # set the 'runid' to the model run that you would like to perform
-    runid = 'run_template'
+    runid = sys.argv[1]
     
     # initialize simulation
     sim = Simulation(runid)
