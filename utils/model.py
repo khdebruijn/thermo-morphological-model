@@ -10,6 +10,7 @@ import pandas as pd
 import xbTools
 from xbTools.grid.creation import xgrid, ygrid
 from xbTools.xbeachtools import XBeachModelSetup
+from xbTools.general.executing_runs import xb_run_script_win
 
 class Simulation():
     def __init__(self, runid):
@@ -28,7 +29,7 @@ class Simulation():
         
         return None
     
-    def read_config(config_file):
+    def read_config(self, config_file):
         '''
         Creates configuration variables from file
         ------
@@ -45,7 +46,7 @@ class Simulation():
                 super(AttrDict, self).__init__(*args, **kwargs)
                 self.__dict__ = self
                     
-        with open(config_file) as f:
+        with open(os.join(self.cwd, config_file)) as f:
             cfg = yaml.safe_load(f)
             
         config = AttrDict(cfg)
@@ -105,7 +106,7 @@ class Simulation():
         # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
         self.ne_layer = np.zeros(self.xgr.shape)
         
-        return self.xgr, self.zgr
+        return self.xgr, self.zgr, self.ne_layer
     
     # def export_grid(self):
     #     np.savetxt(self.config.xbeach.xfile, self.xgr)
@@ -188,7 +189,7 @@ class Simulation():
             # wave boundary conditions
             "wavemodel":"surfbeat",
             "break":"roelvink1",
-            "alpha":"0"  # direction of x-axis relative to east (placeholder)
+            "alpha":"0",  # direction of x-axis relative to east (placeholder)
             
             # wind boundary condition
             # "windfile": wind.txt
@@ -204,16 +205,49 @@ class Simulation():
         print(xb_setup)
         
         xb_setup.write_model(self.cwd)
+        
+        return None
+    
+    @classmethod
+    def start_xbeach(xbeach_path, params_path):
+        """
+        Running this function starts the XBeach module as a subprocess.
+        --------------------------
+        xbeach_path: str
+            string containing the file path to the xbeach executible from the project directory
+        params_path: str
+            string containing the file path to the params.txt file from the project directory
+        --------------------------
+
+        returns boolean (True if process was a sucess, False if not)
+        """
+
+        # Command to run XBeach
+        command = [xbeach_path, params_path]
+
+        # Call XBeach using subprocess
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # Wait for the process to finish and get the return code
+        stdout, stderr = process.communicate()
+        return_code = process.returncode
+
+        return return_code == 0
+    
+    # def _generate_batch_file(self):
+    #     xb_run_script_win()  # not used yet (could develop in future)
                 
     def update_bed_sedero(self, fp_xbeach_output):
         # Read output file
-        cum_sedero = np.loadtxt(os.path.join(fp_xbeach_output, "..."))
+        cum_sedero = np.loadtxt(fp_xbeach_output)
         
         # update bed level
         self.bed_current += cum_sedero
         
         # save current bed
         self.bed_timeseries.append(self.bed_current)
+        
+        return self.bed_current
         
     def write_ne_layer(self, fp="ne_layer.txt"):
         """This function is used to write the current non-erodible layer to a file to be used by xbeach
@@ -313,31 +347,7 @@ class Simulation():
     
     
     
-    @classmethod
-    def start_xbeach(xbeach_path, params_path):
-        """
-        Running this function starts the XBeach module as a subprocess.
-        --------------------------
-        xbeach_path: str
-            string containing the file path to the xbeach executible from the project directory
-        params_path: str
-            string containing the file path to the params.txt file from the project directory
-        --------------------------
-
-        returns boolean (True if process was a sucess, False if not)
-        """
-
-        # Command to run XBeach
-        command = [xbeach_path, params_path]
-
-        # Call XBeach using subprocess
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # Wait for the process to finish and get the return code
-        stdout, stderr = process.communicate()
-        return_code = process.returncode
-
-        return return_code == 0
+    
 
 
     # def write_xbeach_output(self, output_path, save_path):
