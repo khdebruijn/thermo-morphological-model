@@ -40,6 +40,14 @@ def main(sim):
         config.model.bathy_grid_path)
     
     
+    # generate file with forcing for thermal module
+    sim.generate_thermal_forcing_timeseries(
+        config.model.time_start,
+        config.model.time_end,
+        config.model.timestep,
+        os.path.join(sim.proj_dir, "datasets/ts_datasets/thermal_forcing.csv")
+        )
+    
     # generate thermal model 1D output model files
     
 
@@ -48,7 +56,9 @@ def main(sim):
         
 
         # call thermal update routine
-        
+        sea_ice = False # placeholder
+        if not(sea_ice and not config.thermal.with_sea_ice):
+            pass
         
         # generate updated 'ne_layer' file
         current_bath = sim.update_bed_sedero("sedero.txt")

@@ -49,12 +49,12 @@ class Simulation():
         with open(os.join(self.cwd, config_file)) as f:
             cfg = yaml.safe_load(f)
             
-        config = AttrDict(cfg)
+        self.config = AttrDict(cfg)
                 
         for key in cfg:
-            config[key] = AttrDict(cfg[key])
-                
-        return config
+            self.config[key] = AttrDict(cfg[key])
+                                
+        return self.config
         
     def set_temporal_params(self, t_start, t_end, dt):
         # this variable will be used to keep track of time
@@ -63,8 +63,10 @@ class Simulation():
         # time indexing is easier for numerical models    
         self.T = np.arange(0, len(self.timestamps), 1) 
         
-        # set time step
+        # set start and end time, and time step
         self.dt = dt
+        self.t_start = t_start
+        self.t_end = t_end
         
 
     def generate_initial_grid(self, nx, ny, len_x, len_y, 
@@ -120,18 +122,21 @@ class Simulation():
     def _load_grid_bathy(self, fp_bathy_grid):            
         with open(fp_bathy_grid) as f:
             self.bathy_grid = np.loadtxt(f)   
-            
-    def xbeach_setup(self, i):
+    
+    
+    
+    # XBEACH FUNCTIONS
+    def xbeach_setup(self, timestep_id):
         """This function initializes an xbeach run, i.e., it writes all inputs to files
         """
-        xb_setup = XBeachModelSetup(f"Run {self.directory}: timestep {i}")
+        xb_setup = XBeachModelSetup(f"Run {self.directory}: timestep {timestep_id}")
         
         xb_setup.set_grid(self.xgr, None, self.zgr, posdwn=-1)
         
         xb_setup.set_waves('jonstable', {
-            "Hm0":self.conditions[i]["Hs(m)"],
-            "Tp":self.conditions[i]["Tp(s)"],
-            "mainang":self.conditions[i]["Dp(degree)"],  # relative to true north
+            "Hm0":self.conditions[timestep_id]["Hs(m)"],
+            "Tp":self.conditions[timestep_id]["Tp(s)"],
+            "mainang":self.conditions[timestep_id]["Dp(degree)"],  # relative to true north
             "gammajsp": 1.3,  # placeholder
             "s": 0.18,     # placeholder
             "duration": self.dt,
@@ -184,7 +189,7 @@ class Simulation():
             # tide boundary conditions
             "tideloc": 0,
             # "zs0file":
-            "zs0":self.conditions[i]["SS(m)"],
+            "zs0":self.conditions[timestep_id]["SS(m)"],
 
             # wave boundary conditions
             "wavemodel":"surfbeat",
@@ -248,14 +253,6 @@ class Simulation():
         self.bed_timeseries.append(self.bed_current)
         
         return self.bed_current
-        
-    def write_ne_layer(self, fp="ne_layer.txt"):
-        """This function is used to write the current non-erodible layer to a file to be used by xbeach
-        """
-
-        np.savetxt("ne_layer.txt", self.ne_layer)
-        
-        return None
     
     # def export_bed(self):
     #     self.bed.to_csv("...")
@@ -342,11 +339,66 @@ class Simulation():
         
         return ct
         
+        
+        
+    # THERMAL FUNCTIONS
+    def initialize_thermal_module(self, fpath_initial_conditions):
+        # function to read initial conditions
+        self.active_layer_depth = self.generate_initial_conditions(self.t_start, fpath_initial_conditions)
+    
+    @classmethod
+    def generate_initial_conditions(t_start, fpath):
+        pass
+        
+        
+    def write_ne_layer(self, fp="ne_layer.txt"):
+        """This function is used to write the current non-erodible layer to a file to be used by xbeach
+        """
+
+        np.savetxt("ne_layer.txt", self.ne_layer)
+        
+        return None
+    
+    
+    def thermal_update(self, timestep_id):
+        
+        total_flux = np.zeros(self.xgr.shape)
+        
+        if self.config.thermal.with_solar:
+            total_flux += self._get_sw_solar_flux(timestep_id)
+        
+        if self.config.thermal.with_longwave:
+            total_flux += self._get_lw_flux(timestep_id)
+            
+        if self.config.thermal.with_convective:
+            total_flux += self._get_convective_flux(timestep_id)
+            
+        if self.config.thermal.with_latent:
+            total_flux += self._get_latent_flux(timestep_id)
+            
+        active_layer_depth = ...
+        
+    def _get_sw_solar_flux(self, timestep_id, fpath=...):
+        pass
+    
+    def _get_lw_flux(self, timestep_id, fpath=...):
+        pass
+    
+    def _get_convective_flux(self, timestep_id, fpath=...):
+        pass
+    
+    def _get_latent_flux(self, timestep_id, fpath=...):
+        pass
+        
     def run_simulation(self):
         pass
     
-    
-    
+    @classmethod
+    def generate_thermal_forcing_timeseries(t_start, t_end, dt, fpath):
+        
+        with open(fpath) as f:
+            
+        
     
 
 
