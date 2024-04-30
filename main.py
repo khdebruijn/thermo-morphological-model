@@ -1,6 +1,7 @@
 import os
 import sys
 
+from IPython import get_ipython
 import numpy as np
 import pandas as pd
 
@@ -92,6 +93,10 @@ def main(sim):
 
 
 if __name__ == '__main__':
+    
+    # reduce ipython cache size to free up memory
+    ipython = get_ipython()
+    ipython.Completer.cache_size = 5
 
     # set the 'runid' to the model run that you would like to perform
     runid = sys.argv[1]

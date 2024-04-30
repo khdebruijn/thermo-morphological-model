@@ -39,6 +39,8 @@ thermal:
   with_convective : True  # include convective heat transfer in thermal computation step
   with_latent     : True  # include latent heat in thermal computation step\
   with_sea_ice    : True  # indicates whether or not the thermal component is run during the period in which the sea is covered with ice
+  grid_resolution : 30  # number of points for each 1D thermal model
+  max_depth       : 3  # m, the maximum depth of the 1D thermal model
 
 # output
 output:

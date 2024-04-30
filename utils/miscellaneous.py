@@ -44,3 +44,24 @@ def plot_line_with_deviation(time_vector, variable, ax=None, **plt_kwargs):
     color = p[0].get_color()
     ax.fill_between(std.index, under_line, over_line, color=color, alpha=.3)
     return p
+
+def interpolate_points(x, y, num_points):
+    """
+    Interpolate points linearly between given points (x, y).
+    
+    Parameters:
+        x (array-like): X coordinates of the given points.
+        y (array-like): Y coordinates of the given points.
+        num_points (int): Number of points to interpolate between the given points.
+    
+    Returns:
+        np.ndarray: Array of interpolated points.
+    """
+    # Generate interpolated points using linspace
+    interpolated_x = np.linspace(x[0], x[-1], num_points)
+    interpolated_y = np.interp(interpolated_x, x, y)
+    
+    # Combine provided points and interpolated points
+    all_points = np.column_stack((interpolated_x, interpolated_y))
+    
+    return all_points

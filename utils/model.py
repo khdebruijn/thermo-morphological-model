@@ -12,6 +12,8 @@ from xbTools.grid.creation import xgrid, ygrid
 from xbTools.xbeachtools import XBeachModelSetup
 from xbTools.general.executing_runs import xb_run_script_win
 
+from utils.miscellaneous import interpolate_points
+
 class Simulation():
     def __init__(self, runid):
         self.runid = runid
@@ -24,6 +26,7 @@ class Simulation():
         # set working directory
         self.proj_dir = os.getcwd()
         self.cwd = os.path.join(os.getcwd(), 'runs', self.runid)
+        self.ts_dir = os.path.join(self.proj_dir, "database/ts_datasets/")
         
         os.chdir(self.cwd)    
         
@@ -343,13 +346,77 @@ class Simulation():
         
     # THERMAL FUNCTIONS
     def initialize_thermal_module(self, fpath_initial_conditions):
-        # function to read initial conditions
-        self.active_layer_depth = self.generate_initial_conditions(self.t_start, fpath_initial_conditions)
-    
-    @classmethod
-    def generate_initial_conditions(t_start, fpath):
-        pass
+       
+        # read in forcing concditions
+        fpath = os.path.join(self.proj_dir, "database/ts_datasets/")
+        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, os.path.join(fpath, "era5.csv"))
         
+        # read initial conditions
+        ground_temp_distr_dry, ground_temp_distr_wet = self._generate_initial_ground_temperature_distribution(self.forcing_data, 
+                                                                                                             self.t_start, 
+                                                                                                             self.config.thermal.grid_resolution,
+                                                                                                             self.config.thermal.max_depth)
+        # set these initial conditions for the xgr
+        self.temp_matrix = np.zeros((self.config.model.nx, self.config.thermal.grid_resolution))
+        
+        for i in range(len(self.temp_matrix)):
+            if self.zgr[i] >= 0:
+                self.temp_matrix[i,:] = ground_temp_distr_dry
+            else:
+                self.temp_matrix[i,:] = ground_temp_distr_wet
+        
+    @classmethod
+    def _generate_initial_ground_temperature_distribution(df, t_start, n, max_depth):
+        """This method generates an initial ground temperature distribution using soil temperature in different layers (read from 'df'),
+        at the first time step 't_start'. The depth between 0 and 'max_depth' is divided in 'n' grid points.
+        
+        The ECMWF Integrated Forecasting System (IFS) has a four-layer representation of soil, where the surface is at 0cm: 
+        Layer 1: 0 - 7cm, 
+        Layer 2: 7 - 28cm, 
+        Layer 3: 28 - 100cm, 
+        Layer 4: 100 - 289cm. 
+        Soil temperature is set at the middle of each layer, and heat transfer is calculated at the interfaces between them. 
+        It is assumed that there is no heat transfer out of the bottom of the lowest layer. Soil temperature is defined over the whole globe, 
+        even over ocean. Regions with a water surface can be masked out by only considering grid points where the land-sea mask has a value greater than 0.5. 
+        This parameter has units of kelvin (K). Temperature measured in kelvin can be converted to degrees Celsius (°C) by subtracting 273.15.
+        
+        Temperature is linearly interpolated for the entire depth, and assumed constant below the center of Layer 4, as well as constant above the center 
+        of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
+        exchange from the lower layers.
+        """
+        mask = (df['time'] == t_start)
+        row = df[mask]
+        
+        dry_points = np.array([
+            [0, df.soil_temperature_level_1.values[0]],
+            [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
+            [(0.28+0.07)/2, df.soil_temperature_level_2.values[0]],
+            [(1+0.28)/2, df.soil_temperature_level_3.values[0]],
+            [(2.89+1)/2, df.soil_temperature_level_4.values[0]],
+            [(2.29+max_depth)/2, df.soil_temperature_level_4.values[0]],
+        ])
+        
+        ground_temp_distr_dry = interpolate_points(dry_points[0,:], dry_points[1,:], n)
+        
+        wet_points = np.array([
+            [0, df.soil_temperature_level_1_offs.values[0]],
+            [(0.07+0)/2, df.soil_temperature_level_1_offs.values[0]],
+            [(0.28+0.07)/2, df.soil_temperature_level_2_offs.values[0]],
+            [(1+0.28)/2, df.soil_temperature_level_3_offs.values[0]],
+            [(2.89+1)/2, df.soil_temperature_level_4_offs.values[0]],
+            [(2.29+max_depth)/2, df.soil_temperature_level_4_offs.values[0]],
+        ])
+        
+        ground_temp_distr_wet = interpolate_points(wet_points[0,:], wet_points[1,:], n)
+        
+        return ground_temp_distr_dry, ground_temp_distr_wet
+        
+    def update_angles(self):
+        """This function geneartes an array of local angles (in radians) for the grid, based on the central differences method.
+        """
+        self.angles = np.gradient(self.zgr, self.xgr)
+        
+        return self.angles
         
     def write_ne_layer(self, fp="ne_layer.txt"):
         """This function is used to write the current non-erodible layer to a file to be used by xbeach
@@ -362,43 +429,81 @@ class Simulation():
     
     def thermal_update(self, timestep_id):
         
+        # first get the correct forcing timestep
+        mask = (self.forcing_data == timestep_id)
+        row = self.forcing_data[mask]
+        
+        # with associated values
+        air_temp = row["2m_temperature"].values[0]
+        sea_temp = row['sea_surface_temperature'].values[0]
+        
+        # get water level to check whether to use convective heat transfer from air or sea
+        water_level = ...
+        
+        dry_mask = (self.zgr >= water_level)
+        wet_mask = (self.zgr < water_level)
+        
+        # temperature difference for convective heat transfer (define temperature flux as positive when it is directed into the ground)
+        temp_diff_at_interface = (air_temp - self.temp_matrix[:,0]) * dry_mask + (sea_temp - self.temp_matrix[:,0]) * wet_mask
+        
         total_flux = np.zeros(self.xgr.shape)
+        conv_heat = np.zero(self.xgr.shape)
         
-        if self.config.thermal.with_solar:
-            total_flux += self._get_sw_solar_flux(timestep_id)
+        # if self.config.thermal.with_solar:
+        #     total_flux += self._get_sw_solar_flux(timestep_id)
         
-        if self.config.thermal.with_longwave:
-            total_flux += self._get_lw_flux(timestep_id)
+        # if self.config.thermal.with_longwave:
+        #     total_flux += self._get_lw_flux(timestep_id)
             
-        if self.config.thermal.with_convective:
-            total_flux += self._get_convective_flux(timestep_id)
+        # if self.config.thermal.with_convective:
+        #     total_flux += self._get_convective_flux(timestep_id)
             
-        if self.config.thermal.with_latent:
-            total_flux += self._get_latent_flux(timestep_id)
+        # if self.config.thermal.with_latent:
+        #     total_flux += self._get_latent_flux(timestep_id)
             
         active_layer_depth = ...
         
-    def _get_sw_solar_flux(self, timestep_id, fpath=...):
-        pass
-    
-    def _get_lw_flux(self, timestep_id, fpath=...):
-        pass
-    
-    def _get_convective_flux(self, timestep_id, fpath=...):
-        pass
-    
-    def _get_latent_flux(self, timestep_id, fpath=...):
-        pass
+    # functions below are used to quickly obtain values for forcing data
+    def _get_sw_flux(self, timestep_id):
+        return self.forcing_data["mean_surface_net_short_wave_radiation_flux.csv"].values[timestep_id]
+    def _get_lw_flux(self, timestep_id):
+        return self.forcing_data["mean_surface_net_long_wave_radiation_flux.csv"].values[timestep_id]
+    def _get_latent_flux(self, timestep_id):
+        return self.forcing_data["mean_surface_latent_heat_flux.csv"].values[timestep_id]
+    def _get_snow_depth(self, timestep_id):
+        return self.forcing_data["snow_depth.csv"].values[timestep_id]
+    def _get_sea_ice(self, timestep_id):
+        return self.forcing_data["sea_ice_cover.csv"].values[timestep_id]
+    def _get_2m_temp(self, timestep_id):
+        return self.forcing_data["2m_temperature.csv"].values[timestep_id]
+    def _get_sea_temp(self, timestep_id):
+        return self.forcing_data["sea_surface_temperature.csv"].values[timestep_id]
+    def _get_u_wind(self, timestep_id):
+        return self.forcing_data["10m_u_component_of_wind.csv"].values[timestep_id]
+    def _get_v_wind(self, timestep_id):
+        return self.forcing_data["10v_u_component_of_wind.csv"].values[timestep_id]
+    def _get_soil_temp(self, timestep_id, level=1):
+        if not level in [1, 2, 3, 4]:
+            raise ValueError("'level' variable should have a value of 1, 2, 3, or 4")
+        return self.forcing_data[f"soil_temperature_level_{level}.csv"].values[timestep_id]
+
+    @classmethod 
+    def _get_timeseries(tstart, tend, fpath):
+        """returns timeseries start from tstart and ending at tend. The filepath has to be specified.
         
-    def run_simulation(self):
-        pass
-    
-    @classmethod
-    def generate_thermal_forcing_timeseries(t_start, t_end, dt, fpath):
+        returns: pd.DataFrame of length T"""
         
         with open(fpath) as f:
+            df = pd.read_csv(f)
+            mask = (df["time"] >= tstart) * (df["time"] < tend)
             
-        
+            df = df[mask]
+            
+        return df
+            
+            
+    def run_simulation(self):
+        pass       
     
 
 
