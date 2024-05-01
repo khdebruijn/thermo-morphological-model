@@ -12,7 +12,7 @@ from xbTools.grid.creation import xgrid, ygrid
 from xbTools.xbeachtools import XBeachModelSetup
 from xbTools.general.executing_runs import xb_run_script_win
 
-from utils.miscellaneous import interpolate_points
+from utils.miscellaneous import interpolate_points, get_A_matrix, count_nonzero_until_zero
 
 class Simulation():
     def __init__(self, runid):
@@ -29,7 +29,17 @@ class Simulation():
         self.ts_dir = os.path.join(self.proj_dir, "database/ts_datasets/")
         
         os.chdir(self.cwd)    
+
+        # setup output location
+        if not os.path.exists(os.join(self.cwd, "results/")):
+            os.mkdir(os.path.join(self.cwd, "results/"))
+            
+        self.result_dir = os.path.join(self.cwd, "results/")
         
+        # create result files
+        for output_var in self.config.output.output_vars:
+            with open(os.path.join(self.result_dir, output_var, ".txt"), "w") as f:   
+                f.write("PLACEHOLDER HEADER")
         return None
     
     def read_config(self, config_file):
@@ -68,8 +78,8 @@ class Simulation():
         
         # set start and end time, and time step
         self.dt = dt
-        self.t_start = t_start
-        self.t_end = t_end
+        self.t_start = pd.to_datetime(t_start)
+        self.t_end = pd.to_datetime(t_end)
         
 
     def generate_initial_grid(self, nx, ny, len_x, len_y, 
@@ -176,7 +186,9 @@ class Simulation():
             "ne_layer": "ne_layer.txt",
             
             # physical constant
-            "rho": 1025,
+            "rho": self.config.xbeach.rho_sea_water,
+            "reposeangle": self.config.xbeach.reposeangle,
+            "vicmol": self.config.xbeach.visc_kin,
             
             # physical processes
             "avalanching": 1,  # Turn on avalanching
@@ -343,7 +355,6 @@ class Simulation():
         return ct
         
         
-        
     # THERMAL FUNCTIONS
     def initialize_thermal_module(self, fpath_initial_conditions):
        
@@ -356,14 +367,45 @@ class Simulation():
                                                                                                              self.t_start, 
                                                                                                              self.config.thermal.grid_resolution,
                                                                                                              self.config.thermal.max_depth)
-        # set these initial conditions for the xgr
+        self.thermal_zgr = ground_temp_distr_dry[:,0]
+        
+        # initialize temperature matrix, which is used to keep track of temperatures through the grid
         self.temp_matrix = np.zeros((self.config.model.nx, self.config.thermal.grid_resolution))
         
+        # set the above determined initial conditions for the xgr
         for i in range(len(self.temp_matrix)):
-            if self.zgr[i] >= 0:
-                self.temp_matrix[i,:] = ground_temp_distr_dry
+            if self.zgr[i] >= self.config.thermal.wl_switch:  # assume that the initial water level is at zero
+                self.temp_matrix[i,:] = ground_temp_distr_dry[:,1]
             else:
-                self.temp_matrix[i,:] = ground_temp_distr_wet
+                self.temp_matrix[i,:] = ground_temp_distr_wet[:,1]
+        
+        # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
+        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+        
+        # using the states, the initial enthalpy can be determined. The enthalpy matrix is used as the 'preserved' quantity, and is used to numerically solve the
+        # heat balance equation. Enthalpy formulation from Ravens et al. (2023).
+        self.enthalpy_matrix = \
+            frozen_mask * self.config.thermal.c_frozen_soil * self.temp_matrix + \
+            unfrozen_mask * (self.config.thermal.c_unfrozen_soil * self.temp_matrix + \
+                (self.config.thermal.c_unfrozen_soil - self.config.thermal.c_frozen_soil) * self.config.thermal.T_melt + \
+                    self.config.thermal.L_water_ice * self.config.thermal.nb)
+
+        # calculate the courant-friedlichs-lewy number and check that it is < 0.5, which is required for this discretization of the 1D heat equation
+        self.cfl_frozen = self.config.thermal.c_frozen_soil * self.config.thermal.k_frozen_soil * self.config.thermal.dt / (self.config.thermal.max_depth / (self.config.thermal.grid_resolution - 1))**2
+        self.cfl_unfrozen = self.config.thermal.c_unfrozen_soil * self.config.thermal.k_unfrozen_soil * self.config.thermal.dt / (self.config.thermal.max_depth / (self.config.thermal.grid_resolution - 1))**2
+        
+        if self.cfl_frozen >= 0.5:
+            raise ValueError("CFL should be smaller than 0.5!")
+        if self.cfl_unfrozen >= 0.5:
+            raise ValueError("CFL should be smaller than 0.5!")
+        
+        # get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points
+        # at the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative
+        self.A_matrix = get_A_matrix(self.config.thermal.grid_resolution)
+        
+        # which timesteps should have thermal output (i.e., thaw depth, and temperature distribution)
+        self.thermal_output_ids = self.T[::self.config.output.thermal_output_res]
         
     @classmethod
     def _generate_initial_ground_temperature_distribution(df, t_start, n, max_depth):
@@ -384,7 +426,7 @@ class Simulation():
         of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
         exchange from the lower layers.
         """
-        mask = (df['time'] == t_start)
+        mask = (df.time == t_start)
         row = df[mask]
         
         dry_points = np.array([
@@ -446,9 +488,10 @@ class Simulation():
         # temperature difference for convective heat transfer (define temperature flux as positive when it is directed into the ground)
         temp_diff_at_interface = (air_temp - self.temp_matrix[:,0]) * dry_mask + (sea_temp - self.temp_matrix[:,0]) * wet_mask
         
-        total_flux = np.zeros(self.xgr.shape)
-        conv_heat = np.zero(self.xgr.shape)
-        
+        latent_flux = np.zeros(self.xgr.shape)
+        radiation_flux = np.zeros(self.xgr.shape)
+        convective_flux = np.zero(self.xgr.shape)
+                
         # if self.config.thermal.with_solar:
         #     total_flux += self._get_sw_solar_flux(timestep_id)
         
@@ -460,8 +503,32 @@ class Simulation():
             
         # if self.config.thermal.with_latent:
         #     total_flux += self._get_latent_flux(timestep_id)
-            
-        active_layer_depth = ...
+        
+        flux_bc_top = latent_flux + radiation_flux + convective_flux
+
+        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+        
+        cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
+        
+        self.new_enthalpy_matrix = self.enthalpy_matrix + cfl_matrix * self.temp_matrix @ self.A_matrix
+        
+        # from this new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
+        # again, the state masks are used to make this calculation faster
+        self.temp_matrix = \
+            frozen_mask * (self.enthalpy_matrix / self.config.thermal.c_unfrozen_soil) + \
+            unfrozen_mask * (self.enthalpy_matrix - \
+                            (self.config.thermal.c_unfrozen_soil - self.config.thermal.c_frozen_soil) * self.config.thermal.T_melt - \
+                             self.config.thermal.L_water_ice * self.config.thermal.nb) / self.config.thermal.c_unfrozen_soil
+        
+        # get the number of grid points for each 1D model where the temperature exceeds the melting point (counted from the top until the first un-thawed point), 
+        # normalize with the total number of points, and multiply with the total grid length.
+        self.thaw_depth = count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt)) / self.config.thermal.grid_resolution * self.config.thermal.max_depth
+        
+    def write_thermal_output(self):
+        
+        # f.write()
+        
         
     # functions below are used to quickly obtain values for forcing data
     def _get_sw_flux(self, timestep_id):

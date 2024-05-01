@@ -64,6 +64,10 @@ def main(sim):
         # generate updated 'ne_layer' file
         current_bath = sim.update_bed_sedero("sedero.txt")
 
+        # write thaw depth to output file every output interval
+        if i in sim.thermal_output_ids:
+            sim.write_thermal_output()
+            
         # check if xbeach is enabled for current timestep
         if xb_times[i]:
             print(f"starting xbeach for timestep {sim.timestamps[i]}")
@@ -88,6 +92,9 @@ def main(sim):
 
             # copy updated morphology to thermal module and to new output file
             updated_bed = sim.update_bed_sedero("sedero.txt")
+            
+            # update grid
+            pass
     
     return 
 

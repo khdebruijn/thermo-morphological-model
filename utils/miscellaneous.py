@@ -65,3 +65,38 @@ def interpolate_points(x, y, num_points):
     all_points = np.column_stack((interpolated_x, interpolated_y))
     
     return all_points
+
+def get_A_matrix(n):
+    """ This function is used to get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points.
+        Att the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative.
+
+    Args:
+        n (int): number of points in the grid
+    """
+    # Initialize an empty square matrix
+    matrix = np.zeros((n, n))
+
+    # Fill the main diagonal with -2
+    np.fill_diagonal(matrix, -2)
+
+    # Fill the sub-diagonal with 1
+    np.fill_diagonal(matrix[1:], 1)
+
+    # Fill the super-diagonal with 1
+    np.fill_diagonal(matrix[:, 1:], 1)
+    
+    matrix[0,0] += 1
+    matrix[-1,-1] += 1
+
+    return matrix
+
+def count_nonzero_until_zero(matrix):
+    """Returns the number of grid points with a nonzero input, counted for each row from the lowest index until the first zero input.
+
+    Args:
+        matrix (np.array): a matrix
+
+    Returns:
+        result: number of grid points for each row before a zero input.
+    """
+    return np.argmax(matrix == 0, axis=1)
