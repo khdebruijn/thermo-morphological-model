@@ -525,9 +525,29 @@ class Simulation():
         # normalize with the total number of points, and multiply with the total grid length.
         self.thaw_depth = count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt)) / self.config.thermal.grid_resolution * self.config.thermal.max_depth
         
-    def write_thermal_output(self):
+    def write_ne_layer(self):
+        """This function writes the thaw depth obtained from the thermal update to a file to be used by xbeach.
+        """
+        np.savetxt(os.path.join(self.cwd, "ne_layer.txt"), self.thaw_depth)
         
-        # f.write()
+        return None
+        
+    def write_output(self, timestep_id):
+        """This function writes output in the results folder, and creates subfolders for each timestep for which results are output.
+        """
+        dir = os.path.join(self.result_dir, str(timestep_id) + "/")
+        
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        
+        if "bathymetry" in self.config.output.output_vars:
+            np.savetxt(os.path.join(dir, "bathymetry"), self.bathy_current)
+        if "ground_temperature_distribution" in self.config.output.output_vars:
+            np.savetxt(os.path.join(dir, "ground_temperature_distribution"), self.bathy_current)
+        if "thaw_depht" in self.config.output.output_vars:
+            np.savetxt(os.path.join(dir, "thaw_depht"), self.bathy_current)
+        
+        return None
         
         
     # functions below are used to quickly obtain values for forcing data

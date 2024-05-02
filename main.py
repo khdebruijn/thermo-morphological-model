@@ -64,9 +64,9 @@ def main(sim):
         # generate updated 'ne_layer' file
         current_bath = sim.update_bed_sedero("sedero.txt")
 
-        # write thaw depth to output file every output interval
-        if i in sim.thermal_output_ids:
-            sim.write_thermal_output()
+        # write output variables to output file every output interval
+        if i in sim.output_ids:
+            sim.write_output()
             
         # check if xbeach is enabled for current timestep
         if xb_times[i]:
