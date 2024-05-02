@@ -98,6 +98,7 @@ class Simulation():
         note that the current version is 1D and does not implement a grid in y-direction
         """
         
+        # Load initial bathymetry and the accompanying grid
         if bathy_path:
             self._load_bathy(
                 os.path.join(self.proj_dir, bathy_path)
@@ -111,12 +112,14 @@ class Simulation():
             )
         else:
             self._load_grid_bathy(os.path.join(self.cwd, "x.grd"))
-                
+        
+        # transform into a more suitable grid for xbeach
         self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2)
         self.zgr = np.interp(self.xgr, self.bath_grid, self.bathy_initial)
         
+        # save a copy of the grid, which serves as the bathymetry
         self.bathy_current = np.copy(self.zgr)
-        self.bathy_timeseries = [self.zgr]
+        # self.bathy_timeseries = [self.zgr]
         
         # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
         self.ne_layer = np.zeros(self.xgr.shape)
