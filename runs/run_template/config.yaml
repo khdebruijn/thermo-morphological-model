@@ -11,7 +11,7 @@ model:
   time_start: '01-01-1981'  # DD-MM-YY starting time (if -1 take entire dataset)
   time_end : '01-01-1982' # DD-MM-YY stopping time (if -1 take entire dataset)
   timestep: 1              # size of timesteps (in hours)
-  call_xbeach_inter:  168  #  xbeach is called during inter-storm periods every X hours (default: 168, i.e. 1 week)
+  call_xbeach_inter:  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
 
 # wrapper parameters:
 wrapper:
@@ -31,16 +31,37 @@ xbeach:
   dtheta:   '15'     # bin width
   wbctype: 'jons'   # type of wave boundary condition
   bcfile:  'filelist.txt'  # file ocntaining the bc specifications
+  reposeangle: 35  # [degrees] angle of repose used in xbeach (placeholder)
+  rho_sea_water : 1025  # [kg/m3] density (sea) water
+  rho_water     : 1000  # [kg/m3] density water
+  visc_kin      : 0.000006  # [m2/s] kinematic viscosity sea water (placeholder)
 
 # thermal moodel parameters
 thermal:
+  dt: 360  # [s] timestep used in the thermal model on the temporal subgrid
   with_solar      : True  # include short wave solar radiation in thermal computation step
   with_longwave   : True  # include longwave radiation (incoming & outgoining) in thermal computation step
   with_convective : True  # include convective heat transfer in thermal computation step
   with_latent     : True  # include latent heat in thermal computation step\
   with_sea_ice    : True  # indicates whether or not the thermal component is run during the period in which the sea is covered with ice
+  grid_resolution : 30  # number of points for each 1D thermal model
+  max_depth       : 3  # [m], the maximum depth of the 1D thermal model
+  # wl_switch       : 0  # [m], water level relative to outputted local water level at which is switched from wet to dry (positive means higher than output water level)
+  # dz_max          : 10 # [m/s/m] Maximum bed level change due to avalanching
+  T_melt          : 273.15  # [K] Melting temperature at the interface of water/air and bluff
+  nb              : 0.20  # [-] ground ice content
+  # rho_ice         : 971  # [kg/m3] density ice
+  L_water_ice     : 334000000 # [J/m3] latent heat of fusion water-ice
+  c_frozen_soil   : ...  # [J/K] heat capacity for frozen soil
+  c_unfrozen_soil : ...  # [J/K] heat capacity for unfrozen soil
+  # c_sea_water     : ...  # [J/K] heat capacity for seawater
+  k_frozen_soil   : ... #  [W/m/K] thermal conductivity for frozen soil
+  k_unfrozen_soil : ... #  [W/m/K] thermal conductivity for unfrozen soil
+  # k_sea_water     : ... #  [W/m/K] thermal conductivity for sea water
+
 
 # output
 output:
-  output_res  : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
-  output_var  : ["bath", "al_depth"]  # list of output variables
+  # path : 
+  thermal_output_res  : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
+  output_vars  : ["bathymetry", "ground_temperature_distribution", "thaw_depth"]  # list of output variables

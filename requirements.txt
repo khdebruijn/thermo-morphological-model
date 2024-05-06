@@ -9,3 +9,10 @@ yaml
 pyyaml
 xbTools
 datetime
+xarray
+netcdf4
+scipy
+h5netcdf
+dask
+bottleneck
+IPython
