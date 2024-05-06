@@ -12,17 +12,42 @@ from xbTools.grid.creation import xgrid, ygrid
 from xbTools.xbeachtools import XBeachModelSetup
 from xbTools.general.executing_runs import xb_run_script_win
 
-from utils.miscellaneous import interpolate_points, get_A_matrix, count_nonzero_until_zero
+from utils.miscellaneous import interpolate_points, get_A_matrix, count_nonzero_until_zero, generate_perpendicular_grids, linear_interp_with_nearest
 
 class Simulation():
-    def __init__(self, runid):
+    
+    ################################################
+    ##                                            ##
+    ##            # GENERAL FUNCTIONS             ##
+    ##                                            ##
+    ################################################
+    
+    def __init__(self, runid, config_file="config.yaml"):
+        """Initializer of the Simulation class. The runid is assigned, which is then used in the _set_directory method(). It also reads the configuration file.
+        -----
+        runid: string
+            string that contains the name of the folder in the runs directory, which is used for reading inputs and writing outputs.
+        config_file: string
+            string that contains the name of the configuration file, default config.yaml, in the runid folder"""
         self.runid = runid
         self._set_directory()
+        self.read_config(config_file)
     
     def __repr__(self) -> str:
-        return str(self.directory)
+        """Provides a string representation of the current simulation."""
+        
+        description = \
+            f"RUNID: {self.runid}\n" + \
+            f"PROJECT DIRECTORY: {self.proj_dir}\n" + \
+            f"CURRENT WORKING DIRECTORY: {self.cwd}\n" + \
+            f"TIMESERIES DIRECTORY: {self.ts_dir}\n" + \
+            f"RESULTS DIRECTORY: {self.result_dir}\n"
+            
+        return description
     
     def _set_directory(self):
+        """This method sets up the different directories used during the simulation, i.e. the project directory, the current working directory, the directory
+        containing the timeseries related to the forcing, and it creates a result directory with associated files."""
         # set working directory
         self.proj_dir = os.getcwd()
         self.cwd = os.path.join(os.getcwd(), 'runs', self.runid)
@@ -70,6 +95,7 @@ class Simulation():
         return self.config
         
     def set_temporal_params(self, t_start, t_end, dt):
+        """This method sets the temporal parameters used during the simulation."""
         # this variable will be used to keep track of time
         self.timestamps = pd.date_range(start=t_start, end=t_end, freq=f'{dt}h')
         
@@ -81,7 +107,6 @@ class Simulation():
         self.t_start = pd.to_datetime(t_start)
         self.t_end = pd.to_datetime(t_end)
         
-
     def generate_initial_grid(self, nx, ny, len_x, len_y, 
                               bathy_path=None,
                               bathy_grid_path=None):
@@ -115,14 +140,14 @@ class Simulation():
         
         # transform into a more suitable grid for xbeach
         self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2)
-        self.zgr = np.interp(self.xgr, self.bath_grid, self.bathy_initial)
+        self.zgr = np.interp(self.xgr, self.bathy_grid, self.bathy_initial)
         
         # save a copy of the grid, which serves as the bathymetry
         self.bathy_current = np.copy(self.zgr)
         # self.bathy_timeseries = [self.zgr]
         
         # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
-        self.ne_layer = np.zeros(self.xgr.shape)
+        self.thaw_depth = np.zeros(self.xgr.shape)
         
         return self.xgr, self.zgr, self.ne_layer
     
@@ -132,16 +157,36 @@ class Simulation():
 
     
     def _load_bathy(self, fp_initial_bathy):
+        """Method to load the initial bathymetry.
+        ------
+        fp_initial_bathy: string
+            filepath to the initial bathymetry (relative to the project directory)
+        """
         with open(fp_initial_bathy) as f:
             self.bathy_initial = np.loadtxt(f)
             
-    def _load_grid_bathy(self, fp_bathy_grid):            
+    def _load_grid_bathy(self, fp_bathy_grid):
+        """Method to load the initial bathymetry (x) grid.
+        ------
+        fp_initial_bathy: string
+            filepath to the initial bathymetry x grid (relative to the project directory)
+        """
         with open(fp_bathy_grid) as f:
-            self.bathy_grid = np.loadtxt(f)   
+            self.bathy_grid = np.loadtxt(f)
+            
+            
+    def load_forcing(self, fname_in_ts_datasets="era5.csv"):
+        """This function loads in the forcing data and makes it an attribute of the simulation instance"""
+        # read in forcing concditions
+        fpath = os.path.join(self.proj_dir, "database/ts_datasets/")
+        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, os.path.join(fpath, fname_in_ts_datasets))
+        return None
     
-    
-    
-    # XBEACH FUNCTIONS
+    ################################################
+    ##                                            ##
+    ##            # XBEACH FUNCTIONS              ##
+    ##                                            ##
+    ################################################
     def xbeach_setup(self, timestep_id):
         """This function initializes an xbeach run, i.e., it writes all inputs to files
         """
@@ -259,18 +304,7 @@ class Simulation():
     
     # def _generate_batch_file(self):
     #     xb_run_script_win()  # not used yet (could develop in future)
-                
-    def update_bed_sedero(self, fp_xbeach_output):
-        # Read output file
-        cum_sedero = np.loadtxt(fp_xbeach_output)
-        
-        # update bed level
-        self.bed_current += cum_sedero
-        
-        # save current bed
-        self.bed_timeseries.append(self.bed_current)
-        
-        return self.bed_current
+            
     
     # def export_bed(self):
     #     self.bed.to_csv("...")
@@ -297,8 +331,11 @@ class Simulation():
         else:
             pass # not implemented yet
         
-        self.xbeach_no_storms = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
-        self.xbeach_times = self.storm_timing + self.xbeach_no_storms
+        self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
+        
+        self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.xbeach.sea_ice_threshold)
+        
+        self.xbeach_times = (self.storm_timing + self.xbeach_inter) * self.xbeach_sea_ice
 
         return self.xbeach_times
         
@@ -356,20 +393,28 @@ class Simulation():
         ct[:,call_xbeach_inter] = 1
         
         return ct
+    
+    def _when_xbeach_no_sea_ice(self, sea_ice_threshold):
         
+        it =  (self.forcing_data.sea_ice_cover.values < sea_ice_threshold)
         
-    # THERMAL FUNCTIONS
-    def initialize_thermal_module(self, fpath_initial_conditions):
-       
-        # read in forcing concditions
-        fpath = os.path.join(self.proj_dir, "database/ts_datasets/")
-        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, os.path.join(fpath, "era5.csv"))
+        return it
+        
+    ################################################
+    ##                                            ##
+    ##            # THERMAL FUNCTIONS             ##
+    ##                                            ##
+    ################################################
+    def initialize_thermal_module(self):
         
         # read initial conditions
         ground_temp_distr_dry, ground_temp_distr_wet = self._generate_initial_ground_temperature_distribution(self.forcing_data, 
                                                                                                              self.t_start, 
                                                                                                              self.config.thermal.grid_resolution,
                                                                                                              self.config.thermal.max_depth)
+        # save the grid resolution
+        self.dz = self.config.thermal.max_depth / (self.config.thermal.grid_resolution - 1) 
+        
         self.thermal_zgr = ground_temp_distr_dry[:,0]
         
         # initialize temperature matrix, which is used to keep track of temperatures through the grid
@@ -409,7 +454,12 @@ class Simulation():
         
         # which timesteps should have thermal output (i.e., thaw depth, and temperature distribution)
         self.thermal_output_ids = self.T[::self.config.output.thermal_output_res]
-        
+    
+    def print_and_return_A_matrix(self):
+        """This function prints and returns the A_matrix"""
+        print(self.A_matrix)
+        return self.A_matrix
+    
     @classmethod
     def _generate_initial_ground_temperature_distribution(df, t_start, n, max_depth):
         """This method generates an initial ground temperature distribution using soil temperature in different layers (read from 'df'),
@@ -429,8 +479,7 @@ class Simulation():
         of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
         exchange from the lower layers.
         """
-        mask = (df.time == t_start)
-        row = df[mask]
+        row = df[df.time == t_start]
         
         dry_points = np.array([
             [0, df.soil_temperature_level_1.values[0]],
@@ -455,24 +504,33 @@ class Simulation():
         ground_temp_distr_wet = interpolate_points(wet_points[0,:], wet_points[1,:], n)
         
         return ground_temp_distr_dry, ground_temp_distr_wet
-        
-    def update_angles(self):
-        """This function geneartes an array of local angles (in radians) for the grid, based on the central differences method.
-        """
-        self.angles = np.gradient(self.zgr, self.xgr)
-        
-        return self.angles
-        
-    def write_ne_layer(self, fp="ne_layer.txt"):
-        """This function is used to write the current non-erodible layer to a file to be used by xbeach
-        """
-
-        np.savetxt("ne_layer.txt", self.ne_layer)
-        
-        return None
-    
     
     def thermal_update(self, timestep_id):
+        
+        # first get the new boundary condition
+        ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id)
+
+        # determine which part of the domain is frozen and unfrozen (needed to later calculate temperature from enthalpy)
+        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+        
+        # CFL number is different for different phases
+        cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
+        
+        # get the new enthalpy matrix
+        self.enthalpy_matrix = self.enthalpy_matrix + cfl_matrix * (np.column_stack((ghost_nodes_temperature, self.temp_matrix)) @ self.A_matrix)
+        
+        # from this new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
+        # again, the state masks are used to make this calculation faster
+        self.temp_matrix = \
+            frozen_mask * (self.enthalpy_matrix / self.config.thermal.c_unfrozen_soil) + \
+            unfrozen_mask * (self.enthalpy_matrix - \
+                            (self.config.thermal.c_unfrozen_soil - self.config.thermal.c_frozen_soil) * self.config.thermal.T_melt - \
+                             self.config.thermal.L_water_ice * self.config.thermal.nb) / self.config.thermal.c_unfrozen_soil
+        
+        return None
+     
+    def _get_ghost_node_boundary_condition(self, timestep_id):
         
         # first get the correct forcing timestep
         mask = (self.forcing_data == timestep_id)
@@ -483,7 +541,7 @@ class Simulation():
         sea_temp = row['sea_surface_temperature'].values[0]
         
         # get water level to check whether to use convective heat transfer from air or sea
-        water_level = ...
+        water_level = np.loadtxt("...")
         
         dry_mask = (self.zgr >= water_level)
         wet_mask = (self.zgr < water_level)
@@ -491,42 +549,86 @@ class Simulation():
         # temperature difference for convective heat transfer (define temperature flux as positive when it is directed into the ground)
         temp_diff_at_interface = (air_temp - self.temp_matrix[:,0]) * dry_mask + (sea_temp - self.temp_matrix[:,0]) * wet_mask
         
-        latent_flux = np.zeros(self.xgr.shape)
-        radiation_flux = np.zeros(self.xgr.shape)
-        convective_flux = np.zero(self.xgr.shape)
-                
-        # if self.config.thermal.with_solar:
-        #     total_flux += self._get_sw_solar_flux(timestep_id)
-        
-        # if self.config.thermal.with_longwave:
-        #     total_flux += self._get_lw_flux(timestep_id)
-            
-        # if self.config.thermal.with_convective:
-        #     total_flux += self._get_convective_flux(timestep_id)
-            
-        # if self.config.thermal.with_latent:
-        #     total_flux += self._get_latent_flux(timestep_id)
-        
-        flux_bc_top = latent_flux + radiation_flux + convective_flux
-
-        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+        # apply boundary conditions
+        frozen_mask = (self.temp_matrix[:,0] < self.config.thermal.T_melt)
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
-        
+
         cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
         
-        self.new_enthalpy_matrix = self.enthalpy_matrix + cfl_matrix * self.temp_matrix @ self.A_matrix
+        # calculate the new enthalpy
+        # 1) calculate temperature diffusion
+        ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.enthalpy_matrix[:,1])
+
+        # 2) add radiation, assuming radiation only influences the dry domain
+        ghost_nodes_enth += self.config.thermal.dt * dry_mask * \
+            (row["mean_surface_latent_heat_flux"] + row["mean_surface_net_short_wave_radiation_flux"] + row["mean_surface_net_long_wave_radiation_flux"])
         
-        # from this new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
-        # again, the state masks are used to make this calculation faster
-        self.temp_matrix = \
-            frozen_mask * (self.enthalpy_matrix / self.config.thermal.c_unfrozen_soil) + \
-            unfrozen_mask * (self.enthalpy_matrix - \
+        # 3) add convective heat transfer from water and air
+        ghost_nodes_enth += \
+            self.config.thermal.dt * \
+                temp_diff_at_interface * \
+                    (frozen_mask * self.thermal.k_frozen_soil + unfrozen_mask * self.thermal.k.unfrozen_soil) * \
+                self.dz # placeholder
+        
+        # determine the temperature distribution
+        ghost_nodes_temperature = \
+            frozen_mask * (self.ghost_nodes_enth / self.config.thermal.c_unfrozen_soil) + \
+            unfrozen_mask * (self.ghost_nodes_enth - \
                             (self.config.thermal.c_unfrozen_soil - self.config.thermal.c_frozen_soil) * self.config.thermal.T_melt - \
                              self.config.thermal.L_water_ice * self.config.thermal.nb) / self.config.thermal.c_unfrozen_soil
         
-        # get the number of grid points for each 1D model where the temperature exceeds the melting point (counted from the top until the first un-thawed point), 
-        # normalize with the total number of points, and multiply with the total grid length.
-        self.thaw_depth = count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt)) / self.config.thermal.grid_resolution * self.config.thermal.max_depth
+        return ghost_nodes_temperature
+    
+    def update_grid(self, fp_xbeach_output="sedero.txt"):
+        """This function updates the current grid, calculates the angles of the new grid with the horizontal, generates a new thermal grid 
+        (perpendicular to the existing grid), and fits the previous temperature and enthalpy distributions to the new grid."""
+        
+        # generate perpendicular grids for previous timestep (to cast temperature and enthalpy)
+        self.abs_xgr, self.abs_zgr = generate_perpendicular_grids(self.xgr, self.zgr)
+        
+        # update the current bathymetry
+        self._update_bed_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
+        
+        # generate a new xgrid and zgrid
+        self.xgr_new, self.zgr_new = xgrid(self.xgr, self.bathy_current, dxmin=2)
+        self.zgr_new = np.interp(self.xgr_new, self.xgr, self.bathy_current)
+        
+        # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
+        self.abs_xgr_new, self.abs_zgr_new = generate_perpendicular_grids(self.xgr_new, self.zgr_new)
+        
+        # cast temperature matrix
+        self.temp_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new)
+        self.enthalpy_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.enthalpy_matrix, self.abs_xgr_new, self.abs_zgr_new)
+
+        # set the grid to be equal to this new grid
+        self.xgr = self.xgr_new
+        self.zgr = self.zgr_new
+        
+        # update the angles
+        self._update_angles()
+        
+    def _update_angles(self):
+        """This function geneartes an array of local angles (in radians) for the grid, based on the central differences method.
+        """
+        self.angles = np.gradient(self.zgr, self.xgr)
+        
+        return self.angles
+    
+    def _update_bed_sedero(self, fp_xbeach_output):
+        """This method updates the current bed given the xbeach output.
+        ---------
+        fp_xbeach_output: string
+            filepath to the xbeach sedero (sedimentation-erosion) output relative to the current working directory."""
+        # Read output file
+        cum_sedero = np.loadtxt(fp_xbeach_output)
+        
+        # update bed level
+        self.bathy_current += cum_sedero
+        
+        # save current bed
+        self.bed_timeseries.append(self.bathy_current)
+        
+        return self.bathy_current
         
     def write_ne_layer(self):
         """This function writes the thaw depth obtained from the thermal update to a file to be used by xbeach.
@@ -534,6 +636,32 @@ class Simulation():
         np.savetxt(os.path.join(self.cwd, "ne_layer.txt"), self.thaw_depth)
         
         return None
+        
+    def find_thaw_depth(self):
+        """Finds thaw depth based on the maximum z-value close to the x-grid coordinate (i.e., +-0.5*dx) that is unthawed."""
+        # initialize thaw depth array
+        self.thaw_depth = np.zeros(self.xgr.shape)
+
+        # get the points from the temperature models
+        x_matrix, z_matrix = generate_perpendicular_grids(
+            self.xgr, self.zgr, 
+            resolution=self.config.thermal.grid_resolution, 
+            max_depth=self.config.thermal.max_depth)
+        
+        # determine in which interval to look for thaw depth
+        dx_min = np.min(self.xgr[1:] - self.xgr[:-1])
+        
+        # loop through x-coordinates, and find thaw depth for each coordinate
+        for i in range(len(self.xgr)):
+            
+            # selection of points to look at for current grid coordinate
+            mask = (x_matrix.flatten() > self.xgr[i] - 0.5 * dx_min) * (x_matrix.flatten() < self.xgr[i] + 0.5 * dx_min)
+            
+            # look at masked temperature matrix, use that to determine which points are thawed, and use the point with the highest z coordinate to calculate
+            # the thaw depth
+            self.thaw_depth[i] = self.zgr - np.max(self.zgr.flatten()[mask][self.temp_matrix.flatten()[mask] < self.config.thermal.T_melt])
+                
+        return self.thaw_depth
         
     def write_output(self, timestep_id):
         """This function writes output in the results folder, and creates subfolders for each timestep for which results are output.
@@ -543,15 +671,21 @@ class Simulation():
         if not os.path.exists(dir):
             os.makedirs(dir)
         
+        np.savetxt(os.path.join(dir, "xgr"), self.xgr)
+        np.savetxt(os.path.join(dir, "zgr"), self.zgr)
+        
+        np.savetxt(os.path.join(dir, "xgr"), self.thermal_zgr)
+
         if "bathymetry" in self.config.output.output_vars:
             np.savetxt(os.path.join(dir, "bathymetry"), self.bathy_current)
         if "ground_temperature_distribution" in self.config.output.output_vars:
-            np.savetxt(os.path.join(dir, "ground_temperature_distribution"), self.bathy_current)
+            np.savetxt(os.path.join(dir, "xgrid_ground_temperature_distribution"), self.abs_xgr_new.flatten())
+            np.savetxt(os.path.join(dir, "zgrid_ground_temperature_distribution"), self.abs_zgr_new.flatten())
+            np.savetxt(os.path.join(dir, "ground_temperature_distribution"), self.temp_matrix.flatten())
         if "thaw_depht" in self.config.output.output_vars:
-            np.savetxt(os.path.join(dir, "thaw_depht"), self.bathy_current)
+            np.savetxt(os.path.join(dir, "thaw_depht"), self.thaw_depth)
         
         return None
-        
         
     # functions below are used to quickly obtain values for forcing data
     def _get_sw_flux(self, timestep_id):
@@ -590,10 +724,15 @@ class Simulation():
             df = df[mask]
             
         return df
+    
+    # part of old thaw depth method:        
+    #   # get the number of grid points for each 1D model where the temperature exceeds the melting point (counted from the top until the first un-thawed point), 
+        # normalize with the total number of points, and multiply with the total grid length.
+        # self.thaw_depth = count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt)) / self.config.thermal.grid_resolution * self.config.thermal.max_depth
+    
             
-            
-    def run_simulation(self):
-        pass       
+    # def run_simulation(self):
+    #     pass       
     
 
 
