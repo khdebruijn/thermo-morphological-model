@@ -7,9 +7,6 @@ import pandas as pd
 
 from utils.model import Simulation
 
-from utils.load import read_config
-# from utils.model import generate_params, generate_grid, start_xbeach, write_xbeach_output
-
 def main(sim):
     """run this function to perform a simulation
 
@@ -30,7 +27,8 @@ def main(sim):
     
     # this variable is used to determine if xbeach should be ran for each timestep
     xb_times = sim.timesteps_with_xbeach_active(
-        os.join(sim.proj_dir, "database/raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv")
+        os.path.join(sim.proj_dir, "database/raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv"),
+        from_projection=True
         )
     
     # generate initial grid files and save them
@@ -92,7 +90,8 @@ if __name__ == '__main__':
     
     # reduce ipython cache size to free up memory
     ipython = get_ipython()
-    ipython.Completer.cache_size = 5
+    if ipython:
+        ipython.Completer.cache_size = 5
 
     # set the 'runid' to the model run that you would like to perform
     runid = sys.argv[1]

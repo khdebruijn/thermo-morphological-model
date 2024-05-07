@@ -4,6 +4,7 @@ import yaml
 from datetime import datetime
 import math
 
+from IPython.display import display
 import subprocess
 import matplotlib.pyplot as plt
 import numpy as np
@@ -35,6 +36,7 @@ class Simulation():
         self.runid = runid
         self._set_directory()
         self.read_config(config_file)
+        self._create_output_directory()
     
     def __repr__(self) -> str:
         """Provides a string representation of the current simulation."""
@@ -59,14 +61,15 @@ class Simulation():
         os.chdir(self.cwd)    
 
         # setup output location
-        if not os.path.exists(os.join(self.cwd, "results/")):
+        if not os.path.exists(os.path.join(self.cwd, "results/")):
             os.mkdir(os.path.join(self.cwd, "results/"))
             
         self.result_dir = os.path.join(self.cwd, "results/")
         
+    def _create_output_directory(self):
         # create result files
         for output_var in self.config.output.output_vars:
-            with open(os.path.join(self.result_dir, output_var, ".txt"), "w") as f:   
+            with open(os.path.join(self.result_dir, output_var + ".txt"), "w") as f:   
                 f.write("PLACEHOLDER HEADER")
         return None
     
@@ -87,7 +90,7 @@ class Simulation():
                 super(AttrDict, self).__init__(*args, **kwargs)
                 self.__dict__ = self
                     
-        with open(os.join(self.cwd, config_file)) as f:
+        with open(os.path.join(self.cwd, config_file)) as f:
             cfg = yaml.safe_load(f)
             
         self.config = AttrDict(cfg)
@@ -111,7 +114,7 @@ class Simulation():
         self.t_end = pd.to_datetime(t_end)
         
         # this array defines when to generate output files
-        self.temp_output_ids = np.arange(0, len(self.timestamps), self.config.output.thermal_output_resoutput_res)
+        self.temp_output_ids = np.arange(0, len(self.timestamps), self.config.output.output_res)
         
     def generate_initial_grid(self, nx, ny, len_x, len_y, 
                               bathy_path=None,
@@ -366,12 +369,12 @@ class Simulation():
         # determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
         st = np.zeros(self.T.shape)  # array of the same shape as t (0 when no storm, 1 when storm)
         
-        self.conditions = np.zeros(self.T.shape)  # also directly read wave conditions here
+        self.conditions = np.zeros(self.T.shape, dtype=object)  # also directly read wave conditions here
         
         with open(fp_storm) as f:
             
             df = pd.read_csv(f)
-            
+                        
             for index, data in df.iterrows():
                 
                 duration = int(data["Storm_duration(days)"] * 24)  # in hours
@@ -379,17 +382,35 @@ class Simulation():
                 day = 0
                 
                 for hour in range(duration+1):
-                   
-                    if hour >= 24:
-                        
-                        day += 1
-                        hour -= 24
+                    
+                    day = hour // 24
+                    hour = hour % 24
+                    
+                    if data.start_date_of_storm_month in [1, 3, 5, 7, 8, 10, 12] and data.start_date_of_storm_day + day > 31:
+                        month_length = 31
+                        end_of_month_storm = 1
+                    elif data.start_date_of_storm_month in [4, 6, 9, 11] and data.start_date_of_storm_day + day > 30:
+                        month_length = 30
+                        end_of_month_storm = 1
+                    elif data.start_date_of_storm_month in [2]:
+                        if data.start_date_of_storm_year in np.arange(1940, 2200, 4) and data.start_date_of_storm_day + day > 29:
+                            month_length = 29
+                            end_of_month_storm = 1
+                        elif data.start_date_of_storm_day + day > 28:
+                            month_length = 28
+                            end_of_month_storm = 1
+                    else:
+                        month_length = 0
+                        end_of_month_storm = 0
+                    
+                    print("day: ", day)
+                    print("hour: ", hour)
                     
                     timestamp = datetime(
                         data.start_date_of_storm_year, 
-                        data.start_date_of_storm_month, 
-                        data.start_date_of_storm_day + day, 
-                        12 + hour,  # assume storms always start at 12:00:00 during the day
+                        data.start_date_of_storm_month + end_of_month_storm, 
+                        data.start_date_of_storm_day + day - month_length, 
+                        hour,  # assume storms always start at 00:00:00 during the day
                         0, 
                         0
                         )
@@ -397,9 +418,9 @@ class Simulation():
                     t = np.argmax((timestamp == self.timestamps))  # we get the current timestep here
                     
                     st[t] += 1  #  make sure xbeach will be active for this timestep
-                    
+                                        
                     self.conditions[t] = {
-                       "Hso(m)": data[" Hso(m)"],
+                       "Hso(m)": data["Hso(m)"],
                        "Hs(m)": data["Hs(m)"],
                        "Dp(deg)": data["Dp(deg)"],
                        "Tp(s)": data["Tp(s)"],
@@ -747,15 +768,14 @@ class Simulation():
             raise ValueError("'level' variable should have a value of 1, 2, 3, or 4")
         return self.forcing_data[f"soil_temperature_level_{level}.csv"].values[timestep_id]
 
-    @classmethod 
-    def _get_timeseries(tstart, tend, fpath):
+    def _get_timeseries(self, tstart, tend, fpath):
         """returns timeseries start from tstart and ending at tend. The filepath has to be specified.
         
         returns: pd.DataFrame of length T"""
         
         with open(fpath) as f:
             df = pd.read_csv(f)
-            mask = (df["time"] >= tstart) * (df["time"] < tend)
+            mask = (pd.to_datetime(df["time"]) >= tstart) * (pd.to_datetime(df["time"]) < tend)
             
             df = df[mask]
             
