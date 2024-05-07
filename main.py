@@ -16,7 +16,6 @@ def main(sim):
     Args:
         sim (Simulation): instance of the Simulation class
     """
-    
     config = sim.read_config(config_file="config.yaml")
     
     # read temporal parameters
@@ -46,13 +45,13 @@ def main(sim):
     # initialize thermal model
     sim.initialize_thermal_module()
 
-    # loop through timesteps
+    # loop through (xbeach) timesteps
     for timestep_id in range(len(sim.T)):
         
-        sim.thermal_update()
-        
-        # generate updated 'ne_layer' file
-        current_bath = sim.update_bed_sedero("sedero.txt")
+        # loop through thermal subgrid timestep
+        for subgrid_timestep_id in np.arange(config.model.timestep * 3600 / config.thermal.dt):
+            
+            sim.thermal_update(timestep_id)
             
         # check if xbeach is enabled for current timestep
         if xb_times[timestep_id]:
@@ -64,9 +63,6 @@ def main(sim):
             sim.write_ne_layer()
                         
              # generate params.txt file 
-             # (including: grid/bathymetry, waves input, flow, tide and surge,
-             # water level, wind input, sediment input, avalanching, vegetation, 
-             # drifters ipnut, output selection)
             sim.xbeach_setup(timestep_id)
             
             print(f"starting xbeach for timestep {sim.timestamps[timestep_id]}")
@@ -86,8 +82,8 @@ def main(sim):
             sim.update_grid("sedero.txt")
             
         # write output variables to output file every output interval
-        if timestep_id in sim.output_ids:
-            sim.write_output()
+        if timestep_id in sim.temp_output_ids:
+            sim.write_output(timestep_id)
                 
     return sim.xgr, sim.zgr
 

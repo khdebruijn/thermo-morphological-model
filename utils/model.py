@@ -5,6 +5,7 @@ from datetime import datetime
 import math
 
 import subprocess
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString
@@ -109,6 +110,9 @@ class Simulation():
         self.t_start = pd.to_datetime(t_start)
         self.t_end = pd.to_datetime(t_end)
         
+        # this array defines when to generate output files
+        self.temp_output_ids = np.arange(0, len(self.timestamps), self.config.output.thermal_output_resoutput_res)
+        
     def generate_initial_grid(self, nx, ny, len_x, len_y, 
                               bathy_path=None,
                               bathy_grid_path=None):
@@ -208,6 +212,9 @@ class Simulation():
         
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
         
+        # (including: grid/bathymetry, waves input, flow, tide and surge,
+        # water level, wind input, sediment input, avalanching, vegetation, 
+        # drifters ipnut, output selection)
         xb_setup.set_params({
             # bed composition parameters
             "D50": 0.000245,  # placeholder
@@ -640,9 +647,6 @@ class Simulation():
         # update bed level
         self.bathy_current += cum_sedero
         
-        # save current bed
-        self.bed_timeseries.append(self.bathy_current)
-        
         return self.bathy_current
         
     def write_ne_layer(self):
@@ -757,6 +761,22 @@ class Simulation():
             
         return df
     
+    ################################################
+    ##                                            ##
+    ##            # PLOTTING FUNCTIONS            ##
+    ##                                            ##
+    ################################################
+    def plot_bathymetry(self):
+        
+        fig, ax = plt.subplots(figsize=(15, 5))
+        
+        ax.plot(self.xgr, self.zgr, label="bathymetry")
+        
+        ax.set_xlabel("x [m]")
+        ax.set_ylabel("z [m]")
+        
+        return fig
+            
     # part of old thaw depth method:        
     #   # get the number of grid points for each 1D model where the temperature exceeds the melting point (counted from the top until the first un-thawed point), 
         # normalize with the total number of points, and multiply with the total grid length.

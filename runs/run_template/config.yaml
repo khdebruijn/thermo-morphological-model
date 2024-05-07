@@ -65,5 +65,5 @@ thermal:
 # output
 output:
   # path : 
-  thermal_output_res  : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
+  output_res  : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
   output_vars  : ["bathymetry", "ground_temperature_distribution", "thaw_depth"]  # list of output variables
