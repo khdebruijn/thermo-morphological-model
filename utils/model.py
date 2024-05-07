@@ -2,6 +2,7 @@ import os
 import yaml
 
 from datetime import datetime
+import math
 
 import subprocess
 import numpy as np
@@ -204,6 +205,8 @@ class Simulation():
             "dtbc": 60, # placeholder
         })
         
+        wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
+        
         xb_setup.set_params({
             # bed composition parameters
             "D50": 0.000245,  # placeholder
@@ -220,6 +223,7 @@ class Simulation():
             
             # grid parameters
             # most already specified with xb_setup.set_grid(...)
+            "alfa": self.config.model.grid_orientation,
             "thetamin": -90,
             "thetamax": 90,
             "dtheta": 15,
@@ -260,8 +264,8 @@ class Simulation():
             "alpha":"0",  # direction of x-axis relative to east (placeholder)
             
             # wind boundary condition
-            # "windfile": wind.txt
-            "windh": 5, # placeholder
+            "windh": wind_direction,
+            "windv": wind_velocity,
             
             # output variables
             "outputformat":"netcdf",
@@ -321,8 +325,18 @@ class Simulation():
     #     with open(fp_wave) as f:
     #         pass
         
-    def load_wind_conditions(self, fp_wind):
-        pass
+    def _get_wind_conditions(self, timestep_id):
+        
+        row = self.forcing_data[self.forcing_data.index.values == timestep_id]
+        
+        u = row["10m_u_component_of_wind"]
+        v = row["10m_v_component_of_wind"]
+        
+        direction = math.atan2(u, v) / (2*np.pi) * 360
+        
+        velocity = math.sqrt(u**2 + v**2)
+        
+        return direction, velocity
     
     def timesteps_with_xbeach_active(self, fp_storm, from_projection=True):
         
@@ -533,7 +547,7 @@ class Simulation():
     def _get_ghost_node_boundary_condition(self, timestep_id):
         
         # first get the correct forcing timestep
-        mask = (self.forcing_data == timestep_id)
+        mask = (self.forcing_data.index.values == timestep_id)
         row = self.forcing_data[mask]
         
         # with associated values

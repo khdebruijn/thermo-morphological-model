@@ -12,6 +12,7 @@ model:
   time_end : '01-01-1982' # DD-MM-YY stopping time (if -1 take entire dataset)
   timestep: 1              # size of timesteps (in hours)
   call_xbeach_inter:  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
+  grid_orientation: 88.14  # [degrees], grid orientation with respect to east. The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook
 
 # wrapper parameters:
 wrapper:
@@ -35,6 +36,7 @@ xbeach:
   rho_sea_water : 1025  # [kg/m3] density (sea) water
   rho_water     : 1000  # [kg/m3] density water
   visc_kin      : 0.000006  # [m2/s] kinematic viscosity sea water (placeholder)
+  sea_ice_threshold: 0.20  # Only run xbeach if sea ice fraction is below threshold, otherwise assume all wave action attenuated
 
 # thermal moodel parameters
 thermal:
