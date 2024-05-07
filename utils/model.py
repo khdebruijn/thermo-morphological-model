@@ -7,6 +7,7 @@ import math
 import subprocess
 import numpy as np
 import pandas as pd
+from shapely.geometry import LineString
 
 import xbTools
 from xbTools.grid.creation import xgrid, ygrid
@@ -662,19 +663,36 @@ class Simulation():
             resolution=self.config.thermal.grid_resolution, 
             max_depth=self.config.thermal.max_depth)
         
-        # determine in which interval to look for thaw depth
-        dx_min = np.min(self.xgr[1:] - self.xgr[:-1])
+        # determine indices of thaw depth in perpendicular model
+        indices = count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt))
         
-        # loop through x-coordinates, and find thaw depth for each coordinate
-        for i in range(len(self.xgr)):
-            
-            # selection of points to look at for current grid coordinate
-            mask = (x_matrix.flatten() > self.xgr[i] - 0.5 * dx_min) * (x_matrix.flatten() < self.xgr[i] + 0.5 * dx_min)
-            
-            # look at masked temperature matrix, use that to determine which points are thawed, and use the point with the highest z coordinate to calculate
-            # the thaw depth
-            self.thaw_depth[i] = self.zgr - np.max(self.zgr.flatten()[mask][self.temp_matrix.flatten()[mask] < self.config.thermal.T_melt])
+        # find associated coordinates of these points
+        x_thaw = x_matrix[indices]
+        z_thaw = z_matrix[indices]
+        
+        # sort 
+        sort_indices = np.argsort(x_thaw)
+        x_thaw_sorted = x_thaw[sort_indices]
+        z_thaw_sorted = z_thaw[sort_indices]
+        
+        # loop through the grid        
+        for i, x, z in zip(np.arange(len(self.xgr)), self.xgr, self.zgr):
+            # try to find two points between which to interpolate for the thaw depth, otherwise set thaw depth to 0
+            try:
+                mask1 = (x_thaw_sorted < x)
+                x1 = x_thaw_sorted[mask1][-1]
+                z1 = z_thaw_sorted[mask1][-1]
                 
+                mask2 = (x_thaw_sorted > x)
+                x2 = x_thaw_sorted[mask2][0]
+                z2 = z_thaw_sorted[mask2][0]
+                
+                z_thaw_interpolated = z1 + (z2 - z1)/(x2 - x1) * (x - x1)
+                
+                self.thaw_depth[i] = z - (z_thaw_interpolated)
+            except:
+                self.thaw_depth[i] = 0
+        
         return self.thaw_depth
         
     def write_output(self, timestep_id):
@@ -744,6 +762,17 @@ class Simulation():
         # normalize with the total number of points, and multiply with the total grid length.
         # self.thaw_depth = count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt)) / self.config.thermal.grid_resolution * self.config.thermal.max_depth
     
+    # Also part of old thaw depth method (but a second iteration):
+    # # determine in which interval to look for thaw depth
+        # dx_min = np.min(self.xgr[1:] - self.xgr[:-1])
+        # # loop through x-coordinates, and find thaw depth for each coordinate
+        # for i in range(len(self.xgr)):
+        #     # selection of points to look at for current grid coordinate
+        #     mask = (x_matrix.flatten() > self.xgr[i] - 0.5 * dx_min) * (x_matrix.flatten() < self.xgr[i] + 0.5 * dx_min)
+        #     # look at masked temperature matrix, use that to determine which points are thawed, and use the point with the highest z coordinate to calculate
+        #     # the thaw depth
+        #     self.thaw_depth[i] = self.zgr - np.max(self.zgr.flatten()[mask][self.temp_matrix.flatten()[mask] < self.config.thermal.T_melt])
+                
             
     # def run_simulation(self):
     #     pass       

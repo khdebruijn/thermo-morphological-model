@@ -16,3 +16,4 @@ h5netcdf
 dask
 bottleneck
 IPython
+shapely

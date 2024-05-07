@@ -62,9 +62,18 @@ def count_nonzero_until_zero(matrix):
         matrix (np.array): a matrix
 
     Returns:
-        result: number of grid points for each row before a zero input.
+        result: number of grid points for each row before a zero input (-1 if no zeros in the entire row)
     """
-    return np.argmax(matrix == 0, axis=1)
+    
+    matrix = np.column_stack((matrix, np.zeros(matrix.shape[0])))
+    
+    indices = np.argmax(matrix == 0, axis=1)
+    
+    mask = (indices == matrix.shape[1]-1)
+    
+    indices[mask] = -1
+    
+    return indices
 
 def generate_perpendicular_grids(xgr, zgr, resolution=30, max_depth=3):
     """This function takes an xgrid and a zgrid, as well as a resolution and maximum depth, and returns a (temperature) grid perpendicular to the existing x and z-grid.
