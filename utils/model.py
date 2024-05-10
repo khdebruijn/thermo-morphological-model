@@ -97,21 +97,37 @@ class Simulation():
                 
         for key in cfg:
             self.config[key] = AttrDict(cfg[key])
+
+        # for sub_dic in self.config.keys():
+        #     for key in self.config[sub_dic].keys():
+                
+        #         try:
+        #             if float(self.config[sub_dic][key]) == int(self.config[sub_dic][key]):
+        #                 self.config[sub_dic][key] = int(self.config[sub_dic][key])
+        #             else:
+        #                 self.config[sub_dic][key] = float(self.config[sub_dic][key])
+                        
+        #         except ValueError:
+        #             pass
+        #         except TypeError:
+        #             pass
+        
                                 
         return self.config
         
     def set_temporal_params(self, t_start, t_end, dt):
         """This method sets the temporal parameters used during the simulation."""
-        # this variable will be used to keep track of time
-        self.timestamps = pd.date_range(start=t_start, end=t_end, freq=f'{dt}h')
-        
-        # time indexing is easier for numerical models    
-        self.T = np.arange(0, len(self.timestamps), 1) 
         
         # set start and end time, and time step
         self.dt = dt
         self.t_start = pd.to_datetime(t_start)
         self.t_end = pd.to_datetime(t_end)
+        
+        # this variable will be used to keep track of time
+        self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h')
+        
+        # time indexing is easier for numerical models    
+        self.T = np.arange(0, len(self.timestamps), 1) 
         
         # this array defines when to generate output files
         self.temp_output_ids = np.arange(0, len(self.timestamps), self.config.output.output_res)
@@ -135,14 +151,14 @@ class Simulation():
         # Load initial bathymetry and the accompanying grid
         if bathy_path:
             self._load_bathy(
-                os.path.join(self.proj_dir, bathy_path)
+                os.path.join(self.cwd, bathy_path)
             )
         else:
             self._load_bathy(os.path.join(self.cwd, "bed.dep"))
             
         if bathy_grid_path:
             self._load_grid_bathy(
-                os.path.join(self.proj_dir, bathy_grid_path)
+                os.path.join(self.cwd, bathy_grid_path)
             )
         else:
             self._load_grid_bathy(os.path.join(self.cwd, "x.grd"))
@@ -158,7 +174,7 @@ class Simulation():
         # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
         self.thaw_depth = np.zeros(self.xgr.shape)
         
-        return self.xgr, self.zgr, self.ne_layer
+        return self.xgr, self.zgr, self.thaw_depth
     
     # def export_grid(self):
     #     np.savetxt(self.config.xbeach.xfile, self.xgr)
@@ -359,13 +375,13 @@ class Simulation():
         self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
         
         self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.xbeach.sea_ice_threshold)
-        
+
         self.xbeach_times = (self.storm_timing + self.xbeach_inter) * self.xbeach_sea_ice
 
         return self.xbeach_times
-        
+    
     def _when_storms_projection(self, fp_storm):
-        
+
         # determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
         st = np.zeros(self.T.shape)  # array of the same shape as t (0 when no storm, 1 when storm)
         
@@ -373,74 +389,41 @@ class Simulation():
         
         with open(fp_storm) as f:
             
-            df = pd.read_csv(f)
-                        
-            for index, data in df.iterrows():
-                
-                duration = int(data["Storm_duration(days)"] * 24)  # in hours
-                
-                day = 0
-                
-                for hour in range(duration+1):
+            df = pd.read_csv(f, parse_dates=['time'])
+            
+            mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
+            
+            df = df[mask]
                     
-                    day = hour // 24
-                    hour = hour % 24
-                    
-                    if data.start_date_of_storm_month in [1, 3, 5, 7, 8, 10, 12] and data.start_date_of_storm_day + day > 31:
-                        month_length = 31
-                        end_of_month_storm = 1
-                    elif data.start_date_of_storm_month in [4, 6, 9, 11] and data.start_date_of_storm_day + day > 30:
-                        month_length = 30
-                        end_of_month_storm = 1
-                    elif data.start_date_of_storm_month in [2]:
-                        if data.start_date_of_storm_year in np.arange(1940, 2200, 4) and data.start_date_of_storm_day + day > 29:
-                            month_length = 29
-                            end_of_month_storm = 1
-                        elif data.start_date_of_storm_day + day > 28:
-                            month_length = 28
-                            end_of_month_storm = 1
-                    else:
-                        month_length = 0
-                        end_of_month_storm = 0
-                    
-                    print("day: ", day)
-                    print("hour: ", hour)
-                    
-                    timestamp = datetime(
-                        data.start_date_of_storm_year, 
-                        data.start_date_of_storm_month + end_of_month_storm, 
-                        data.start_date_of_storm_day + day - month_length, 
-                        hour,  # assume storms always start at 00:00:00 during the day
-                        0, 
-                        0
-                        )
-
-                    t = np.argmax((timestamp == self.timestamps))  # we get the current timestep here
-                    
-                    st[t] += 1  #  make sure xbeach will be active for this timestep
-                                        
-                    self.conditions[t] = {
-                       "Hso(m)": data["Hso(m)"],
-                       "Hs(m)": data["Hs(m)"],
-                       "Dp(deg)": data["Dp(deg)"],
-                       "Tp(s)": data["Tp(s)"],
-                       "SS(m)": data["SS(m)"],
-                       "Hindcast_or_projection": data["Hindcast_or_projection"]
+        for i, row in df.iterrows():
+            
+            index = np.argwhere(self.timestamps==row.time)
+            
+            st[index] = 1
+            
+            self.conditions[index] = {
+                       "Hso(m)": row["Hso(m)"],
+                       "Hs(m)": row["Hs(m)"],
+                       "Dp(deg)": row["Dp(deg)"],
+                       "Tp(s)": row["Tp(s)"],
+                       "SS(m)": row["SS(m)"],
+                       "Hindcast_or_projection": row["Hindcast_or_projection"]
                         }  # safe storm conditions for this timestep as well
+               
         return st
                 
     def _when_xbeach_inter(self, call_xbeach_inter):
         
         ct = np.zeros(self.T.shape)
         
-        ct[:,call_xbeach_inter] = 1
+        ct[::call_xbeach_inter] = 1
         
         return ct
     
     def _when_xbeach_no_sea_ice(self, sea_ice_threshold):
         
         it =  (self.forcing_data.sea_ice_cover.values < sea_ice_threshold)
-        
+                
         return it
         
     ################################################
@@ -477,14 +460,16 @@ class Simulation():
         # using the states, the initial enthalpy can be determined. The enthalpy matrix is used as the 'preserved' quantity, and is used to numerically solve the
         # heat balance equation. Enthalpy formulation from Ravens et al. (2023).
         self.enthalpy_matrix = \
-            frozen_mask * self.config.thermal.c_frozen_soil * self.temp_matrix + \
-            unfrozen_mask * (self.config.thermal.c_unfrozen_soil * self.temp_matrix + \
-                (self.config.thermal.c_unfrozen_soil - self.config.thermal.c_frozen_soil) * self.config.thermal.T_melt + \
-                    self.config.thermal.L_water_ice * self.config.thermal.nb)
+            frozen_mask * \
+                self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen * self.temp_matrix + \
+            unfrozen_mask * \
+                (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen * self.temp_matrix + \
+                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen * self.config.thermal.T_melt + \
+                self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb)
 
         # calculate the courant-friedlichs-lewy number and check that it is < 0.5, which is required for this discretization of the 1D heat equation
-        self.cfl_frozen = self.config.thermal.c_frozen_soil * self.config.thermal.k_frozen_soil * self.config.thermal.dt / (self.config.thermal.max_depth / (self.config.thermal.grid_resolution - 1))**2
-        self.cfl_unfrozen = self.config.thermal.c_unfrozen_soil * self.config.thermal.k_unfrozen_soil * self.config.thermal.dt / (self.config.thermal.max_depth / (self.config.thermal.grid_resolution - 1))**2
+        self.cfl_frozen = (self.config.thermal.k_soil_frozen / self.config.thermal.rho_soil_frozen) * (self.config.thermal.dt / (self.dz)**2)
+        self.cfl_unfrozen = (self.config.thermal.k_soil_unfrozen / self.config.thermal.rho_soil_unfrozen) * (self.config.thermal.dt / (self.dz)**2)
         
         if self.cfl_frozen >= 0.5:
             raise ValueError("CFL should be smaller than 0.5!")
@@ -504,7 +489,7 @@ class Simulation():
         return self.A_matrix
     
     @classmethod
-    def _generate_initial_ground_temperature_distribution(df, t_start, n, max_depth):
+    def _generate_initial_ground_temperature_distribution(self, df, t_start, n, max_depth):
         """This method generates an initial ground temperature distribution using soil temperature in different layers (read from 'df'),
         at the first time step 't_start'. The depth between 0 and 'max_depth' is divided in 'n' grid points.
         
@@ -566,10 +551,13 @@ class Simulation():
         # from this new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
         # again, the state masks are used to make this calculation faster
         self.temp_matrix = \
-            frozen_mask * (self.enthalpy_matrix / self.config.thermal.c_unfrozen_soil) + \
-            unfrozen_mask * (self.enthalpy_matrix - \
-                            (self.config.thermal.c_unfrozen_soil - self.config.thermal.c_frozen_soil) * self.config.thermal.T_melt - \
-                             self.config.thermal.L_water_ice * self.config.thermal.nb) / self.config.thermal.c_unfrozen_soil
+            frozen_mask * \
+                (self.enthalpy_matrix / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
+            unfrozen_mask * \
+                (self.enthalpy_matrix - \
+                ((self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen) * self.config.thermal.T_melt - \
+                self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) / \
+                    (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
         
         return None
      
@@ -600,25 +588,31 @@ class Simulation():
         
         # calculate the new enthalpy
         # 1) calculate temperature diffusion
-        ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.enthalpy_matrix[:,1])
+        ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.temp_matrix[:,1])
 
         # 2) add radiation, assuming radiation only influences the dry domain
-        ghost_nodes_enth += self.config.thermal.dt * dry_mask * \
-            (row["mean_surface_latent_heat_flux"] + row["mean_surface_net_short_wave_radiation_flux"] + row["mean_surface_net_long_wave_radiation_flux"])
+        ghost_nodes_enth += \
+            self.config.thermal.dt * dry_mask * \
+            (row["mean_surface_latent_heat_flux"] + row["mean_surface_net_short_wave_radiation_flux"] + row["mean_surface_net_long_wave_radiation_flux"]) / \
+            (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
         
         # 3) add convective heat transfer from water and air
         ghost_nodes_enth += \
             self.config.thermal.dt * \
-                temp_diff_at_interface * \
-                    (frozen_mask * self.thermal.k_frozen_soil + unfrozen_mask * self.thermal.k.unfrozen_soil) * \
-                self.dz # placeholder
+            temp_diff_at_interface * \
+                (frozen_mask * self.thermal.k_soil_frozen + unfrozen_mask * self.thermal.k_soil_unfrozen) * \
+            self.dz / \
+                (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
         
         # determine the temperature distribution
         ghost_nodes_temperature = \
-            frozen_mask * (self.ghost_nodes_enth / self.config.thermal.c_unfrozen_soil) + \
-            unfrozen_mask * (self.ghost_nodes_enth - \
-                            (self.config.thermal.c_unfrozen_soil - self.config.thermal.c_frozen_soil) * self.config.thermal.T_melt - \
-                             self.config.thermal.L_water_ice * self.config.thermal.nb) / self.config.thermal.c_unfrozen_soil
+            frozen_mask * \
+                (self.ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
+            unfrozen_mask * \
+                (self.ghost_nodes_enth - \
+                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen * self.config.thermal.T_melt - \
+                self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) \
+                    / (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
         
         return ghost_nodes_temperature
     
@@ -774,11 +768,12 @@ class Simulation():
         returns: pd.DataFrame of length T"""
         
         with open(fpath) as f:
-            df = pd.read_csv(f)
-            mask = (pd.to_datetime(df["time"]) >= tstart) * (pd.to_datetime(df["time"]) < tend)
+            df = pd.read_csv(f, parse_dates=['time'])
+                    
+            mask = (df["time"] >= tstart) * (df["time"] <= tend)
             
             df = df[mask]
-            
+                        
         return df
     
     ################################################
@@ -796,6 +791,94 @@ class Simulation():
         ax.set_ylabel("z [m]")
         
         return fig
+    
+    
+    
+    ################################################
+    ##                                            ##
+    ##            # LEGACY CODE                   ##
+    ##                                            ##
+    ################################################
+    
+    # Old storm timing function
+    # def _when_storms_projection(self, fp_storm):
+        
+    #     # determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
+    #     st = np.zeros(self.T.shape)  # array of the same shape as t (0 when no storm, 1 when storm)
+        
+    #     self.conditions = np.zeros(self.T.shape, dtype=object)  # also directly read wave conditions here
+        
+    #     with open(fp_storm) as f:
+            
+    #         df = pd.read_csv(f)
+            
+    #         mask = (df.time >= self.t_start) * (df.time <= self.t_end)
+            
+    #         df = df[mask]
+            
+    #     mask = 
+        
+    #     for storm_time in df.time.values:
+            
+    #         index = np.argwhere(self.timestamps==storm_time)
+            
+    #         st[index] = 1
+            
+    #         self.conditions[t] = {
+    #                    "Hso(m)": data["Hso(m)"],
+    #                    "Hs(m)": data["Hs(m)"],
+    #                    "Dp(deg)": data["Dp(deg)"],
+    #                    "Tp(s)": data["Tp(s)"],
+    #                    "SS(m)": data["SS(m)"],
+    #                    "Hindcast_or_projection": data["Hindcast_or_projection"]
+    #                     }  # safe storm conditions for this timestep as well
+            
+    #         for index, data in df.iterrows():
+                
+    #             duration = int(data["Storm_duration(days)"] * 24)  # in hours
+                
+    #             day = 0
+                
+    #             for hour in range(duration+1):
+                    
+    #                 day = hour // 24
+    #                 hour = hour % 24
+                    
+    #                 if data.start_date_of_storm_month in [1, 3, 5, 7, 8, 10, 12] and data.start_date_of_storm_day + day > 31:
+    #                     month_length = 31
+    #                     end_of_month_storm = 1
+    #                 elif data.start_date_of_storm_month in [4, 6, 9, 11] and data.start_date_of_storm_day + day > 30:
+    #                     month_length = 30
+    #                     end_of_month_storm = 1
+    #                 elif data.start_date_of_storm_month in [2]:
+    #                     if data.start_date_of_storm_year in np.arange(1940, 2200, 4) and data.start_date_of_storm_day + day > 29:
+    #                         month_length = 29
+    #                         end_of_month_storm = 1
+    #                     elif data.start_date_of_storm_day + day > 28:
+    #                         month_length = 28
+    #                         end_of_month_storm = 1
+    #                 else:
+    #                     month_length = 0
+    #                     end_of_month_storm = 0
+                    
+    #                 print("day: ", day)
+    #                 print("hour: ", hour)
+                    
+    #                 timestamp = datetime(
+    #                     data.start_date_of_storm_year, 
+    #                     data.start_date_of_storm_month + end_of_month_storm, 
+    #                     data.start_date_of_storm_day + day - month_length, 
+    #                     hour,  # assume storms always start at 00:00:00 during the day
+    #                     0, 
+    #                     0
+    #                     )
+
+    #                 t = np.argmax((timestamp == self.timestamps))  # we get the current timestep here
+                    
+    #                 st[t] += 1  #  make sure xbeach will be active for this timestep
+                                        
+                    
+    #     return st
             
     # part of old thaw depth method:        
     #   # get the number of grid points for each 1D model where the temperature exceeds the melting point (counted from the top until the first un-thawed point), 

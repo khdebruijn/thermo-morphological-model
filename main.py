@@ -27,7 +27,7 @@ def main(sim):
     
     # this variable is used to determine if xbeach should be ran for each timestep
     xb_times = sim.timesteps_with_xbeach_active(
-        os.path.join(sim.proj_dir, "database/raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv"),
+        os.path.join(sim.proj_dir, "database/ts_datasets/storms.csv"),
         from_projection=True
         )
     
@@ -37,8 +37,8 @@ def main(sim):
         config.model.ny, 
         config.model.len_x, 
         config.model.len_y,
-        config.model.bathy_path,
-        config.model.bathy_grid_path)
+        "bathy.txt",
+        "bathy_grid.txt")
     
     # initialize thermal model
     sim.initialize_thermal_module()
