@@ -14,25 +14,35 @@ model:
 # wrapper parameters:
 wrapper:
   dir:  'runs/...'         # location of model run
-  bathy_path: "database/bathy.txt"  # path to initial bathymetry
-  bathy_grid_path: "database/bathy_grid.txt"  # path to grid corresponding to initial bathymetry
+  sea_ice_threshold: 0.20  # Only run xbeach if sea ice fraction is below threshold, otherwise assume all wave action attenuated
   
 # xbeach parameters
 xbeach:
-  # version: '1.24'  # version of xbeach used
+  # general settings
+  version: '1.24'  # version of xbeach used
+
+  # grid settings
   xfile:   'x.grd'   # file used for the grid (x-direction)
-  yfile:   'y.grd'   # file used for the grid (y-direction)
   depfile: 'bed.dep'  # file used for the bed
   tstop:   '3600'    # length of xbeach simulation (in seconds), should be the same as model.timestep
   thetamin: '-90'  # minimum angle
   thetamax: '90'   # maximum angle
   dtheta:   '15'     # bin width
+
+  # hydrodynamics settings
   wbctype: 'jons'   # type of wave boundary condition
   bcfile:  'filelist.txt'  # file ocntaining the bc specifications
-  reposeangle: 35  # [degrees] angle of repose used in xbeach (placeholder)
   rho_sea_water : 1025  # [kg/m3] density (sea) water
   visc_kin      : 0.000006  # [m2/s] kinematic viscosity sea water (placeholder)
-  sea_ice_threshold: 0.20  # Only run xbeach if sea ice fraction is below threshold, otherwise assume all wave action attenuated
+
+  # sediment properties
+  reposeangle: 35  # [degrees] angle of repose used in xbeach (placeholder)
+  dryslp: 35  # [degrees] Critical avalanching slope above water (dz/dx and dz/dy) (placeholder)
+  wetslp: 35  # [degrees] Critical avalanching slope below water (dz/dx and dz/dy) (placeholder)
+  D50: 0.00190  # [m] mean grain size, value from erikson data (at waterline, a few km westward of the transect) 
+  rho_solid: 2650  # [kg/m3] density of sediment particles
+  bedfriccoef: 0.01  # [-] bed friction coefficient (placeholder)
+
 
 # thermal moodel parameters
 thermal:
@@ -70,6 +80,5 @@ thermal:
 
 # output
 output:
-  # path : 
   output_res  : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
   output_vars  : ["bathymetry", "ground_temperature_distribution", "thaw_depth"]  # list of output variables

@@ -97,22 +97,7 @@ class Simulation():
                 
         for key in cfg:
             self.config[key] = AttrDict(cfg[key])
-
-        # for sub_dic in self.config.keys():
-        #     for key in self.config[sub_dic].keys():
-                
-        #         try:
-        #             if float(self.config[sub_dic][key]) == int(self.config[sub_dic][key]):
-        #                 self.config[sub_dic][key] = int(self.config[sub_dic][key])
-        #             else:
-        #                 self.config[sub_dic][key] = float(self.config[sub_dic][key])
-                        
-        #         except ValueError:
-        #             pass
-        #         except TypeError:
-        #             pass
-        
-                                
+               
         return self.config
         
     def set_temporal_params(self, t_start, t_end, dt):
@@ -182,10 +167,6 @@ class Simulation():
         self.thaw_depth = np.zeros(self.xgr.shape)
         
         return self.xgr, self.zgr, self.thaw_depth
-    
-    # def export_grid(self):
-    #     np.savetxt(self.config.xbeach.xfile, self.xgr)
-    #     np.savetxt(self.config.xbeach.yfile, self.zgr)
 
     
     def _load_bathy(self, fp_initial_bathy):
@@ -242,9 +223,12 @@ class Simulation():
         # water level, wind input, sediment input, avalanching, vegetation, 
         # drifters ipnut, output selection)
         xb_setup.set_params({
-            # bed composition parameters
-            "D50": 0.000245,  # placeholder
-            "D90": 0.000367,  # placeholder
+            # sediment parameters
+            "D50": self.config.xbeach.D50,
+            "rhos": self.config.xbeach.rho_solid,
+            "reposeangle": self.config.xbeach.reposeangle,
+            "dryslp": self.config.xbeach.dryslp,
+            "wetslp": self.config.xbeach.wetslp,
             
             # flow boundary condition parameters
             "left": "neumann",
@@ -252,8 +236,9 @@ class Simulation():
             
             #flow parameters
             # -----
+
             # general
-            "befriccoef":0.01,  # placeholder
+            "befriccoef":self.config.xbeach.bedfriccoef,  # placeholder
             
             # grid parameters
             # most already specified with xb_setup.set_grid(...)
@@ -273,7 +258,6 @@ class Simulation():
             
             # physical constant
             "rho": self.config.xbeach.rho_sea_water,
-            "reposeangle": self.config.xbeach.reposeangle,
             "vicmol": self.config.xbeach.visc_kin,
             
             # physical processes
@@ -344,15 +328,8 @@ class Simulation():
     #     xb_run_script_win()  # not used yet (could develop in future)
             
     
-    # def export_bed(self):
-    #     self.bed.to_csv("...")
-    
-    # def initialize_erodible_layer(self, fp_active_layer):
+    # def load_tide_conditions(self, fp_wave):
     #     pass
-    
-    def load_tide_conditions(self, fp_wave):
-        pass
-    
     
     # def load_wave_conditions(self, fp_wave):
         
@@ -381,7 +358,7 @@ class Simulation():
         
         self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
         
-        self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.xbeach.sea_ice_threshold)
+        self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.wrapper.sea_ice_threshold)
 
         self.xbeach_times = (self.storm_timing + self.xbeach_inter) * self.xbeach_sea_ice
 
@@ -798,15 +775,24 @@ class Simulation():
     ##            # PLOTTING FUNCTIONS            ##
     ##                                            ##
     ################################################
-    def plot_bathymetry(self):
+    def plot_bathymetry(self, timestep_ids=[]):
         
         fig, ax = plt.subplots(figsize=(15, 5))
+
+        for timestep_id in timestep_ids:
+            
+            dir = os.path.join(self.result_dir, str(timestep_id))
+            
+            xgr = np.loadtxt("xgr.txt")
+            zgr = np.loadtxt("zgr.txt")
         
-        ax.plot(self.xgr, self.zgr, label="bathymetry")
+            ax.plot(xgr, zgr, label=f"timestep_id: {timestep_id}")
         
         ax.set_xlabel("x [m]")
         ax.set_ylabel("z [m]")
         
+        ax.legend()
+                
         return fig
     
     
@@ -816,6 +802,8 @@ class Simulation():
     ##            # LEGACY CODE                   ##
     ##                                            ##
     ################################################
+    
+    
     
     # Old storm timing function
     # def _when_storms_projection(self, fp_storm):
