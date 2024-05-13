@@ -5,9 +5,6 @@ dataset_parameters:
 # model settings
 model:
   nx: 100  # number of points in x-direction
-  ny: 0    # number of points in y-direction
-  len_x: 4000  # length of the grid in x-direction (m), starting from the baseline (x=0)
-  len_y: 0    # length of the grid in y-direction (m)
   time_start: '01-08-2020'  # DD-MM-YY starting time (if -1 take entire dataset)
   time_end : '01-09-2020' # DD-MM-YY stopping time (if -1 take entire dataset)
   timestep: 1              # size of timesteps (in hours)
@@ -47,7 +44,7 @@ thermal:
   with_sea_ice    : True  # indicates whether or not the thermal component is run during the period in which the sea is covered with ice
   
   # model properties
-  dt: 360  # [s] timestep used in the thermal model on the temporal subgrid
+  dt: 2  # [s] timestep used in the thermal model on the temporal subgrid
   grid_resolution : 30  # number of points for each 1D thermal model
   max_depth       : 3  # [m], the maximum depth of the 1D thermal model
   # dz_max          : 10 # [m/s/m] Maximum bed level change due to avalanching
@@ -67,8 +64,8 @@ thermal:
   nb              : 0.65  # [-] ground ice content (Ravens et al, 2023: 0.65 - 0.45)
   c_soil_frozen   : 4600000  # [J/K/m3] heat capacity for frozen soil (Ravens et al, 2023)
   c_soil_unfrozen : 7000000  # [J/K/m3] heat capacity for unfrozen soil (Ravens et al, 2023)
-  k_frozen_soil   : 2.7 #  [W/m/K] thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
-  k_unfrozen_soil : 1.5 #  [W/m/K] thermal conductivity for unfrozen soil (Ravens et al, 2023: 0.6 - 1.5)
+  k_soil_frozen   : 2.7 #  [W/m/K] thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
+  k_soil_unfrozen : 1.5 #  [W/m/K] thermal conductivity for unfrozen soil (Ravens et al, 2023: 0.6 - 1.5)
 
 
 # output

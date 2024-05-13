@@ -3,6 +3,24 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import LinearNDInterpolator
 
+def textbox(text):
+    """Function to quickly generate text boxes
+
+    Args:
+        text (_type_): _description_
+    """
+    row_length = len(text) + 6
+    
+    row0 = row_length * "%" + "\n"
+    row1 = "%" + (row_length-2) * " " + "%" + "\n"
+    row2 = f"%  {text}  %" + "\n"
+    row3 = row1
+    row4 = row_length * "%"
+
+    total_text = row0 + row1 + row2 + row3 + row4
+    
+    return total_text
+
 def interpolate_points(x, y, num_points):
     """
     Interpolate points linearly between given points (x, y).

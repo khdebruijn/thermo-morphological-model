@@ -15,4 +15,6 @@ database/ts_datasets/*.csv
 
 database/initial_conditions/*.txt
 
+runs/*/results/*/*.txt
+
 .env

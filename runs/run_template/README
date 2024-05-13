@@ -10,9 +10,13 @@ File with bathymetry information. It simply contains the heights for all grid po
 x.grd:
 File with x-coordinates of the grid. This file is only used with a non-equidistant grid.
 
-y.grd:
-File with y-coordinates of the grid. This file is only used with a non-equidistant two-dimensional grid.
-
 jonswap.txt:
 File with boundary condition information. In this case the description of a JONSWAP spectrum. Severel flavours exist for this file. This one has a syntax similar to the params.txt file.
+For the current version of the model, boundary conditions are read directly from the database.
+
+config.yaml
+File with model settings.
+
+results folder:
+Generated when running the thermo-morphological model. It contains subfolders for all output timestep ids. The output resolution can be defined in the config.yaml file, as well as the variables that should be output.
 

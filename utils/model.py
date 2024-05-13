@@ -132,7 +132,9 @@ class Simulation():
         # this array defines when to generate output files
         self.temp_output_ids = np.arange(0, len(self.timestamps), self.config.output.output_res)
         
-    def generate_initial_grid(self, nx, ny, len_x, len_y, 
+    def generate_initial_grid(self, 
+                              nx=None, 
+                              len_x=None, 
                               bathy_path=None,
                               bathy_grid_path=None):
         """Generates grid files (x.grd & y.grd) from given nx and ny.
@@ -163,8 +165,13 @@ class Simulation():
         else:
             self._load_grid_bathy(os.path.join(self.cwd, "x.grd"))
         
-        # transform into a more suitable grid for xbeach
-        self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2)
+        # check whether to use an xbeach generated xgrid or to generate uniform grid using linspace
+        if nx:
+            self.xgr = np.linspace(min(self.bathy_grid), max(self.bathy_grid), self.config.model.nx)
+        else:
+            # transform into a more suitable grid for xbeach
+            self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2)
+            
         self.zgr = np.interp(self.xgr, self.bathy_grid, self.bathy_initial)
         
         # save a copy of the grid, which serves as the bathymetry
@@ -444,7 +451,10 @@ class Simulation():
         self.thermal_zgr = ground_temp_distr_dry[:,0]
         
         # initialize temperature matrix, which is used to keep track of temperatures through the grid
-        self.temp_matrix = np.zeros((self.config.model.nx, self.config.thermal.grid_resolution))
+        self.temp_matrix = np.zeros((len(self.xgr), self.config.thermal.grid_resolution))
+        
+        # initialize the associated grid
+        self.abs_xgr_new, self.abs_zgr_new = generate_perpendicular_grids(self.xgr, self.zgr)
         
         # set the above determined initial conditions for the xgr
         for i in range(len(self.temp_matrix)):
@@ -481,7 +491,7 @@ class Simulation():
         self.A_matrix = get_A_matrix(self.config.thermal.grid_resolution)
         
         # which timesteps should have thermal output (i.e., thaw depth, and temperature distribution)
-        self.thermal_output_ids = self.T[::self.config.output.thermal_output_res]
+        self.thermal_output_ids = self.T[::self.config.output.output_res]
     
     def print_and_return_A_matrix(self):
         """This function prints and returns the A_matrix"""
@@ -533,11 +543,14 @@ class Simulation():
         
         return ground_temp_distr_dry, ground_temp_distr_wet
     
-    def thermal_update(self, timestep_id):
+    def thermal_update(self, timestep_id, subgrid_timestep_id):
+        # Only update boundary condition if it's the first time step of the thermal subgrid,
+        # as the boundary condition is constant over the subgrid
+        if subgrid_timestep_id == 0:
+            
+            # get the new boundary condition
+            self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id)
         
-        # first get the new boundary condition
-        ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id)
-
         # determine which part of the domain is frozen and unfrozen (needed to later calculate temperature from enthalpy)
         frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
@@ -546,7 +559,7 @@ class Simulation():
         cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
         
         # get the new enthalpy matrix
-        self.enthalpy_matrix = self.enthalpy_matrix + cfl_matrix * (np.column_stack((ghost_nodes_temperature, self.temp_matrix)) @ self.A_matrix)
+        self.enthalpy_matrix = self.enthalpy_matrix + cfl_matrix * (np.column_stack((self.ghost_nodes_temperature, self.temp_matrix)) @ self.A_matrix)
         
         # from this new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
         # again, the state masks are used to make this calculation faster
@@ -564,15 +577,19 @@ class Simulation():
     def _get_ghost_node_boundary_condition(self, timestep_id):
         
         # first get the correct forcing timestep
-        mask = (self.forcing_data.index.values == timestep_id)
-        row = self.forcing_data[mask]
+        row = self.forcing_data.iloc[timestep_id]
         
         # with associated values
-        air_temp = row["2m_temperature"].values[0]
-        sea_temp = row['sea_surface_temperature'].values[0]
+        air_temp = row["2m_temperature"]
+        sea_temp = row['sea_surface_temperature']
         
-        # get water level to check whether to use convective heat transfer from air or sea
-        water_level = np.loadtxt("...")
+        # check wether or not this will be a storm timestep. If it is, use the storm surge water level.
+        # otherwise, use a water level of z=0
+        if self.xbeach_times[timestep_id]:
+            # get water level to check whether to use convective heat transfer from air or sea
+            water_level = self.conditions[timestep_id]["SS(m)"]
+        else:
+            water_level = 0
         
         dry_mask = (self.zgr >= water_level)
         wet_mask = (self.zgr < water_level)
@@ -600,16 +617,16 @@ class Simulation():
         ghost_nodes_enth += \
             self.config.thermal.dt * \
             temp_diff_at_interface * \
-                (frozen_mask * self.thermal.k_soil_frozen + unfrozen_mask * self.thermal.k_soil_unfrozen) * \
+                (frozen_mask * self.config.thermal.k_soil_frozen + unfrozen_mask * self.config.thermal.k_soil_unfrozen) * \
             self.dz / \
                 (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
         
         # determine the temperature distribution
         ghost_nodes_temperature = \
             frozen_mask * \
-                (self.ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
+                (ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
             unfrozen_mask * \
-                (self.ghost_nodes_enth - \
+                (ghost_nodes_enth - \
                 (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen * self.config.thermal.T_melt - \
                 self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) \
                     / (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
@@ -717,24 +734,24 @@ class Simulation():
     def write_output(self, timestep_id):
         """This function writes output in the results folder, and creates subfolders for each timestep for which results are output.
         """
-        dir = os.path.join(self.result_dir, str(timestep_id) + "/")
+        result_dir_timestep = os.path.join(self.result_dir, str(timestep_id) + "/")
         
-        if not os.path.exists(dir):
-            os.makedirs(dir)
+        # create directory
+        if not os.path.exists(result_dir_timestep):
+            os.makedirs(result_dir_timestep)
         
-        np.savetxt(os.path.join(dir, "xgr"), self.xgr)
-        np.savetxt(os.path.join(dir, "zgr"), self.zgr)
-        
-        np.savetxt(os.path.join(dir, "xgr"), self.thermal_zgr)
-
         if "bathymetry" in self.config.output.output_vars:
-            np.savetxt(os.path.join(dir, "bathymetry"), self.bathy_current)
+            # save xgrid and zgrid of bathymetry
+            np.savetxt(os.path.join(result_dir_timestep, "xgr.txt"), self.xgr)
+            np.savetxt(os.path.join(result_dir_timestep, "zgr.txt"), self.zgr)
+        
         if "ground_temperature_distribution" in self.config.output.output_vars:
-            np.savetxt(os.path.join(dir, "xgrid_ground_temperature_distribution"), self.abs_xgr_new.flatten())
-            np.savetxt(os.path.join(dir, "zgrid_ground_temperature_distribution"), self.abs_zgr_new.flatten())
-            np.savetxt(os.path.join(dir, "ground_temperature_distribution"), self.temp_matrix.flatten())
-        if "thaw_depht" in self.config.output.output_vars:
-            np.savetxt(os.path.join(dir, "thaw_depht"), self.thaw_depth)
+            np.savetxt(os.path.join(result_dir_timestep, "xgrid_ground_temperature_distribution.txt"), self.abs_xgr_new.flatten())
+            np.savetxt(os.path.join(result_dir_timestep, "zgrid_ground_temperature_distribution.txt"), self.abs_zgr_new.flatten())
+            np.savetxt(os.path.join(result_dir_timestep, "ground_temperature_distribution.txt"), self.temp_matrix.flatten())
+        
+        if "thaw_depth" in self.config.output.output_vars:
+            np.savetxt(os.path.join(result_dir_timestep, "thaw_depht"), self.thaw_depth)
         
         return None
         

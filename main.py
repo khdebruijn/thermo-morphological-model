@@ -6,50 +6,64 @@ import numpy as np
 import pandas as pd
 
 from utils.model import Simulation
+from utils.miscellaneous import textbox
 
-def main(sim):
+def main(sim, print_report=False):
     """run this function to perform a simulation
 
     Args:
         sim (Simulation): instance of the Simulation class
     """
-    config = sim.read_config(config_file="config.yaml")
+    print(textbox("INITIALIZING SIMULATION"))
+    print(f"{repr(sim)}")
     
+    config = sim.read_config(config_file="config.yaml")
+    print("succesfully read configuration")
+
     # read temporal parameters
     sim.set_temporal_params(
         config.model.time_start,
         config.model.time_end,
         config.model.timestep
         )
+    print("succesfully set temporal parameters")
     
     # load in forcing data
     sim.load_forcing(fname_in_ts_datasets="era5.csv")
+    print("succesfully loaded forcing")
     
     # this variable is used to determine if xbeach should be ran for each timestep
     xb_times = sim.timesteps_with_xbeach_active(
         os.path.join(sim.proj_dir, "database/ts_datasets/storms.csv"),
         from_projection=True
         )
+    print("succesfully generated xbeach times")
     
     # generate initial grid files and save them
     xgr, zgr, ne_layer = sim.generate_initial_grid(
-        config.model.nx, 
-        config.model.ny, 
-        config.model.len_x, 
-        config.model.len_y,
-        "bathy.txt",
-        "bathy_grid.txt")
+        bathy_path="bathy.txt",
+        bathy_grid_path="bathy_grid.txt"
+        )
+    print("succesfully generated grid")
     
     # initialize thermal model
     sim.initialize_thermal_module()
+    print("succesfully initialized thermal module\n")
+    
+    print(textbox("CFL VALUES"))
+    print(f"CFL frozen soil: {sim.cfl_frozen:.4f}")
+    print(f"CFL unfrozen soil: {sim.cfl_unfrozen:.4f}\n")
 
     # loop through (xbeach) timesteps
+    print(textbox("STARTING SIMULATION"))
     for timestep_id in range(len(sim.T)):
         
+        print(f"timestep {timestep_id+1}/{len(sim.T)}")
+        
         # loop through thermal subgrid timestep
-        for subgrid_timestep_id in np.arange(config.model.timestep * 3600 / config.thermal.dt):
+        for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
             
-            sim.thermal_update(timestep_id)
+            sim.thermal_update(timestep_id, subgrid_timestep_id)
             
         # check if xbeach is enabled for current timestep
         if xb_times[timestep_id]:
