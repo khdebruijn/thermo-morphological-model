@@ -298,7 +298,7 @@ class Simulation():
         
         return None
     
-    def start_xbeach(self, xbeach_path, params_path):
+    def start_xbeach(self, xbeach_path, params_path, batch_fname="run.bat"):
         """
         Running this function starts the XBeach module as a subprocess.
         --------------------------
@@ -306,20 +306,27 @@ class Simulation():
             string containing the file path to the xbeach executible from the project directory
         params_path: str
             string containing the file path to the params.txt file from the project directory
+        batch_fname: str
+            name used for the generated batch file
         --------------------------
 
         returns boolean (True if process was a sucess, False if not)
         """
         # First a batch file is generated to be executed
-        xb_run_script_win(
-            self.xb_setup,
-            1,
-            self.cwd,
-            xbeach_path
-            )
-        
+        # xb_run_script_win(
+        #     xb=self.xb_setup,
+        #     N=1,
+        #     maindir=self.cwd,
+        #     xbeach_exe=xbeach_path
+        #     )
+        with open(batch_fname, "w") as f:
+            f.write(f'cd "{self.cwd}"\n')
+            f.write(f'call "{xbeach_path}"')
+                    
         # Command to run XBeach
-        command = ['"' + str(os.path.join(self.cwd, "run0.bat")) + '"']
+        command = ['"' + str(os.path.join(self.cwd, batch_fname)) + '"']
+        print(command)
+        
         # Call XBeach using subprocess
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 

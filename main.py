@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import sys
 
 from IPython import get_ipython
@@ -85,7 +86,7 @@ def main(sim, print_report=False):
             
             # call xbeach (could include batch file?)
             run_succesful = sim.start_xbeach(
-                os.path.join(sim.proj_dir, "xbeach/XBeach_1.24.6057_Halloween_win64_netcdf/xbeach.exe"),
+                os.path.join(sim.proj_dir, Path("xbeach/XBeach_1.24.6057_Halloween_win64_netcdf/xbeach.exe")),
                 sim.cwd
             )
             

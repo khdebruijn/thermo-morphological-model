@@ -8,7 +8,7 @@
   **********************************************************
  
   Simulation started: YYYYMMDD    hh:mm:ss     time zone (UTC)
-                      20240514  11:21:12     +0200
+                      20240514  12:35:21     +0200
  
   General Input Module
   Reading input parameters:
@@ -38,7 +38,7 @@
                       xori =.0000
                       yori =.0000
                       alfa =.0000
-                        nx =157
+                        nx =184
                         ny =0
                     posdwn =-1.0000
                    depfile =bed.dep
