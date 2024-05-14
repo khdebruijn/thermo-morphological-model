@@ -11,12 +11,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString
+from scipy.interpolate import interp1d
+import xarray as xr
 
 import xbTools
 from xbTools.grid.creation import xgrid, ygrid
 from xbTools.xbeachtools import XBeachModelSetup
 from xbTools.general.executing_runs import xb_run_script_win
 
+from utils.visualization import block_print, enable_print
 from utils.miscellaneous import interpolate_points, get_A_matrix, count_nonzero_until_zero, generate_perpendicular_grids, linear_interp_with_nearest
 
 class Simulation():
@@ -207,16 +210,16 @@ class Simulation():
         self.xb_setup = XBeachModelSetup(f"Run {self.cwd}: timestep {timestep_id}")
         
         self.xb_setup.set_grid(self.xgr, None, self.zgr, posdwn=-1)
-        
-        self.xb_setup.set_waves('jonstable', {
+        self.xb_setup.set_waves('parametric', {
             # need to give each parameter as series (in this case, with length 1)
-            "Hm0":[self.conditions[timestep_id]["Hs(m)"]],
-            "Tp":[self.conditions[timestep_id]["Tp(s)"]],
-            "mainang":[self.conditions[timestep_id]["Dp(deg)"]],  # relative to true north
-            "gammajsp": [1.3],  # placeholder
-            "s": [0.18],     # placeholder
-            "duration": [self.dt],
-            "dtbc": [60], # placeholder
+            "Hm0":self.conditions[timestep_id]["Hs(m)"],
+            "Tp":self.conditions[timestep_id]["Tp(s)"],
+            "mainang":self.conditions[timestep_id]["Dp(deg)"],  # relative to true north
+            "gammajsp": 1.3,  # placeholder
+            "s": 10,     # placeholder
+            "duration": self.dt,
+            "dtbc": 60, # placeholder
+            "fnyq":1, # placeholder
         })
         
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
@@ -279,9 +282,9 @@ class Simulation():
             "zs0":self.conditions[timestep_id]["SS(m)"],
 
             # wave boundary conditions
+            "bcfile": "jonswap.txt",
             "wavemodel":"surfbeat",
             "break":"roelvink1",
-            "alpha":"0",  # direction of x-axis relative to east (placeholder)
             
             # wind boundary condition
             "windh": wind_direction,
@@ -293,8 +296,18 @@ class Simulation():
             "tstart":0,
             "nglobalvar":["zb","zs","H","runup","sedero"]
         })
-                
+        
+        # block printing while writing the output (the xbeach toolbox by default prints that it can't plot parametric conditions)
+        block_print()
+        
+        # write model setup
         self.xb_setup.write_model(self.cwd)
+        
+        # close figures generated during writing
+        plt.close()
+        
+        # re-enable print
+        enable_print()
         
         return None
     
@@ -312,33 +325,15 @@ class Simulation():
 
         returns boolean (True if process was a sucess, False if not)
         """
-        # First a batch file is generated to be executed
-        # xb_run_script_win(
-        #     xb=self.xb_setup,
-        #     N=1,
-        #     maindir=self.cwd,
-        #     xbeach_exe=xbeach_path
-        #     )
         with open(batch_fname, "w") as f:
             f.write(f'cd "{self.cwd}"\n')
             f.write(f'call "{xbeach_path}"')
-                    
+        
         # Command to run XBeach
-        command = ['"' + str(os.path.join(self.cwd, batch_fname)) + '"']
-        print(command)
-        
-        # Call XBeach using subprocess
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        command = [str(os.path.join(self.cwd, batch_fname))]
 
-        # wait for the process to finish
-        process.wait()
-        
-        # get the return codewhat 
-        stdout, stderr = process.communicate()
-        return_code = process.returncode
-        
-        error_message = stderr.decode()
-        print(error_message)
+        # # Call XBeach using subprocess
+        return_code = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode
 
         return return_code == 0
     
@@ -424,10 +419,14 @@ class Simulation():
         
         # for these intervals, if not conditions are supplied from the storm projections, set conditions to '0'
         zero_conditions = {
-                    "Hso(m)": 0,
-                    "Hs(m)": 0,
-                    "Dp(deg)": 0,
-                    "Tp(s)": 0,
+                    "Hso(m)": 0.001,
+                    "Hs(m)": 0.001,
+                    # "Hso(m)": 0,
+                    # "Hs(m)": 0,
+                    "Dp(deg)": 270,                    
+                    # "Dp(deg)": 0,
+                    "Tp(s)": 10,
+                    # "Tp(s)": 0,
                     "SS(m)": 0,
                     "Hindcast_or_projection": 0,
                     }
@@ -656,25 +655,28 @@ class Simulation():
         self.abs_xgr, self.abs_zgr = generate_perpendicular_grids(self.xgr, self.zgr)
         
         # update the current bathymetry
-        self._update_bed_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
+        cum_sedero = self._update_bed_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
         
-        # generate a new xgrid and zgrid
-        self.xgr_new, self.zgr_new = xgrid(self.xgr, self.bathy_current, dxmin=2)
-        self.zgr_new = np.interp(self.xgr_new, self.xgr, self.bathy_current)
+        # only update the grid of there actually was a change in bed level
+        if not all(cum_sedero) == 0:
         
-        # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
-        self.abs_xgr_new, self.abs_zgr_new = generate_perpendicular_grids(self.xgr_new, self.zgr_new)
-        
-        # cast temperature matrix
-        self.temp_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new)
-        self.enthalpy_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.enthalpy_matrix, self.abs_xgr_new, self.abs_zgr_new)
+            # generate a new xgrid and zgrid
+            self.xgr_new, self.zgr_new = xgrid(self.xgr, self.bathy_current, dxmin=2)
+            self.zgr_new = np.interp(self.xgr_new, self.xgr, self.bathy_current)
+            
+            # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
+            self.abs_xgr_new, self.abs_zgr_new = generate_perpendicular_grids(self.xgr_new, self.zgr_new)
+            
+            # cast temperature matrix
+            self.temp_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new)
+            self.enthalpy_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.enthalpy_matrix, self.abs_xgr_new, self.abs_zgr_new)
 
-        # set the grid to be equal to this new grid
-        self.xgr = self.xgr_new
-        self.zgr = self.zgr_new
-        
-        # update the angles
-        self._update_angles()
+            # set the grid to be equal to this new grid
+            self.xgr = self.xgr_new
+            self.zgr = self.zgr_new
+            
+            # update the angles
+            self._update_angles()
         
     def _update_angles(self):
         """This function geneartes an array of local angles (in radians) for the grid, based on the central differences method.
@@ -688,13 +690,22 @@ class Simulation():
         ---------
         fp_xbeach_output: string
             filepath to the xbeach sedero (sedimentation-erosion) output relative to the current working directory."""
+            
         # Read output file
-        cum_sedero = np.loadtxt(fp_xbeach_output)
+        ds = xr.open_dataset(fp_xbeach_output).squeeze()
+        cum_sedero = ds.sedero.values
+        xgr = ds.globalx.values
+        
+        # Create an interpolation function
+        interpolation_function = interp1d(xgr, cum_sedero, kind='linear', fill_value='extrapolate')
+        
+        # interpolate values to the used grid
+        interpolated_cum_sedero = interpolation_function(self.xgr)
         
         # update bed level
-        self.bathy_current += cum_sedero
+        self.bathy_current += interpolated_cum_sedero
         
-        return self.bathy_current
+        return cum_sedero
         
     def write_ne_layer(self):
         """This function writes the thaw depth obtained from the thermal update to a file to be used by xbeach.
@@ -841,6 +852,26 @@ class Simulation():
     ##                                            ##
     ################################################
     
+    # Old code to start xbeach:
+            
+        # os.system('start "" "' + str(os.path.join(params_path, batch_fname)) + '"')
+        
+        # First a batch file is generated to be executed
+        # xb_run_script_win(
+        #     xb=self.xb_setup,
+        #     N=1,
+        #     maindir=self.cwd,
+        #     xbeach_exe=xbeach_path
+        #     )
+        
+        # command = ['"' + str(os.path.join(self.cwd, batch_fname)) + '"']
+
+        # # get the return code 
+        # stdout, stderr = process.communicate()
+        # return_code = process.returncode
+        
+        # error_message = stderr.decode()
+        # print(error_message)
     
     
     # Old storm timing function

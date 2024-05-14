@@ -51,7 +51,7 @@ def main(sim, print_report=False):
     sim.initialize_thermal_module()
     print("succesfully initialized thermal module\n")
     
-    print(textbox("CFL VALUES"))
+    print(textbox("CFL VALUES (for 1D thermal models)"))
     print(f"CFL frozen soil: {sim.cfl_frozen:.4f}")
     print(f"CFL unfrozen soil: {sim.cfl_unfrozen:.4f}\n")
 
@@ -89,15 +89,22 @@ def main(sim, print_report=False):
                 os.path.join(sim.proj_dir, Path("xbeach/XBeach_1.24.6057_Halloween_win64_netcdf/xbeach.exe")),
                 sim.cwd
             )
+            try:
+                if run_succesful:  
+                    print(f"xbeach ran succesfully for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
+                else:
+                    print(f"xbeach failed to run for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
+            except IndexError:
+                # index error occurs when xbeach is called during the final time step, this catches it
+                print(f"xbeach ran succesfully for final timestep timestep ({sim.timestamps[timestep_id]})")
             
-            if run_succesful:  
-                print(f"xbeach ran succesfully for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
-            else:
-                print(f"xbeach failed to run for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
-                
+            print()
+            
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
-            sim.update_grid("sedero.txt")
-                
+            sim.update_grid("xboutput.nc")
+
+    print(textbox("SIMULATION FINISHED"))
+    
     return sim.xgr, sim.zgr
 
 
