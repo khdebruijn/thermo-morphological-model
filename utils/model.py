@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import yaml
 
 from datetime import datetime
@@ -203,18 +204,19 @@ class Simulation():
     def xbeach_setup(self, timestep_id):
         """This function initializes an xbeach run, i.e., it writes all inputs to files
         """
-        xb_setup = XBeachModelSetup(f"Run {self.directory}: timestep {timestep_id}")
+        self.xb_setup = XBeachModelSetup(f"Run {self.cwd}: timestep {timestep_id}")
         
-        xb_setup.set_grid(self.xgr, None, self.zgr, posdwn=-1)
+        self.xb_setup.set_grid(self.xgr, None, self.zgr, posdwn=-1)
         
-        xb_setup.set_waves('jonstable', {
-            "Hm0":self.conditions[timestep_id]["Hs(m)"],
-            "Tp":self.conditions[timestep_id]["Tp(s)"],
-            "mainang":self.conditions[timestep_id]["Dp(degree)"],  # relative to true north
-            "gammajsp": 1.3,  # placeholder
-            "s": 0.18,     # placeholder
-            "duration": self.dt,
-            "dtbc": 60, # placeholder
+        self.xb_setup.set_waves('jonstable', {
+            # need to give each parameter as series (in this case, with length 1)
+            "Hm0":[self.conditions[timestep_id]["Hs(m)"]],
+            "Tp":[self.conditions[timestep_id]["Tp(s)"]],
+            "mainang":[self.conditions[timestep_id]["Dp(deg)"]],  # relative to true north
+            "gammajsp": [1.3],  # placeholder
+            "s": [0.18],     # placeholder
+            "duration": [self.dt],
+            "dtbc": [60], # placeholder
         })
         
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
@@ -222,7 +224,7 @@ class Simulation():
         # (including: grid/bathymetry, waves input, flow, tide and surge,
         # water level, wind input, sediment input, avalanching, vegetation, 
         # drifters ipnut, output selection)
-        xb_setup.set_params({
+        self.xb_setup.set_params({
             # sediment parameters
             "D50": self.config.xbeach.D50,
             "rhos": self.config.xbeach.rho_solid,
@@ -291,15 +293,12 @@ class Simulation():
             "tstart":0,
             "nglobalvar":["zb","zs","H","runup","sedero"]
         })
-        
-        print(xb_setup)
-        
-        xb_setup.write_model(self.cwd)
+                
+        self.xb_setup.write_model(self.cwd)
         
         return None
     
-    @classmethod
-    def start_xbeach(xbeach_path, params_path):
+    def start_xbeach(self, xbeach_path, params_path):
         """
         Running this function starts the XBeach module as a subprocess.
         --------------------------
@@ -311,16 +310,28 @@ class Simulation():
 
         returns boolean (True if process was a sucess, False if not)
         """
-
+        # First a batch file is generated to be executed
+        xb_run_script_win(
+            self.xb_setup,
+            1,
+            self.cwd,
+            xbeach_path
+            )
+        
         # Command to run XBeach
-        command = [xbeach_path, params_path]
-
+        command = ['"' + str(os.path.join(self.cwd, "run0.bat")) + '"']
         # Call XBeach using subprocess
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        # Wait for the process to finish and get the return code
+        # wait for the process to finish
+        process.wait()
+        
+        # get the return codewhat 
         stdout, stderr = process.communicate()
         return_code = process.returncode
+        
+        error_message = stderr.decode()
+        print(error_message)
 
         return return_code == 0
     
@@ -338,7 +349,7 @@ class Simulation():
         
     def _get_wind_conditions(self, timestep_id):
         
-        row = self.forcing_data[self.forcing_data.index.values == timestep_id]
+        row = self.forcing_data.iloc[timestep_id]
         
         u = row["10m_u_component_of_wind"]
         v = row["10m_v_component_of_wind"]
@@ -393,14 +404,30 @@ class Simulation():
                        "SS(m)": row["SS(m)"],
                        "Hindcast_or_projection": row["Hindcast_or_projection"]
                         }  # safe storm conditions for this timestep as well
-               
+        
+        
         return st
                 
     def _when_xbeach_inter(self, call_xbeach_inter):
         
         ct = np.zeros(self.T.shape)
         
+        # set xbeach active at provided intervals
         ct[::call_xbeach_inter] = 1
+        
+        # for these intervals, if not conditions are supplied from the storm projections, set conditions to '0'
+        zero_conditions = {
+                    "Hso(m)": 0,
+                    "Hs(m)": 0,
+                    "Dp(deg)": 0,
+                    "Tp(s)": 0,
+                    "SS(m)": 0,
+                    "Hindcast_or_projection": 0,
+                    }
+        
+        mask = (ct==1) * (self.conditions==0)
+        
+        self.conditions[mask] = zero_conditions
         
         return ct
     
@@ -439,6 +466,10 @@ class Simulation():
                 self.temp_matrix[i,:] = ground_temp_distr_dry[:,1]
             else:
                 self.temp_matrix[i,:] = ground_temp_distr_wet[:,1]
+                
+        # find and write the initial thaw depth
+        self.find_thaw_depth()
+        self.write_ne_layer()
         
         # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
         frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)

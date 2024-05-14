@@ -5,8 +5,8 @@ dataset_parameters:
 # model settings
 model:
   nx: 100  # number of points in x-direction
-  time_start: '01-08-2020'  # DD-MM-YY starting time (if -1 take entire dataset)
-  time_end : '01-09-2020' # DD-MM-YY stopping time (if -1 take entire dataset)
+  time_start: '08-01-2020'  # MM-DD-YY starting time (if -1 take entire dataset)
+  time_end : '09-01-2020' # MM-DD-YY stopping time (if -1 take entire dataset)
   timestep: 1              # size of timesteps (in hours)
   call_xbeach_inter:  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
   grid_orientation: 88.14  # [degrees], grid orientation with respect to east. The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook

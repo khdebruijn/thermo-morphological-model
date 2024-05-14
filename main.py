@@ -41,8 +41,8 @@ def main(sim, print_report=False):
     
     # generate initial grid files and save them
     xgr, zgr, ne_layer = sim.generate_initial_grid(
-        bathy_path="bathy.txt",
-        bathy_grid_path="bathy_grid.txt"
+        bathy_path="bed.dep",
+        bathy_grid_path="x.grd"
         )
     print("succesfully generated grid")
     
@@ -59,6 +59,10 @@ def main(sim, print_report=False):
     for timestep_id in range(len(sim.T)):
         
         print(f"timestep {timestep_id+1}/{len(sim.T)}")
+        
+        # write output variables to output file every output interval
+        if timestep_id in sim.temp_output_ids:
+            sim.write_output(timestep_id)
         
         # loop through thermal subgrid timestep
         for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
@@ -86,16 +90,12 @@ def main(sim, print_report=False):
             )
             
             if run_succesful:  
-                print(f"xbeach ran succesfully for timestep {sim.timestamps[timestep_id]} to {sim.timestamp[timestep_id+1]}")
+                print(f"xbeach ran succesfully for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
             else:
-                print(f"xbeach failed to run for timestep {sim.timestamps[timestep_id]} to {sim.timestamp[timestep_id+1]}")
+                print(f"xbeach failed to run for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
                 
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid("sedero.txt")
-            
-        # write output variables to output file every output interval
-        if timestep_id in sim.temp_output_ids:
-            sim.write_output(timestep_id)
                 
     return sim.xgr, sim.zgr
 

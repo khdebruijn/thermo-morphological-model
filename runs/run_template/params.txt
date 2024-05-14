@@ -1,62 +1,71 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% XBeach parameter settings input file                                %%%
-%%%                                                                     %%%
-%%% date: 01-Jan-2015 12:00                                             %%%
-%%% function: xb_write_params                                           %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% XBeach model: Run C:\Users\bruij_kn\OneDrive - Stichting Deltares\Documents\GitHub\thermo-morphological-model\runs\run_template: timestep 0 
+%% Params created on 2024-05-14 11H:05m 
+%% Params created by bruij_kn 
 
-%%% Bed composition parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% General 
 
-D50             = 0.000245
-D90             = 0.000367
+wavemodel           = surfbeat
+wbctype             = jonstable
 
-%%% Flow boundary condition parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Grid 
 
-left            = neumann
-right           = neumann
+vardx               = 1
+posdwn              = -1
+nx                  = 174
+ny                  = 0
+xori                = 0
+yori                = 0
+alfa                = 0
+xfile               = x.grd
+depfile             = bed.dep
+thetamin            = -90
+thetamax            = 90
+thetanaut           = 0
+dtheta              = 10
+dtheta_s            = 10
 
-%%% Flow parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% par 
 
 
-%%% General %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Bed composition parameters 
 
-bedfriccoef     = 0.020000
+D50                 = 0.0019
 
-%%% Grid parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Sediment input 
 
-depfile = bed.dep
-posdwn = 0
-nx = NX
-ny = 0
-vardx = 1
-xfile = x.grd
-xori = 0
-yori = 0
+rhos                = 2650
 
-thetamin = -90
-thetamax = 90
-dtheta = 15
-thetanaut = 0
+%% Avalanching 
 
-%%% Model time %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+dryslp              = 35
+wetslp              = 35
 
-tstop = 3600
+%% Morphology parameters 
 
-%%% Morphology parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+wetslp              = 35
+morfac              = 1
+morstart            = 0
+ne_layer            = ne_layer.txt
 
-morfac          = 1
-morstart        = 0
-ne_layer        = ne_layer.txt
+%% Flow boundary condition parameters 
 
-%%% Physical constants %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+left                = neumann
+right               = neumann
 
-rho = 1025
+%% Grid parameters 
 
-%%% Physical processes %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+thetamin            = -90
+thetamax            = 90
+dtheta              = 15
+thetanaut           = 0
+
+%% Model time 
+
+tstop               = 1
+
+%% Physical processes 
 
 avalanching         = 1
-flow                = 1
-lwve                = 1
 morphology          = 1
 sedtrans            = 1
 swave               = 1
@@ -64,31 +73,31 @@ swrunup             = 1
 viscosity           = 1
 wind                = 1
 
-%%% Tide boundary conditions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Tide boundary conditions 
 
-tideloc = 0
-zs0file = tide.txt
+tideloc             = 0
 
+%% Initial conditions 
 
-%%% Wave boundary condition parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+zs0                 = 0
 
-wbctype = jons
-bcfile = jonswap.txt
-wavemodel = surfbeat
-break = roelvink1
-alfa = 0
-wbcEvarreduce   = 0.300000
+%% Wave breaking parameters 
 
-%%% Wind boundary condition parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+break               = roelvink1
+alpha               = 0
 
-windfile = wind.txt
+%% Output 
 
-%%% Output variables %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+outputformat        = netcdf
+tstart              = 0
 
-outputformat = netcdf
-tint = 3600
-tstart = 0
-nglobalvar = 5
+%% Wave boundary condition parameters 
+
+bcfile              = jonstable.txt
+
+%% Output variables 
+
+nglobalvar          = 5
 zb
 zs
 H
