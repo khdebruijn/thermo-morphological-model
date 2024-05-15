@@ -40,7 +40,6 @@ class Simulation():
         self.runid = runid
         self._set_directory()
         self.read_config(config_file)
-        self._create_output_directory()
     
     def __repr__(self) -> str:
         """Provides a string representation of the current simulation."""
@@ -69,13 +68,6 @@ class Simulation():
             os.mkdir(os.path.join(self.cwd, "results/"))
             
         self.result_dir = os.path.join(self.cwd, "results/")
-        
-    def _create_output_directory(self):
-        # create result files
-        for output_var in self.config.output.output_vars:
-            with open(os.path.join(self.result_dir, output_var + ".txt"), "w") as f:   
-                f.write("PLACEHOLDER HEADER")
-        return None
     
     def read_config(self, config_file):
         '''
@@ -777,7 +769,7 @@ class Simulation():
             np.savetxt(os.path.join(result_dir_timestep, "ground_temperature_distribution.txt"), self.temp_matrix.flatten())
         
         if "thaw_depth" in self.config.output.output_vars:
-            np.savetxt(os.path.join(result_dir_timestep, "thaw_depht"), self.thaw_depth)
+            np.savetxt(os.path.join(result_dir_timestep, "thaw_depth.txt"), self.thaw_depth)
         
         return None
         
