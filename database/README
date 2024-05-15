@@ -1,0 +1,12 @@
+DESCRIPTION OF NOTEBOOKS IN THIS FOLDER
+"cmip5_generate_timeseries.ipynb": Currently not used. Will be used to generate timeseries in future.
+"compare_erikson_gibbs.ipynb": Currently used to generate a bathymetry file ('bed.dep') and grid file ('x.grd'). It also visualizes the beach transect locations, and bathymetry transect locations. The notebook uses sediment sizes to determine potential equillibrium profiles, and in general just looks at what data is useable. It currently does not save anything.
+"era5_first_analysis.ipynb": Currently used to open era5 datasets to get a first feel for the dataset.
+"era5_generate_timeseries.ipynb": Used to generate model-useable timeseries from era5 data.
+"era5_get.ipynb": Used to obtain era5 data from the web client.
+"era5_retrieve.py": Used to obtain era5 data from the web client (by: Kees Nederhoff).
+"erikson_first_analysis.ipynb": Currently used to open erikson datasets to get a first feel for the dataset.
+"erikson_storm_to_timeseries.ipynb": Used to convert the erikson storm dataset into a useable timeseries for the model.
+"generate_bathymetry.ipynb": Calculates distances relative to shoreline/bluff edge baseline and orientations of the transect, and calculates the grid based on this (without interpolated points).
+"gibbs_first_analysis.ipynb": This notebook visualizes the gibbs data, which consists of shoreline and bluff edge positions through the years with respect to a baseline.
+"gibbs_generate_timeseries.ipynb": This notebook generates timeseries for the bluff edges and shoreline positions.

@@ -1,0 +1,56 @@
+In order to perform your own model run, complete the following steps:
+
+### 1) Create a subfolder in the 'runs' folder.
+
+Each run folder should contain at least the following files:
+
+bed.dep:
+    File with bathymetry information. It simply contains the heights for all grid points. On row corresponds to one cross-shore transect. This file is obligatory when running XBeach.
+x.grd:
+    File with x-coordinates of the grid. This file is only used with a non-equidistant grid.
+config.yaml:
+    File with model settings.
+
+### 2) Ensure the folder contains at least the three files described above, see 'run_template' for an example.
+
+### 3) Open a conda or miniforge prompt.
+
+### 4) Activate your environment (requirements are listed in 'requirements.txt').
+
+### 5) Change directory to the thermo-morphological project folder (cd path/to/folder).
+
+### 6) Type the following command.
+    #### 6.1) python main.py subfolder_name
+    #### 6.2) (with subfolder_name replaced with the name that you chose for this run)
+
+### 7) The run is started.
+
+During the model execution, the following files will be created:
+
+domain.png:
+    Image depicting the computational domain.
+E_reuse.bcf:
+    ---
+ebcflist.bcf:
+    ---
+jonswap.txt:
+    File with boundary condition information. In this case the description of a JONSWAP spectrum. Severel flavours exist for this file. This one has a syntax similar to the params.txt file.
+    For the current version of the model, boundary conditions are read directly from the database.
+ne_layer.txt:
+    File used to keep track of the non-erodible layer to be passed to xbeach during each instance of xbeach, and is updated after each run.
+params.txt:
+    File with model settings in XBeach format. Each line containing an =-sign and not starting with a %-sign is interpreted as a model setting in the form “name = value”. This file is obligatory when running XBeach. It also refers to the other files.
+q_reuze.bcf:
+    ---
+qbcflist.bcf:
+    ---
+run.bat:
+    batch file used to change directory to the current working directory and calling xbeach as a subprocess.
+XBlog.txt:
+    This file logs the output of each instance of XBeach called as a subprocess, and is updated after each run.
+xboutput.nc:
+    This file contains the output of each XBeach run, and is updated after each run.
+XBwarning.txt:
+    This file logs warnings that pop up during XBeach runs, and is updated after each run.
+
+### 8) A 'results' folder is generated when running the thermo-morphological model. It contains subfolders for all output timestep ids. The output resolution can be defined in the config.yaml file, as well as the variables that should be written as output.
