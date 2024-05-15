@@ -19,7 +19,8 @@ def enable_print():
 
 class SimulationPlot(object):
     """
-    ...
+    This class is used to make plots for a Simulation object. In order to make the plots, the simulation 
+    should be completed by running main.py and passing the simulation folder name as argument from the terminal.
     """
     def __init__(self, sim):
         """Initializer for the SimulationPlot class.
