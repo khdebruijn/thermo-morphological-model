@@ -357,7 +357,7 @@ class Simulation():
         
         return direction, velocity
     
-    def timesteps_with_xbeach_active(self, fp_storm, from_projection=True):
+    def timesteps_with_xbeach_active(self, fp_storm):
         """This function gets the timestep ids for which xbeach should be active.
 
         Args:
@@ -369,10 +369,7 @@ class Simulation():
             array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
         """
         # get storm conditions timestep ids
-        if from_projection:
-            self.storm_timing = self._when_storms_projection(fp_storm)
-        else:
-            pass # not implemented yet
+        self.storm_timing = self._when_storms_projection(fp_storm)
         
         # get inter-storm timestep ids
         self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
