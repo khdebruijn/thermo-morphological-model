@@ -121,5 +121,4 @@ if __name__ == '__main__':
     # initialize simulation
     sim = Simulation(runid)
 
-    # generate_params(cfg)    
     main(sim)

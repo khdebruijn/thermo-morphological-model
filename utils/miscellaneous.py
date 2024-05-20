@@ -3,10 +3,13 @@ import pandas as pd
 from scipy.interpolate import LinearNDInterpolator
 
 def textbox(text):
-    """Function to quickly generate text boxes
+    """Function to quickly generate text boxes.
 
     Args:
-        text (_type_): _description_
+        text (str): string of the text that should be in the textbox.
+        
+    Returns:
+        str: String representation of the input text with a textbox around it.
     """
     row_length = len(text) + 6
     

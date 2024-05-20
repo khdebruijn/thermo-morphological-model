@@ -152,12 +152,12 @@ class Simulation():
         else:
             # transform into a more suitable grid for xbeach
             self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2)
-            
+        
+        # interpolate bathymetry to grid
         self.zgr = np.interp(self.xgr, self.bathy_grid, self.bathy_initial)
         
         # save a copy of the grid, which serves as the bathymetry
         self.bathy_current = np.copy(self.zgr)
-        # self.bathy_timeseries = [self.zgr]
         
         # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
         self.thaw_depth = np.zeros(self.xgr.shape)
@@ -331,18 +331,21 @@ class Simulation():
     
     # def _generate_batch_file(self):
     #     xb_run_script_win()  # not used yet (could develop in future)
-            
-    
     # def load_tide_conditions(self, fp_wave):
     #     pass
-    
     # def load_wave_conditions(self, fp_wave):
-        
     #     with open(fp_wave) as f:
     #         pass
         
     def _get_wind_conditions(self, timestep_id):
-        
+        """This function gets the wind conditions from the forcing dataset.
+
+        Args:
+            timestep_id (int): timestep id for the current timestep for which wind dta is requested
+
+        Returns:
+            tuple: (wind_direction, wind_velocity)
+        """
         row = self.forcing_data.iloc[timestep_id]
         
         u = row["10m_u_component_of_wind"]
@@ -355,23 +358,42 @@ class Simulation():
         return direction, velocity
     
     def timesteps_with_xbeach_active(self, fp_storm, from_projection=True):
-        
+        """This function gets the timestep ids for which xbeach should be active.
+
+        Args:
+            fp_storm (Path): path to the csv file containing storm data.
+            from_projection (bool, optional): choose whether to use the storm projection dataset (
+                                              or something else, but that is not yet implemented). Defaults to True.
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
+        # get storm conditions timestep ids
         if from_projection:
             self.storm_timing = self._when_storms_projection(fp_storm)
         else:
             pass # not implemented yet
         
+        # get inter-storm timestep ids
         self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
         
+        # get sea-ice timestep ids
         self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.wrapper.sea_ice_threshold)
 
-        self.xbeach_times = (self.storm_timing + self.xbeach_inter) * self.xbeach_sea_ice
+        # ran xbeach for storm and inter-storm timesteps, but never when too much sea ice
+        self.xbeach_times = self.storm_timing * self.xbeach_sea_ice + self.xbeach_inter
 
         return self.xbeach_times
     
     def _when_storms_projection(self, fp_storm):
+        """This function is used to determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
 
-        # determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
+        Args:
+            fp_storm (Path): path to storm dataset
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
         st = np.zeros(self.T.shape)  # array of the same shape as t (0 when no storm, 1 when storm)
         
         self.conditions = np.zeros(self.T.shape, dtype=object)  # also directly read wave conditions here
@@ -379,7 +401,7 @@ class Simulation():
         with open(fp_storm) as f:
             
             df = pd.read_csv(f, parse_dates=['time'])
-            
+                        
             mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
             
             df = df[mask]
@@ -390,6 +412,7 @@ class Simulation():
             
             st[index] = 1
             
+            # safe storm conditions for this timestep as well
             self.conditions[index] = {
                        "Hso(m)": row["Hso(m)"],
                        "Hs(m)": row["Hs(m)"],
@@ -397,13 +420,19 @@ class Simulation():
                        "Tp(s)": row["Tp(s)"],
                        "SS(m)": row["SS(m)"],
                        "Hindcast_or_projection": row["Hindcast_or_projection"]
-                        }  # safe storm conditions for this timestep as well
-        
+                        }
         
         return st
                 
     def _when_xbeach_inter(self, call_xbeach_inter):
-        
+        """This function determines the timestamps that xbeach is called regardless of sea-ice or storms.
+
+        Args:
+            call_xbeach_inter (int): Call xbeach every 'call_xbeach_inter' timestamps, regardsless of the presence of sea ice or a storm.
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
         ct = np.zeros(self.T.shape)
         
         # set xbeach active at provided intervals
@@ -423,14 +452,21 @@ class Simulation():
                     "Hindcast_or_projection": 0,
                     }
         
-        mask = (ct==1) * (self.conditions==0)
-        
+        mask = np.nonzero((ct==1) * (self.conditions==0))
+        print(mask)
         self.conditions[mask] = zero_conditions
         
         return ct
     
     def _when_xbeach_no_sea_ice(self, sea_ice_threshold):
-        
+        """This function determines when xbeach should not be ran due to sea ice, based on a threshold value)
+
+        Args:
+            sea_ice_threshold (_type_): _description_
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach can be ran and 0 if not (w.r.t. sea ice).
+        """
         it =  (self.forcing_data.sea_ice_cover.values < sea_ice_threshold)
                 
         return it
@@ -441,6 +477,11 @@ class Simulation():
     ##                                            ##
     ################################################
     def initialize_thermal_module(self):
+        """This function initializes the thermal module of the model.
+
+        Raises:
+            ValueError: raised if CFL > 0.5
+        """
         
         # read initial conditions
         ground_temp_distr_dry, ground_temp_distr_wet = self._generate_initial_ground_temperature_distribution(self.forcing_data, 
@@ -523,8 +564,6 @@ class Simulation():
         of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
         exchange from the lower layers.
         """
-        row = df[df.time == t_start]
-        
         dry_points = np.array([
             [0, df.soil_temperature_level_1.values[0]],
             [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
@@ -581,11 +620,18 @@ class Simulation():
         return None
      
     def _get_ghost_node_boundary_condition(self, timestep_id):
-        
+        """This function uses the forcing at a specific timestep to return an array containing the ghost node temperature.
+
+        Args:
+            timestep_id (int): index of the current timestep.
+
+        Returns:
+            array: temperature values for the ghost nodes.
+        """
         # first get the correct forcing timestep
         row = self.forcing_data.iloc[timestep_id]
         
-        # with associated values
+        # with associated forcing values
         air_temp = row["2m_temperature"]
         sea_temp = row['sea_surface_temperature']
         
@@ -733,11 +779,11 @@ class Simulation():
         for i, x, z in zip(np.arange(len(self.xgr)), self.xgr, self.zgr):
             # try to find two points between which to interpolate for the thaw depth, otherwise set thaw depth to 0
             try:
-                mask1 = (x_thaw_sorted < x)
+                mask1 = np.nonzero((x_thaw_sorted < x))
                 x1 = x_thaw_sorted[mask1][-1]
                 z1 = z_thaw_sorted[mask1][-1]
                 
-                mask2 = (x_thaw_sorted > x)
+                mask2 = np.nonzero((x_thaw_sorted > x))
                 x2 = x_thaw_sorted[mask2][0]
                 z2 = z_thaw_sorted[mask2][0]
                 
