@@ -5,11 +5,14 @@ dataset_parameters:
 # model settings
 model:
   nx: 100  # number of points in x-direction
+  longitude: -143.7  # longitude of the study site
+  latitude: 70.13  # latitude of the study site
   time_start: '08-01-2020'  # MM-DD-YY starting time (if -1 take entire dataset)
   time_end : '08-10-2020' # MM-DD-YY stopping time (if -1 take entire dataset)
   timestep: 1              # size of timesteps (in hours)
   call_xbeach_inter:  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
   grid_orientation: 88.14  # [degrees], grid orientation with respect to east. The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook
+  time_zone_diff: -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
 
 # wrapper parameters:
 wrapper:
@@ -47,12 +50,12 @@ xbeach:
 # thermal moodel parameters
 thermal:
   # general
-  with_solar      : True  # include short wave solar radiation in thermal computation step
-  with_longwave   : True  # include longwave radiation (incoming & outgoining) in thermal computation step
-  with_convective : True  # include convective heat transfer in thermal computation step
-  with_latent     : True  # include latent heat in thermal computation step\
-  with_sea_ice    : True  # indicates whether or not the thermal component is run during the period in which the sea is covered with ice
-  
+  with_solar                  : True  # include short wave solar radiation in thermal computation step
+  with_longwave               : True  # include longwave radiation (incoming & outgoining) in thermal computation step
+  # with_convective             : True  # include convective heat transfer in thermal computation step
+  with_latent                 : True  # include latent heat in thermal computation step\
+  with_solar_flux_calculator  : True  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
+
   # model properties
   dt: 2  # [s] timestep used in the thermal model on the temporal subgrid
   grid_resolution : 30  # number of points for each 1D thermal model

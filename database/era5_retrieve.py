@@ -7,7 +7,7 @@ import os
 import datetime
 import numpy as np
 import cdsapi
-import os
+from pathlib import Path
 
 #==============================================================================
 # 1. Settings
@@ -22,8 +22,10 @@ years_wanted            = list(range(1950, 2024))  # Note that 2024 is not inclu
 # San Fransisco         "36/235/40/240"
 
 # Define working directory
-os.chdir(r'q:\Projects\Alaska\CoMoS_AK\XBeach\01_data\ERA5\forKevin')
-os.getcwd()
+cwd = os.getcwd()
+download_path = Path("C:/Users/bruij_kn/Downloads")
+os.chdir(download_path)
+
 
 #==============================================================================
 # 2. Loop

@@ -653,16 +653,26 @@ class Simulation():
         cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
         
         # calculate the new enthalpy
-        # 1) calculate temperature diffusion
+            # 1) calculate temperature diffusion
         ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.temp_matrix[:,1])
 
-        # 2) add radiation, assuming radiation only influences the dry domain
+            # 2) add radiation, assuming radiation only influences the dry domain
+        latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0
+        lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0
+        if self.config.thermal.with_solar:
+            if self.config.thermal.with_solar_flux_calculator:
+                sw_flux = self.solar_flux_calculator(timestep_id, row["mean_surface_net_short_wave_radiation_flux"], )
+            else:
+                sw_flux = row["mean_surface_net_short_wave_radiation_flux"]
+        else:
+            sw_flux = 0
+        
         ghost_nodes_enth += \
             self.config.thermal.dt * dry_mask * \
-            (row["mean_surface_latent_heat_flux"] + row["mean_surface_net_short_wave_radiation_flux"] + row["mean_surface_net_long_wave_radiation_flux"]) / \
+            (latent_flux + sw_flux + lw_flux) / \
             (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
         
-        # 3) add convective heat transfer from water and air
+            # 3) add convective heat transfer from water and air
         ghost_nodes_enth += \
             self.config.thermal.dt * \
             temp_diff_at_interface * \
@@ -791,6 +801,80 @@ class Simulation():
                 self.thaw_depth[i] = 0
         
         return self.thaw_depth
+    
+    def solar_flux_calculator(self, timestep_id, I0, timezone_diff):
+        """
+        This function calculates the effective solar radiation flux on a sloped surface. The method from Buffo (1972) is used, 
+        assuming that the radiaton on the surface already includes the atmospheric transmission coefficient. Using the radiation data for a flat surface 
+        and the angle of the incoming rays with the flat sruface, the intensity of the incoming rays can be estimated, which can then be projected on an inclined
+        surface.
+
+        Args:
+            timestep_id (int): index of the current timestep.
+            I0 (float): incoming radiation for the current timestep on a flat surface
+            timezone_diff (float): difference in hours for the timezone which is modelled relative to UTC.
+
+        Returns:
+            array: incoming radiation for sloped surfaces for the computational domain for the current timestep.
+        """       
+        # 1) current timestamp
+        current_timestamp = self.timestamps[timestep_id]
+        
+        # 2) latitude and orientation
+        phi = self.config.model.latitude / 360 * 2 * np.pi
+        beta = (90 - self.model.grid_orientation) / 360 * 2 * np.pi
+        
+        # 3) local angles
+        alpha = -self.angles 
+        
+        # 4) declination, Sarbu (2017)
+        delta = 23.45 * np.sin(
+            (360/365 * (284 + current_timestamp.dayofyear)) / 360 * 2 * np.pi
+            )
+        
+        # 5) hour angle, for Alaska timezone difference w.r.t. UTC is -8h
+        local_hour_of_day = current_timestamp.hour + timezone_diff
+        # convert to hour angle
+        h = (((local_hour_of_day - 12) % 24)/24) * 2 * np.pi
+        # convert angles to range [-pi, pi]
+        mask = np.nonzero(h>=np.pi)
+        h[mask] = -((2 * np.pi) - h[mask])
+        
+        # 6) calculate altitude angle off of the horizontal that the suns rays strike a horizontal surface
+        A = np.arcsin(np.sin(phi) * np.sin(delta) + np.cos(phi) * np.cos(delta) * np.cos(h))
+        
+        # 7) calculate the azimuth
+        AZ = np.cos(delta) * (np.sin(h)) / np.cos(A)
+        
+        # correct azimuth for when close to solstices (“Central Beaufort Sea Wave and Hydrodynamic Modeling Study Report 1: Field Measurements and Model Development,” n.d.)
+        ew_AM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day <= 12))# east-west AM mask
+        ew_PM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day > 12))# east-west PM mask
+
+        AZ[ew_AM_mask] = -np.pi + np.abs(AZ[ew_AM_mask])
+        AZ[ew_PM_mask] = np.pi - np.abs(AZ[ew_PM_mask])
+        
+        # convert to azimuth measured clockwise from the east
+        Z = np.arcsin(np.cos(delta) * np.sin(h) / np.cos(A)) + 1/2 * np.pi
+
+        # 8) calculate multiplication factor for computational domain
+        sin_theta = np.sin(A) * np.cos(alpha) - np.cos(A) * np.sin(alpha) * np.sin(Z - beta)
+        # filter out values larger than 1 (this is only relevant when theta is actually calculated with the arcsin())
+        sin_theta[np.nonzero(sin_theta>1)] = 1
+        # filter out values smaller than 0 (these do not reach the surface)
+        sin_theta[np.nonzero(sin_theta<0)] = 0
+        
+        # 9) calculate multiplication factor for flat surface
+        sin_0 = np.sin(A) * np.cos(0) - np.cos(A) * np.sin(0) * np.sin(Z - beta)
+        # filter out values larger than 1 (this is only relevant when theta is actually calculated with the arcsin())
+        sin_0[np.nonzero(sin_0>1)] = 1
+        # filter out values smaller than 0 (these do not reach the surface)
+        sin_0[np.nonzero(sin_0<0)] = 0
+        
+        # 10) compute corrected values for incoming solar radiation
+        I_theta = sin_theta / sin_0 * I0
+        
+        return I_theta
+        
         
     def write_output(self, timestep_id):
         """This function writes output in the results folder, and creates subfolders for each timestep for which results are output.
@@ -886,6 +970,35 @@ class Simulation():
     ##            # LEGACY CODE                   ##
     ##                                            ##
     ################################################
+    
+    # Old code from solar flux calculator:
+    
+        # # slope aspect clockwise from the north
+        # beta = (90 - self.config.model.grid_orientation) / 360 * 2 * np.pi
+        
+        # A = np.arcsin(np.sin(phi) * np.sin(delta) + np.cos(phi) * np.cos(delta) * np.cos(h))
+        
+        # # calculate azimuth
+        # AZ = np.arcsin(-np.cos(delta) * np.sin(h) / np.cos(A))
+        
+        # # need to correct for when close to solstices
+        # if np.cos(h) <= np.tan(delta) / np.tan(phi):
+        #     if local_hour_of_day <= 12:
+        #         AZ = -np.pi + np.abs(AZ)
+        #     else:
+        #         AZ = np.pi - AZ
+        
+        # # calculate Z
+        # Z = AZ + 1/2 * np.pi
+        
+        # # calculate angle between the surface and the radiation
+        # theta = np.arcsin(np.sin(A) * np.cos(alpha) - np.cos(A) * np.sin(alpha) * np.sin(Z - beta))
+        
+        # # calculate angle-corrected radiation
+        # I = I0_p * np.sin(theta)
+                
+        # return I
+        
     
     # Old code to start xbeach:
             

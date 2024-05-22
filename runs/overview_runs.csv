@@ -1,0 +1,38 @@
+run_id;t_start;t_end;description
+run_template;8-1-2020;8-10-2020;(MM-DD-YY) used as a read-to-run template, that is easily adjustable to generate other runs
+;;;
+test0;;;used in development
+test1;;;
+test2;;;
+test3;;;
+;;;
+val0;8-2-1950;7-10-2020;runs for the entire period for which there is coastal retreat data
+val1;;;runs for the first characteristic period
+val2;;;runs for the second characteristic period
+val3;;;runs for the third characteristic period
+val4;;;runs for the fourth characteristic period
+val5;;;runs for the fifth characteristic period
+;;;
+sen0;1-1-2020;1-1-2021;k_frozen: considers sensitivity of retreat rate to variable
+sen1;;;k_unfrozen: considers sensitivity of retreat rate to variable
+sen2;;;call_xbeach_inter: considers sensitivity of retreat rate to variable
+sen3;;;c_frozen: considers sensitivity of retreat rate to variable
+sen4;;;c_unfrozen: considers sensitivity of retreat rate to variable
+sen5;;;reposeangle: considers sensitivity of retreat rate to variable
+sen6;;;with_solar: considers sensitivity of retreat rate to variable
+sen7;;;with_longwave: considers sensitivity of retreat rate to variable
+sen8;;;with_convective: considers sensitivity of retreat rate to variable
+sen9;;;with_latent: considers sensitivity of retreat rate to variable
+sen10;;;water_level_switch: considers sensitivity of retreat rate to variable
+sen11;;;nb: considers sensitivity of retreat rate to variable
+sen12;;;T_melt: considers sensitivity of retreat rate to variable
+sen13;;;max_depth: considers sensitivity of retreat rate to variable
+sen14;;;sea_ice_threshold: considers sensitivity of retreat rate to variable
+;;;
+fut0;1-1-2020;1-1-2100;future prediction for scenario 0
+fut1;;;
+fut2;;;
+fut3;;;
+fut4;;;
+fut5;;;
+fut6;;;
