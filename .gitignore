@@ -10,10 +10,13 @@ database/raw_datasets/era5/*/*.nc
 database/raw_datasets/gibbs/*/*
 database/raw_datasets/erikson/*/*
 database/raw_datasets/cmip5/*/*
+database/raw_datasets/engelstad/*.nc
 
 database/ts_datasets/*.csv
 
 database/initial_conditions/*.txt
+
+test/*.nc
 
 runs/*/results/*/*.txt
 

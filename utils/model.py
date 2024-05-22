@@ -152,12 +152,12 @@ class Simulation():
         else:
             # transform into a more suitable grid for xbeach
             self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2)
-            
+        
+        # interpolate bathymetry to grid
         self.zgr = np.interp(self.xgr, self.bathy_grid, self.bathy_initial)
         
         # save a copy of the grid, which serves as the bathymetry
         self.bathy_current = np.copy(self.zgr)
-        # self.bathy_timeseries = [self.zgr]
         
         # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
         self.thaw_depth = np.zeros(self.xgr.shape)
@@ -331,18 +331,21 @@ class Simulation():
     
     # def _generate_batch_file(self):
     #     xb_run_script_win()  # not used yet (could develop in future)
-            
-    
     # def load_tide_conditions(self, fp_wave):
     #     pass
-    
     # def load_wave_conditions(self, fp_wave):
-        
     #     with open(fp_wave) as f:
     #         pass
         
     def _get_wind_conditions(self, timestep_id):
-        
+        """This function gets the wind conditions from the forcing dataset.
+
+        Args:
+            timestep_id (int): timestep id for the current timestep for which wind dta is requested
+
+        Returns:
+            tuple: (wind_direction, wind_velocity)
+        """
         row = self.forcing_data.iloc[timestep_id]
         
         u = row["10m_u_component_of_wind"]
@@ -354,24 +357,40 @@ class Simulation():
         
         return direction, velocity
     
-    def timesteps_with_xbeach_active(self, fp_storm, from_projection=True):
+    def timesteps_with_xbeach_active(self, fp_storm):
+        """This function gets the timestep ids for which xbeach should be active.
+
+        Args:
+            fp_storm (Path): path to the csv file containing storm data.
+            from_projection (bool, optional): choose whether to use the storm projection dataset (
+                                              or something else, but that is not yet implemented). Defaults to True.
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
+        # get storm conditions timestep ids
+        self.storm_timing = self._when_storms_projection(fp_storm)
         
-        if from_projection:
-            self.storm_timing = self._when_storms_projection(fp_storm)
-        else:
-            pass # not implemented yet
-        
+        # get inter-storm timestep ids
         self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
         
+        # get sea-ice timestep ids
         self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.wrapper.sea_ice_threshold)
 
-        self.xbeach_times = (self.storm_timing + self.xbeach_inter) * self.xbeach_sea_ice
+        # ran xbeach for storm and inter-storm timesteps, but never when too much sea ice
+        self.xbeach_times = self.storm_timing * self.xbeach_sea_ice + self.xbeach_inter
 
         return self.xbeach_times
     
     def _when_storms_projection(self, fp_storm):
+        """This function is used to determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
 
-        # determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
+        Args:
+            fp_storm (Path): path to storm dataset
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
         st = np.zeros(self.T.shape)  # array of the same shape as t (0 when no storm, 1 when storm)
         
         self.conditions = np.zeros(self.T.shape, dtype=object)  # also directly read wave conditions here
@@ -379,7 +398,7 @@ class Simulation():
         with open(fp_storm) as f:
             
             df = pd.read_csv(f, parse_dates=['time'])
-            
+                        
             mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
             
             df = df[mask]
@@ -390,6 +409,7 @@ class Simulation():
             
             st[index] = 1
             
+            # safe storm conditions for this timestep as well
             self.conditions[index] = {
                        "Hso(m)": row["Hso(m)"],
                        "Hs(m)": row["Hs(m)"],
@@ -397,13 +417,19 @@ class Simulation():
                        "Tp(s)": row["Tp(s)"],
                        "SS(m)": row["SS(m)"],
                        "Hindcast_or_projection": row["Hindcast_or_projection"]
-                        }  # safe storm conditions for this timestep as well
-        
+                        }
         
         return st
                 
     def _when_xbeach_inter(self, call_xbeach_inter):
-        
+        """This function determines the timestamps that xbeach is called regardless of sea-ice or storms.
+
+        Args:
+            call_xbeach_inter (int): Call xbeach every 'call_xbeach_inter' timestamps, regardsless of the presence of sea ice or a storm.
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
         ct = np.zeros(self.T.shape)
         
         # set xbeach active at provided intervals
@@ -423,14 +449,21 @@ class Simulation():
                     "Hindcast_or_projection": 0,
                     }
         
-        mask = (ct==1) * (self.conditions==0)
-        
+        mask = np.nonzero((ct==1) * (self.conditions==0))
+        print(mask)
         self.conditions[mask] = zero_conditions
         
         return ct
     
     def _when_xbeach_no_sea_ice(self, sea_ice_threshold):
-        
+        """This function determines when xbeach should not be ran due to sea ice, based on a threshold value)
+
+        Args:
+            sea_ice_threshold (_type_): _description_
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach can be ran and 0 if not (w.r.t. sea ice).
+        """
         it =  (self.forcing_data.sea_ice_cover.values < sea_ice_threshold)
                 
         return it
@@ -441,6 +474,11 @@ class Simulation():
     ##                                            ##
     ################################################
     def initialize_thermal_module(self):
+        """This function initializes the thermal module of the model.
+
+        Raises:
+            ValueError: raised if CFL > 0.5
+        """
         
         # read initial conditions
         ground_temp_distr_dry, ground_temp_distr_wet = self._generate_initial_ground_temperature_distribution(self.forcing_data, 
@@ -523,8 +561,6 @@ class Simulation():
         of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
         exchange from the lower layers.
         """
-        row = df[df.time == t_start]
-        
         dry_points = np.array([
             [0, df.soil_temperature_level_1.values[0]],
             [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
@@ -581,11 +617,18 @@ class Simulation():
         return None
      
     def _get_ghost_node_boundary_condition(self, timestep_id):
-        
+        """This function uses the forcing at a specific timestep to return an array containing the ghost node temperature.
+
+        Args:
+            timestep_id (int): index of the current timestep.
+
+        Returns:
+            array: temperature values for the ghost nodes.
+        """
         # first get the correct forcing timestep
         row = self.forcing_data.iloc[timestep_id]
         
-        # with associated values
+        # with associated forcing values
         air_temp = row["2m_temperature"]
         sea_temp = row['sea_surface_temperature']
         
@@ -610,16 +653,26 @@ class Simulation():
         cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
         
         # calculate the new enthalpy
-        # 1) calculate temperature diffusion
+            # 1) calculate temperature diffusion
         ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.temp_matrix[:,1])
 
-        # 2) add radiation, assuming radiation only influences the dry domain
+            # 2) add radiation, assuming radiation only influences the dry domain
+        latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0
+        lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0
+        if self.config.thermal.with_solar:
+            if self.config.thermal.with_solar_flux_calculator:
+                sw_flux = self.solar_flux_calculator(timestep_id, row["mean_surface_net_short_wave_radiation_flux"], )
+            else:
+                sw_flux = row["mean_surface_net_short_wave_radiation_flux"]
+        else:
+            sw_flux = 0
+        
         ghost_nodes_enth += \
             self.config.thermal.dt * dry_mask * \
-            (row["mean_surface_latent_heat_flux"] + row["mean_surface_net_short_wave_radiation_flux"] + row["mean_surface_net_long_wave_radiation_flux"]) / \
+            (latent_flux + sw_flux + lw_flux) / \
             (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
         
-        # 3) add convective heat transfer from water and air
+            # 3) add convective heat transfer from water and air
         ghost_nodes_enth += \
             self.config.thermal.dt * \
             temp_diff_at_interface * \
@@ -733,11 +786,11 @@ class Simulation():
         for i, x, z in zip(np.arange(len(self.xgr)), self.xgr, self.zgr):
             # try to find two points between which to interpolate for the thaw depth, otherwise set thaw depth to 0
             try:
-                mask1 = (x_thaw_sorted < x)
+                mask1 = np.nonzero((x_thaw_sorted < x))
                 x1 = x_thaw_sorted[mask1][-1]
                 z1 = z_thaw_sorted[mask1][-1]
                 
-                mask2 = (x_thaw_sorted > x)
+                mask2 = np.nonzero((x_thaw_sorted > x))
                 x2 = x_thaw_sorted[mask2][0]
                 z2 = z_thaw_sorted[mask2][0]
                 
@@ -748,6 +801,80 @@ class Simulation():
                 self.thaw_depth[i] = 0
         
         return self.thaw_depth
+    
+    def solar_flux_calculator(self, timestep_id, I0, timezone_diff):
+        """
+        This function calculates the effective solar radiation flux on a sloped surface. The method from Buffo (1972) is used, 
+        assuming that the radiaton on the surface already includes the atmospheric transmission coefficient. Using the radiation data for a flat surface 
+        and the angle of the incoming rays with the flat sruface, the intensity of the incoming rays can be estimated, which can then be projected on an inclined
+        surface.
+
+        Args:
+            timestep_id (int): index of the current timestep.
+            I0 (float): incoming radiation for the current timestep on a flat surface
+            timezone_diff (float): difference in hours for the timezone which is modelled relative to UTC.
+
+        Returns:
+            array: incoming radiation for sloped surfaces for the computational domain for the current timestep.
+        """       
+        # 1) current timestamp
+        current_timestamp = self.timestamps[timestep_id]
+        
+        # 2) latitude and orientation
+        phi = self.config.model.latitude / 360 * 2 * np.pi
+        beta = (90 - self.model.grid_orientation) / 360 * 2 * np.pi
+        
+        # 3) local angles
+        alpha = -self.angles 
+        
+        # 4) declination, Sarbu (2017)
+        delta = 23.45 * np.sin(
+            (360/365 * (284 + current_timestamp.dayofyear)) / 360 * 2 * np.pi
+            )
+        
+        # 5) hour angle, for Alaska timezone difference w.r.t. UTC is -8h
+        local_hour_of_day = current_timestamp.hour + timezone_diff
+        # convert to hour angle
+        h = (((local_hour_of_day - 12) % 24)/24) * 2 * np.pi
+        # convert angles to range [-pi, pi]
+        mask = np.nonzero(h>=np.pi)
+        h[mask] = -((2 * np.pi) - h[mask])
+        
+        # 6) calculate altitude angle off of the horizontal that the suns rays strike a horizontal surface
+        A = np.arcsin(np.sin(phi) * np.sin(delta) + np.cos(phi) * np.cos(delta) * np.cos(h))
+        
+        # 7) calculate the azimuth
+        AZ = np.cos(delta) * (np.sin(h)) / np.cos(A)
+        
+        # correct azimuth for when close to solstices (“Central Beaufort Sea Wave and Hydrodynamic Modeling Study Report 1: Field Measurements and Model Development,” n.d.)
+        ew_AM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day <= 12))# east-west AM mask
+        ew_PM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day > 12))# east-west PM mask
+
+        AZ[ew_AM_mask] = -np.pi + np.abs(AZ[ew_AM_mask])
+        AZ[ew_PM_mask] = np.pi - np.abs(AZ[ew_PM_mask])
+        
+        # convert to azimuth measured clockwise from the east
+        Z = np.arcsin(np.cos(delta) * np.sin(h) / np.cos(A)) + 1/2 * np.pi
+
+        # 8) calculate multiplication factor for computational domain
+        sin_theta = np.sin(A) * np.cos(alpha) - np.cos(A) * np.sin(alpha) * np.sin(Z - beta)
+        # filter out values larger than 1 (this is only relevant when theta is actually calculated with the arcsin())
+        sin_theta[np.nonzero(sin_theta>1)] = 1
+        # filter out values smaller than 0 (these do not reach the surface)
+        sin_theta[np.nonzero(sin_theta<0)] = 0
+        
+        # 9) calculate multiplication factor for flat surface
+        sin_0 = np.sin(A) * np.cos(0) - np.cos(A) * np.sin(0) * np.sin(Z - beta)
+        # filter out values larger than 1 (this is only relevant when theta is actually calculated with the arcsin())
+        sin_0[np.nonzero(sin_0>1)] = 1
+        # filter out values smaller than 0 (these do not reach the surface)
+        sin_0[np.nonzero(sin_0<0)] = 0
+        
+        # 10) compute corrected values for incoming solar radiation
+        I_theta = sin_theta / sin_0 * I0
+        
+        return I_theta
+        
         
     def write_output(self, timestep_id):
         """This function writes output in the results folder, and creates subfolders for each timestep for which results are output.
@@ -843,6 +970,35 @@ class Simulation():
     ##            # LEGACY CODE                   ##
     ##                                            ##
     ################################################
+    
+    # Old code from solar flux calculator:
+    
+        # # slope aspect clockwise from the north
+        # beta = (90 - self.config.model.grid_orientation) / 360 * 2 * np.pi
+        
+        # A = np.arcsin(np.sin(phi) * np.sin(delta) + np.cos(phi) * np.cos(delta) * np.cos(h))
+        
+        # # calculate azimuth
+        # AZ = np.arcsin(-np.cos(delta) * np.sin(h) / np.cos(A))
+        
+        # # need to correct for when close to solstices
+        # if np.cos(h) <= np.tan(delta) / np.tan(phi):
+        #     if local_hour_of_day <= 12:
+        #         AZ = -np.pi + np.abs(AZ)
+        #     else:
+        #         AZ = np.pi - AZ
+        
+        # # calculate Z
+        # Z = AZ + 1/2 * np.pi
+        
+        # # calculate angle between the surface and the radiation
+        # theta = np.arcsin(np.sin(A) * np.cos(alpha) - np.cos(A) * np.sin(alpha) * np.sin(Z - beta))
+        
+        # # calculate angle-corrected radiation
+        # I = I0_p * np.sin(theta)
+                
+        # return I
+        
     
     # Old code to start xbeach:
             

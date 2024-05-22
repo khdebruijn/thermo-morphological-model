@@ -35,8 +35,7 @@ def main(sim, print_report=False):
     
     # this variable is used to determine if xbeach should be ran for each timestep
     xb_times = sim.timesteps_with_xbeach_active(
-        os.path.join(sim.proj_dir, "database/ts_datasets/storms.csv"),
-        from_projection=True
+        os.path.join(sim.proj_dir, "database/ts_datasets/storms_erikson.csv"),
         )
     print("succesfully generated xbeach times")
     
@@ -121,5 +120,4 @@ if __name__ == '__main__':
     # initialize simulation
     sim = Simulation(runid)
 
-    # generate_params(cfg)    
     main(sim)
