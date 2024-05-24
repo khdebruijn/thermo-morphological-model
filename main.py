@@ -70,7 +70,7 @@ def main(sim, print_report=False):
             sim.thermal_update(timestep_id, subgrid_timestep_id)
             
         # check if xbeach is enabled for current timestep
-        if xb_times[timestep_id]:
+        if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
             
             # calculate the current thaw depth
             sim.find_thaw_depth()

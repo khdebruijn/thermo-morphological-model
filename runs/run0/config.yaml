@@ -22,6 +22,7 @@ wrapper:
 # xbeach parameters
 xbeach:
   # general settings
+  with_xbeach: True  # include the xbeach module in the model, default true
   version: '1.24'  # version of xbeach used
 
   # grid settings
