@@ -536,10 +536,6 @@ class Simulation():
         
         # initialize angles
         self._update_angles()
-        
-        # initialize solar flux calculator
-        if self.config.thermal.with_solar_flux_calculator:
-            self._initialize_solar_flux_calculator(self.config.model.time_zone_diff)
             
         # which timesteps should have thermal output (i.e., thaw depth, and temperature distribution)
         self.thermal_output_ids = self.T[::self.config.output.output_res]
@@ -623,7 +619,7 @@ class Simulation():
                 (self.enthalpy_matrix / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
             unfrozen_mask * \
                 (self.enthalpy_matrix - \
-                ((self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen) * self.config.thermal.T_melt - \
+                ((self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_frozen) * self.config.thermal.T_melt - \
                 self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) / \
                     (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
         
@@ -702,7 +698,7 @@ class Simulation():
                 (ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
             unfrozen_mask * \
                 (ghost_nodes_enth - \
-                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen * self.config.thermal.T_melt - \
+                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_frozen * self.config.thermal.T_melt - \
                 self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) \
                     / (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
         
@@ -789,7 +785,7 @@ class Simulation():
         
         return solar_flux
         
-    def _initialize_solar_flux_calculator(self, timezone_diff, angle_min=-89, angle_max=89, delta_angle=1, t_start='2000-01-01', t_end='2001-01-01'):
+    def initialize_solar_flux_calculator(self, timezone_diff, angle_min=-89, angle_max=89, delta_angle=1, t_start='2000-01-01', t_end='2001-01-01'):
         """This function initializes a mapping variable for the solar flux calculator. This is required because the enhancement factor is calculated using the
         maximum insolance per day, making it impossible to calculate each hour seperately. Specific values for enhancement factor are indexed using an angle,
         followed by the number of the current day of the year minus 1.
@@ -897,7 +893,7 @@ class Simulation():
         return None
         
     def find_thaw_depth(self):
-        """Finds thaw depth based on the maximum z-value close to the x-grid coordinate (i.e., +-0.5*dx) that is unthawed."""
+        """Finds thaw depth based on the z-values of the two nearest thaw points."""
         # initialize thaw depth array
         self.thaw_depth = np.zeros(self.xgr.shape)
 

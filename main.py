@@ -9,6 +9,7 @@ import pandas as pd
 from utils.model import Simulation
 from utils.miscellaneous import textbox
 
+
 def main(sim, print_report=False):
     """run this function to perform a simulation
 
@@ -50,6 +51,12 @@ def main(sim, print_report=False):
     sim.initialize_thermal_module()
     print("succesfully initialized thermal module\n")
     
+    # initialize solar flux calculator
+    if sim.config.thermal.with_solar_flux_calculator:
+        sim.initialize_solar_flux_calculator(sim.config.model.time_zone_diff)
+    print("succesfully initialized solar flux calculator")
+    
+    # show CFL values (they have already been checked to be below 0.5)
     print(textbox("CFL VALUES (for 1D thermal models)"))
     print(f"CFL frozen soil: {sim.cfl_frozen:.4f}")
     print(f"CFL unfrozen soil: {sim.cfl_unfrozen:.4f}\n")

@@ -17,7 +17,7 @@ model:
 # wrapper parameters:
 wrapper:
   dir:  'runs/...'         # location of model run
-  sea_ice_threshold: 0.20  # Only run xbeach if sea ice fraction is below threshold, otherwise assume all wave action attenuated
+  sea_ice_threshold: 0.15  # Only run xbeach if sea ice fraction is below threshold, otherwise assume all wave action attenuated
   
 # xbeach parameters
 xbeach:
