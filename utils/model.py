@@ -680,13 +680,13 @@ class Simulation():
             sw_flux = 0
         
         ghost_nodes_enth += \
-            self.config.thermal.dt * dry_mask * \
+            (self.config.model.timestep*3600) * dry_mask * \
             (latent_flux + sw_flux + lw_flux) / \
             (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
         
             # 3) add convective heat transfer from water and air
         ghost_nodes_enth += \
-            self.config.thermal.dt * \
+            (self.config.model.timestep*3600) * \
             temp_diff_at_interface * \
                 (frozen_mask * self.config.thermal.k_soil_frozen + unfrozen_mask * self.config.thermal.k_soil_unfrozen) * \
             self.dz / \
