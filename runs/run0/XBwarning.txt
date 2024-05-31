@@ -118,3 +118,39 @@
  tion generation
    No dispersion convergence found for wave train          54  in boundary condi
  tion generation
+   No dispersion convergence found for wave train          55  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          56  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          57  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          58  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          59  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          60  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          61  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          62  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          63  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          64  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          65  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          66  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          67  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          68  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          69  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          70  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          71  in boundary condi
+ tion generation
+   No dispersion convergence found for wave train          72  in boundary condi
+ tion generation

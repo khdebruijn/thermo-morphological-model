@@ -4,12 +4,15 @@ In order to perform your own model run, complete the following steps:
 
 Each run folder should contain at least the following files:
 
+config.yaml:
+    File with model settings.
+
+#### 1.1) Optionally, a schematized grid can be generated. For this, set bathymetry.with_schematized_bathymetry to True in the config.yaml file. If this parameter is set to False, bed.dep and x.grd files should be provided in the subfolder before running the model.
 bed.dep:
     File with bathymetry information. It simply contains the heights for all grid points. On row corresponds to one cross-shore transect. This file is obligatory when running XBeach.
 x.grd:
     File with x-coordinates of the grid. This file is only used with a non-equidistant grid.
-config.yaml:
-    File with model settings.
+
 
 ### 2) Ensure the folder contains at least the three files described above, see 'run_template' for an example.
 

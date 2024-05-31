@@ -239,7 +239,7 @@ class Simulation():
             
             # grid parameters
             # most already specified with xb_setup.set_grid(...)
-            "alfa": self.config.model.grid_orientation,
+            "alfa": self.config.bathymetry.grid_orientation,
             "thetamin": -90,
             "thetamax": 90,
             "dtheta": 15,
@@ -833,7 +833,7 @@ class Simulation():
         
         # 1) latitude and orientation
         phi = self.config.model.latitude / 360 * 2 * np.pi
-        beta = (90 - self.config.model.grid_orientation) / 360 * 2 * np.pi
+        beta = (90 - self.config.bathymetry.grid_orientation) / 360 * 2 * np.pi
         
         # 2) local angles
         alpha = angle / 360 * 2 * np.pi

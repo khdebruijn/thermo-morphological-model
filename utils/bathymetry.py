@@ -56,19 +56,29 @@ def calculate_bluff_edge_toe_position(xgr, zgr):
     
     return xgr[bluff_edge_id], xgr[bluff_toe_id]
 
-def generate_bathymetry(bluff_flat_length,
-                        bluff_height, bluff_slope,
-                        beach_width, beach_slope,
-                        
-                        nearshore_max_depth, nearshore_slope,
-                        offshore_max_depth, offshore_slope,
-                        contintental_flat_width,
-                        
-                        with_artificial=False,
-                        artificial_max_depth=500,
-                        artificial_angle=1/50,
-                        
-                        N=100):
+def generate_schematized_bathymetry(
+        bluff_flat_length,
+        
+        bluff_height, 
+        bluff_slope,
+        
+        beach_width, 
+        beach_slope,
+        
+        nearshore_max_depth, 
+        nearshore_slope,
+        
+        offshore_max_depth, 
+        offshore_slope,
+        
+        contintental_flat_width,
+        
+        with_artificial=False,
+        artificial_max_depth=500,
+        artificial_slope=1/50,
+        
+        N=100
+    ):
     """This function is used to generate a schematized bathymetry, consisting of a flat, 
     bluff, beach, nearshore, offshore, continental flat, and possibly an artificial extension of the grid.
 
@@ -82,7 +92,7 @@ def generate_bathymetry(bluff_flat_length,
     x_near_offs = x_wl + nearshore_max_depth / nearshore_slope
     x_offs_cont = x_near_offs + (offshore_max_depth - nearshore_max_depth) / offshore_slope
     x_cont_arti = x_offs_cont + contintental_flat_width
-    x_end = x_cont_arti + artificial_max_depth / artificial_angle
+    x_end = x_cont_arti + artificial_max_depth / artificial_slope
     
     z_wl = 0
     z_toe = z_wl + beach_width * beach_slope
@@ -120,7 +130,7 @@ def generate_bathymetry(bluff_flat_length,
     total_x = np.array([])
     total_z = np.array([])
     
-    for i in range(len(xs-1)):
+    for i in range(len(xs)-1):
         x1, x2 = xs[i], xs[i+1]
         z1, z2 = zs[i], zs[i+1]
         
