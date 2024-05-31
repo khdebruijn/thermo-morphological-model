@@ -494,7 +494,7 @@ class Simulation():
         self.temp_matrix = np.zeros((len(self.xgr), self.config.thermal.grid_resolution))
         
         # initialize the associated grid
-        self.abs_xgr_new, self.abs_zgr_new = generate_perpendicular_grids(self.xgr, self.zgr)
+        self.abs_xgr, self.abs_zgr = generate_perpendicular_grids(self.xgr, self.zgr)
         
         # set the above determined initial conditions for the xgr
         for i in range(len(self.temp_matrix)):
@@ -502,7 +502,10 @@ class Simulation():
                 self.temp_matrix[i,:] = ground_temp_distr_dry[:,1]
             else:
                 self.temp_matrix[i,:] = ground_temp_distr_wet[:,1]
-                
+        
+        # set initial ghost node temperature as a copy of the surface node of the temperature matrix
+        self.ghost_nodes_temperature = self.temp_matrix[:,0]
+        
         # find and write the initial thaw depth
         self.find_thaw_depth()
         self.write_ne_layer()
@@ -510,25 +513,50 @@ class Simulation():
         # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
         frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+                    
+        # initialize linear distribution of k, starting at min value and ending at max value (at a depth of 1m)
+        id_kmax = np.argmin(np.abs(self.thermal_zgr - self.config.thermal.depth_constant_k))  # id of the grid point at which the maximum k should be reached
+        self.k_unfrozen_distr = np.append(
+            np.linspace(
+                self.config.thermal.k_soil_unfrozen_min, 
+                self.config.thermal.k_soil_unfrozen_max,
+                len(self.thermal_zgr[:id_kmax])), 
+            np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_unfrozen_max)
+        self.k_frozen_distr = np.append(
+            np.linspace(
+                self.config.thermal.k_soil_frozen_min, 
+                self.config.thermal.k_soil_frozen_max,
+                len(self.thermal_zgr[:id_kmax])), 
+            np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_frozen_max)
+        
+        # initialize distribution of ground ice content, uniform for now (placeholder)
+        self.nb_distr = np.ones(self.thermal_zgr.shape) * self.config.thermal.nb
         
         # using the states, the initial enthalpy can be determined. The enthalpy matrix is used as the 'preserved' quantity, and is used to numerically solve the
         # heat balance equation. Enthalpy formulation from Ravens et al. (2023).
         self.enthalpy_matrix = \
             frozen_mask * \
-                self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen * self.temp_matrix + \
+                self.config.thermal.c_soil_frozen * self.temp_matrix + \
             unfrozen_mask * \
-                (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen * self.temp_matrix + \
-                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen * self.config.thermal.T_melt + \
-                self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb)
+                (self.config.thermal.c_soil_unfrozen * self.temp_matrix + \
+                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) * self.config.thermal.T_melt + \
+                self.config.thermal.L_water_ice * self.config.thermal.nb)
 
-        # calculate the courant-friedlichs-lewy number and check that it is < 0.5, which is required for this discretization of the 1D heat equation
-        self.cfl_frozen = (self.config.thermal.k_soil_frozen / self.config.thermal.rho_soil_frozen) * (self.config.thermal.dt / (self.dz)**2)
-        self.cfl_unfrozen = (self.config.thermal.k_soil_unfrozen / self.config.thermal.rho_soil_unfrozen) * (self.config.thermal.dt / (self.dz)**2)
+        # initialize c-matrix
+        self.c_matrix = frozen_mask * self.config.thermal.c_soil_frozen + unfrozen_mask * self.config.thermal.c_soil_unfrozen
         
-        if self.cfl_frozen >= 0.5:
-            raise ValueError("CFL should be smaller than 0.5!")
-        if self.cfl_unfrozen >= 0.5:
-            raise ValueError("CFL should be smaller than 0.5!")
+        # initialize k-matrix
+        self.k_matrix = frozen_mask * np.tile(self.k_frozen_distr, (len(self.xgr), 1)) + unfrozen_mask * np.tile(self.k_unfrozen_distr, (len(self.xgr), 1))
+        
+        # calculate the courant-friedlichs-lewy number matrix
+        self.cfl_matrix = self.k_matrix / self.c_matrix * self.config.thermal.dt / self.dz**2
+        
+        # check that all cfl's are <0.5, which is required for this discretization of the 1D heat equation
+        # self.cfl_frozen = (self.config.thermal.k_soil_frozen / self.rho_frozen / self.config.thermal.c_soil_frozen) * (self.config.thermal.dt / (self.dz)**2)
+        # self.cfl_unfrozen = (self.config.thermal.k_soil_unfrozen / self.rho_unfrozen / self.config.thermal.c_soil_unfrozen) * (self.config.thermal.dt / (self.dz)**2)
+        
+        if np.max(self.cfl_matrix >= 0.5):
+            raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
         
         # get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points
         # at the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative
@@ -536,9 +564,8 @@ class Simulation():
         
         # initialize angles
         self._update_angles()
-            
-        # which timesteps should have thermal output (i.e., thaw depth, and temperature distribution)
-        self.thermal_output_ids = self.T[::self.config.output.output_res]
+
+        return None
     
     def print_and_return_A_matrix(self):
         """This function prints and returns the A_matrix"""
@@ -563,7 +590,7 @@ class Simulation():
         Temperature is linearly interpolated for the entire depth, and assumed constant below the center of Layer 4, as well as constant above the center 
         of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
         exchange from the lower layers.
-        """
+        """                                     
         dry_points = np.array([
             [0, df.soil_temperature_level_1.values[0]],
             [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
@@ -595,33 +622,69 @@ class Simulation():
             timestep_id (int): id of the current timestep
             subgrid_timestep_id (int): id of the current subgrid timestep
         """
-        # Only update boundary condition if it's the first time step of the thermal subgrid,
-        # as the boundary condition is constant over the subgrid
-        if subgrid_timestep_id == 0:
-            
-            # get the new boundary condition
-            self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id)
+        # get the new boundary condition
+        self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id)
+        self.bottom_boundary_temperature = self._get_bottom_boundary_temperature()
         
-        # determine which part of the domain is frozen and unfrozen (needed to later calculate temperature from enthalpy)
-        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
-        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+        # aggregate temperature matrix
+        aggregated_temp_matrix = np.concatenate((
+            self.ghost_nodes_temperature.reshape(len(self.xgr), 1),
+            self.temp_matrix,
+            self.bottom_boundary_temperature.reshape(len(self.xgr), 1)
+            ), axis=1)
         
-        # CFL number is different for different phases
-        cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
+        # determine which part of the domain is frozen and unfrozen (for the aggregated temperature matrix)
+        frozen_mask_aggr = (aggregated_temp_matrix < self.config.thermal.T_melt)
+        unfrozen_mask_aggr = np.ones(frozen_mask_aggr.shape) - frozen_mask_aggr
+        
+        # determine c-matrix
+        self.c_matrix = frozen_mask_aggr * self.config.thermal.c_soil_frozen + \
+                        unfrozen_mask_aggr * self.config.thermal.c_soil_unfrozen
+        
+        # determine k-matrix (extend k-distribution with one copied value at the top and bottom boundary to include ghost nodes)
+        k_frozen_distr_aggr = np.concatenate((
+            np.array([self.k_frozen_distr[0]]),
+            self.k_frozen_distr,
+            np.array([self.k_frozen_distr[-1]])))
+        k_unfrozen_distr_aggr = np.concatenate((
+            np.array([self.k_unfrozen_distr[0]]),
+            self.k_frozen_distr,
+            np.array([self.k_unfrozen_distr[-1]])))
+        
+        self.k_matrix = frozen_mask_aggr * np.tile(k_frozen_distr_aggr, (len(self.xgr), 1)) + \
+                        unfrozen_mask_aggr * np.tile(k_unfrozen_distr_aggr, (len(self.xgr), 1))
+        
+        # determine the courant-friedlichs-lewy number matrix
+        self.cfl_matrix = self.k_matrix / self.c_matrix * self.config.thermal.dt / self.dz**2
+        
+        if np.max(self.cfl_matrix >= 0.5):
+            raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
         
         # get the new enthalpy matrix
-        self.enthalpy_matrix = self.enthalpy_matrix + cfl_matrix * (np.column_stack((self.ghost_nodes_temperature, self.temp_matrix)) @ self.A_matrix)
+        self.enthalpy_matrix = self.enthalpy_matrix + \
+                               (self.cfl_matrix * self.c_matrix * aggregated_temp_matrix) @ self.A_matrix
+        
+        # determine state masks (which part of the domain is frozen, in between, or unfrozen (needed to later calculate temperature from enthalpy))
+        frozen_mask = (self.enthalpy_matrix / self.config.thermal.c_soil_frozen < self.config.thermal.T_melt)
+        inbetween_mask = ((self.enthalpy_matrix / self.config.thermal.c_soil_frozen) >= self.config.thermal.T_melt) * \
+                         ((self.enthalpy_matrix - \
+                             (self.config.thermal.c_soil_frozen - self.config.thermal.c_soil_unfrozen) * self.config.thermal.T_melt - \
+                              self.config.thermal.L_water_ice * self.config.thermal.nb) < self.config.thermal.T_melt)
+                          
+        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask - inbetween_mask
         
         # from this new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
         # again, the state masks are used to make this calculation faster
         self.temp_matrix = \
             frozen_mask * \
-                (self.enthalpy_matrix / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
+                (self.enthalpy_matrix / (self.config.thermal.c_soil_frozen)) + \
+            inbetween_mask * \
+                (self.config.thermal.T_melt) * \
             unfrozen_mask * \
                 (self.enthalpy_matrix - \
-                ((self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_frozen) * self.config.thermal.T_melt - \
-                self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) / \
-                    (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
+                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) * self.config.thermal.T_melt - \
+                self.config.thermal.L_water_ice * self.config.thermal.nb) / \
+                    (self.config.thermal.c_soil_unfrozen)
         
         return None
      
@@ -655,17 +718,10 @@ class Simulation():
         # temperature difference for convective heat transfer (define temperature flux as positive when it is directed into the ground)
         temp_diff_at_interface = (air_temp - self.temp_matrix[:,0]) * dry_mask + (sea_temp - self.temp_matrix[:,0]) * wet_mask
         
-        # apply boundary conditions
-        frozen_mask = (self.temp_matrix[:,0] < self.config.thermal.T_melt)
-        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
-
-        cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
+        # determine convective transport
+        convective_transport = 0  # f(temp_diff_at_interface)
         
-        # calculate the new enthalpy
-            # 1) calculate temperature diffusion
-        ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.temp_matrix[:,1])
-
-            # 2) add radiation, assuming radiation only influences the dry domain
+        # determine radiation, assuming radiation only influences the dry domain
         latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0
         lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0
         
@@ -679,30 +735,62 @@ class Simulation():
         else:
             sw_flux = 0
         
-        ghost_nodes_enth += \
-            (self.config.model.timestep*3600) * dry_mask * \
-            (latent_flux + sw_flux + lw_flux) / \
-            (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
+        # add all heat fluxes  together
+        heat_flux = convective_transport + latent_flux + lw_flux + sw_flux
+        
+        # determine temperature of the ghost nodes
+        ghost_nodes_temperature = self.temp_matrix[:,0] + heat_flux * self.dz / self.k_matrix[:,0]
+        
+        
+        # # apply boundary conditions
+        # frozen_mask = (self.temp_matrix[:,0] < self.config.thermal.T_melt)
+        # unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+
+        # cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
+        
+        # calculate the new enthalpy
+            # 1) calculate temperature diffusion
+        # ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.temp_matrix[:,1])
+
+            # 2) add radiation, assuming radiation only influences the dry domain
+
+        
+        # ghost_nodes_enth += \
+        #     (self.config.model.timestep*3600) * dry_mask * \
+        #     (latent_flux + sw_flux + lw_flux) / \
+        #     (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
         
             # 3) add convective heat transfer from water and air
-        ghost_nodes_enth += \
-            (self.config.model.timestep*3600) * \
-            temp_diff_at_interface * \
-                (frozen_mask * self.config.thermal.k_soil_frozen + unfrozen_mask * self.config.thermal.k_soil_unfrozen) * \
-            self.dz / \
-                (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
+        # ghost_nodes_enth += \
+        #     (self.config.model.timestep*3600) * \
+        #     temp_diff_at_interface * \
+        #         (frozen_mask * self.config.thermal.k_soil_frozen + unfrozen_mask * self.config.thermal.k_soil_unfrozen) * \
+        #     self.dz / \
+        #         (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
         
         # determine the temperature distribution
-        ghost_nodes_temperature = \
-            frozen_mask * \
-                (ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
-            unfrozen_mask * \
-                (ghost_nodes_enth - \
-                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_frozen * self.config.thermal.T_melt - \
-                self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) \
-                    / (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
+        # ghost_nodes_temperature = \
+        #     frozen_mask * \
+        #         (ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
+        #     unfrozen_mask * \
+        #         (ghost_nodes_enth - \
+        #         (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_frozen * self.config.thermal.T_melt - \
+        #         self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) \
+        #             / (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
         
         return ghost_nodes_temperature
+    
+    def _get_bottom_boundary_temperature(self):
+        """This function returns a bottom boundary condition temperature, based on the geothermal gradient.
+
+        Returns:
+            array: bottom temperature
+        """
+        bottom_temp = self.temp_matrix[:,-1]
+        
+        vertical_dist = np.cos(np.abs(self.angles)) * self.dz
+        
+        return bottom_temp + vertical_dist * self.config.thermal.geothermal_gradient
     
     def update_grid(self, fp_xbeach_output="sedero.txt"):
         """This function updates the current grid, calculates the angles of the new grid with the horizontal, generates a new thermal grid 
@@ -951,8 +1039,8 @@ class Simulation():
             np.savetxt(os.path.join(result_dir_timestep, "zgr.txt"), self.zgr)
         
         if "ground_temperature_distribution" in self.config.output.output_vars:
-            np.savetxt(os.path.join(result_dir_timestep, "xgrid_ground_temperature_distribution.txt"), self.abs_xgr_new.flatten())
-            np.savetxt(os.path.join(result_dir_timestep, "zgrid_ground_temperature_distribution.txt"), self.abs_zgr_new.flatten())
+            np.savetxt(os.path.join(result_dir_timestep, "xgrid_ground_temperature_distribution.txt"), self.abs_xgr.flatten())
+            np.savetxt(os.path.join(result_dir_timestep, "zgrid_ground_temperature_distribution.txt"), self.abs_zgr.flatten())
             np.savetxt(os.path.join(result_dir_timestep, "ground_temperature_distribution.txt"), self.temp_matrix.flatten())
         
         if "thaw_depth" in self.config.output.output_vars:

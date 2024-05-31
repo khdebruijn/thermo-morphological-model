@@ -52,26 +52,16 @@ def get_A_matrix(n):
         n (int): number of points in the grid
     """
     # Initialize an empty square matrix
-    matrix = np.zeros((n, n))
+    matrix = np.zeros((n+2, n))
+
+    # Fill the super diagonal with 1
+    np.fill_diagonal(matrix[:-2,:], 1)
 
     # Fill the main diagonal with -2
-    np.fill_diagonal(matrix, -2)
+    np.fill_diagonal(matrix[1:-1,:], -2)
 
     # Fill the sub-diagonal with 1
-    np.fill_diagonal(matrix[1:], 1)
-
-    # Fill the super-diagonal with 1
-    np.fill_diagonal(matrix[:, 1:], 1)
-    
-    matrix[0,0] += 1
-    matrix[-1,-1] += 1
-    
-    matrix[0, 0] = -2
-    
-    new_row = np.zeros(matrix.shape[0])
-    new_row[0] = 1
-    
-    matrix = np.vstack((new_row, matrix))
+    np.fill_diagonal(matrix[2:,:], 1)
 
     return matrix
 

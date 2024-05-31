@@ -25,21 +25,21 @@ bathymetry:
   grid_orientation: 88.14  # [degrees], grid orientation with respect to east. The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook
 
   # schematized bathymetry parameters
-  with_schematized_bathymetry:  True  # whether or not to generate a schematized bathymetry upon initialization
-  bluff_flat_length:            100  # [m] length of the flat attached to the crest of the bluff
-  bluff_height:                 12  # [m] height of the bluff
-  bluff_slope:                  0.5  # [-] slope of the bluff, i.e., height/width
-  beach_width:                  12.5  # [m] width of the beach
-  beach_slope:                  0.1  # [-] slope of the beach, i.e., height/width
-  nearshore_max_depth:          3  # [m] maximum depth of the nearshore
-  nearshore_slope:              0.03  # [-] slope of the nearshore section, i.e., height/width
-  offshore_max_depth:           5  # [m] maximum offshore depth
-  offshore_slope:               0.007  # [-] slope of the offshore section, i.e., height/width
-  continental_flat_width:      400  # [m] width of the continental flat section
-  with_artificial:              False  # whether or not to extend to bathymetry with an artificial depth increase (if required by xbeach)
-  artificial_max_depth:         15  # [m] maximum depth of the artificial section
-  artificial_slope:             0.02  # [-] slope of the artificial section, i.e., height/width
-  N:                            100 # number of points of each section
+  with_schematized_bathymetry :  True  # whether or not to generate a schematized bathymetry upon initialization
+  bluff_flat_length           :  100  # [m] length of the flat attached to the crest of the bluff
+  bluff_height                :  12  # [m] height of the bluff
+  bluff_slope                 :  0.5  # [-] slope of the bluff, i.e., height/width
+  beach_width                 :  12.5  # [m] width of the beach
+  beach_slope                 :  0.1  # [-] slope of the beach, i.e., height/width
+  nearshore_max_depth         :  3  # [m] maximum depth of the nearshore
+  nearshore_slope             :  0.03  # [-] slope of the nearshore section, i.e., height/width
+  offshore_max_depth          :  5  # [m] maximum offshore depth
+  offshore_slope              :  0.007  # [-] slope of the offshore section, i.e., height/width
+  continental_flat_width      :  400  # [m] width of the continental flat section
+  with_artificial             :  False  # whether or not to extend to bathymetry with an artificial depth increase (if required by xbeach)
+  artificial_max_depth        :  15  # [m] maximum depth of the artificial section
+  artificial_slope            :  0.02  # [-] slope of the artificial section, i.e., height/width
+  N                           :  100 # number of points of each section
 
 # xbeach parameters
 xbeach:
@@ -93,13 +93,18 @@ thermal:
   # k_sea_water     : ... #  [W/m/K] thermal conductivity for sea water
 
   # soil properties
+  with_density      : False  # whether or not to used density in the temperature distribution calculations. formulations with density have not been implemented yet.
   rho_soil_frozen   : 1500   # [kg/m3] density frozen soil, placeholder (placeholder)
   rho_soil_unfrozen : 1500   # [kg/m3] density unfrozen soil, placeholder (placeholder)
   nb              : 0.65  # [-] ground ice content (Ravens et al, 2023: 0.65 - 0.45)
   c_soil_frozen   : 4600000  # [J/K/m3] heat capacity for frozen soil (Ravens et al, 2023)
   c_soil_unfrozen : 7000000  # [J/K/m3] heat capacity for unfrozen soil (Ravens et al, 2023)
-  k_soil_frozen   : 2.7 #  [W/m/K] thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
-  k_soil_unfrozen : 1.5 #  [W/m/K] thermal conductivity for unfrozen soil (Ravens et al, 2023: 0.6 - 1.5)
+  k_soil_frozen_min   : 0.7  # [W/m/K] minimum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
+  k_soil_frozen_max   : 2.7  # [W/m/K] maximum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
+  k_soil_unfrozen_min : 0.6  # [W/m/K] minimum thermal conductivity for unfrozen soil (Ravens et al, 2023: 0.6 - 1.5)
+  k_soil_unfrozen_max : 1.5  # [W/m/K] maximum thermal conductivity for unfrozen soil (Ravens et al, 2023: 0.6 - 1.5)
+  depth_constant_k    : 1  # [m] depth at which k reaches its maximum value. k remains constant below this depth (Ravens, MATLAB script)
+  geothermal_gradient : 0.025  # [K/m] geothermal gradient, used as the boundary condition at the bottom of each 1D model
 
 
 # output

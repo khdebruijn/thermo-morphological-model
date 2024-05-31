@@ -91,8 +91,7 @@ def main(sim, print_report=False):
     
     # show CFL values (they have already been checked to be below 0.5)
     print(textbox("CFL VALUES (for 1D thermal models)"))
-    print(f"CFL frozen soil: {sim.cfl_frozen:.4f}")
-    print(f"CFL unfrozen soil: {sim.cfl_unfrozen:.4f}\n")
+    print(f"current maximum CFL: {np.max(sim.cfl_matrix):.4f}\n")
 
     # loop through (xbeach) timesteps
     print(textbox("STARTING SIMULATION"))
