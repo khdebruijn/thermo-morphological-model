@@ -168,59 +168,6 @@ def linear_interp_with_nearest(xgr, zgr, values, new_xgr, new_zgr):
     new_temperature_values = new_temperature_values.reshape(new_xgr.shape)
 
     return new_temperature_values
-
-def calculate_shoreline_position(xgr, zgr, cross_value=0):
-    """Returns the x value at which the zgrid passes some horizontal line.
-
-    Args:
-        xgr (array): array containing x coordinates
-        zgr (array): array containing z coordinates
-        cross_value (float, optional): the value that the z grid should cross.
-
-    Returns:
-        float: the x-coordinate of the crossing.
-    """
-    
-    zgr_adjusted = zgr - cross_value
-    
-    idx = np.where(np.diff(np.sign(zgr_adjusted)))[0]
-
-    x1, x2 = xgr[idx], xgr[idx+1]
-    z1, z2 = zgr_adjusted[idx], zgr_adjusted[idx+1]
-
-    x_intersection = x1 + (0 - z1)/(z2 - z1) * (x2 - x1)
-    
-    return x_intersection
-    
-def calculate_bluff_edge_toe_position(xgr, zgr):
-    """Calculates the bluff edge and toe position for a given profile. Method by Palaseanu-Lovejoy et al (2016).
-
-    Args:
-        xgr (array): array containing x coordinates
-        zgr (array): array containing z coordinates
-
-    Returns:
-        tuple: tuple of length 2, with the first being the x value of the bluff edge and 
-               the second being the x value of the bluff toe.
-    """
-    p1 = np.array((xgr[0], zgr[0]))
-    p2 = np.array((xgr[-1], zgr[-1]))
-
-    distances = np.zeros(xgr.shape)
-
-    for i in range(len(xgr)):
-        
-        p3 = np.array((xgr[i], zgr[i]))
-            
-        distances[i] = np.cross(p2-p1, p3-p1) / np.linalg.norm(p2-p1)
-        
-        if zgr[i] < xgr[i] * (zgr[-1] - zgr[0]) / (xgr[-1] - xgr[0]) + zgr[0]:
-            distances[i] *= -1
-        
-    bluff_edge_id = np.argmax(distances)
-    bluff_toe_id = np.argmin(distances)
-    
-    return xgr[bluff_edge_id], xgr[bluff_toe_id]
     
     
 # def get_time_vector(datasets):
