@@ -73,9 +73,12 @@ thermal:
   # general
   with_solar                  : True  # include short wave solar radiation in thermal computation step
   with_longwave               : True  # include longwave radiation (incoming & outgoining) in thermal computation step
-  # with_convective             : True  # include convective heat transfer in thermal computation step
   with_latent                 : True  # include latent heat in thermal computation step\
   with_solar_flux_calculator  : True  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
+  
+  # guess for convective heat transfer from water
+  with_convective_transport_water_guess : True  # include a guess of convective heat transfer from water in thermal computation step. If False, a more sophisticated computation is performed
+  hc_guess : 500  # [W/m2/K], guess for the convective heat transfer coefficient from water (from Kobayashi et al, 1999)
 
   # model properties
   dt: 2  # [s] timestep used in the thermal model on the temporal subgrid
@@ -97,8 +100,8 @@ thermal:
   rho_soil_frozen   : 1500   # [kg/m3] density frozen soil, placeholder (placeholder)
   rho_soil_unfrozen : 1500   # [kg/m3] density unfrozen soil, placeholder (placeholder)
   nb              : 0.65  # [-] ground ice content (Ravens et al, 2023: 0.65 - 0.45)
-  c_soil_frozen   : 4600000  # [J/K/m3] heat capacity for frozen soil (Ravens et al, 2023)
-  c_soil_unfrozen : 7000000  # [J/K/m3] heat capacity for unfrozen soil (Ravens et al, 2023)
+  c_soil_frozen   : 4600000  # [J/K/m3] volumetric heat capacity for frozen soil (Ravens et al, 2023)
+  c_soil_unfrozen : 7000000  # [J/K/m3] volumetric heat capacity for unfrozen soil (Ravens et al, 2023)
   k_soil_frozen_min   : 0.7  # [W/m/K] minimum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
   k_soil_frozen_max   : 2.7  # [W/m/K] maximum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
   k_soil_unfrozen_min : 0.6  # [W/m/K] minimum thermal conductivity for unfrozen soil (Ravens et al, 2023: 0.6 - 1.5)

@@ -18,6 +18,7 @@ import xbTools
 from xbTools.grid.creation import xgrid, ygrid
 from xbTools.xbeachtools import XBeachModelSetup
 from xbTools.general.executing_runs import xb_run_script_win
+from xbTools.general.wave_functions import dispersion
 
 from utils.visualization import block_print, enable_print
 from utils.miscellaneous import interpolate_points, get_A_matrix, count_nonzero_until_zero, generate_perpendicular_grids, linear_interp_with_nearest
@@ -715,11 +716,51 @@ class Simulation():
         dry_mask = (self.zgr >= water_level)
         wet_mask = (self.zgr < water_level)
         
-        # temperature difference for convective heat transfer (define temperature flux as positive when it is directed into the ground)
-        temp_diff_at_interface = (air_temp - self.temp_matrix[:,0]) * dry_mask + (sea_temp - self.temp_matrix[:,0]) * wet_mask
+        # determine convective transport from air (formulation from Man, 2023)
+        convective_transport_air = Simulation._calculate_sensible_heat_flux_air(
+            self._get_wind_conditions(timestep_id=timestep_id)[1], 
+            self.temp_matrix[:,0], 
+            air_temp, 
+            )
         
-        # determine convective transport
-        convective_transport = 0  # f(temp_diff_at_interface)
+        # use either an educated guess from Kobayashi et al (1999), or their entire formulation
+        # the entire formulation is a bit slower because of the dispersion relation that needs to be solved
+        if self.config.thermal.with_convective_transport_water_guess:
+            hc = self.config.thermal.hc_guess
+        else:
+            # determine hydraulic parameters for convective heat transfer computation
+            if self.xb_times[timestep_id]:
+                
+                data_path = os.path.join(self.cwd, "xboutput.nc")
+                
+                ds = xr.load_dataset(data_path)
+                
+                H = ds.H.values.flatten()
+
+                wl = self.config.thermal.wl_switch + ds.runup.values.flatten()
+                
+                d = np.maximum(wl - ds.zb.values.flatten(), np.zeros(H.shape))
+                T = self.conditions[timestep_id]["Tp(s)"]
+                                
+            else:
+                H = np.ones(self.xgr.shape) * 0.001
+                
+                wl = self.config.thermal.wl_switch
+                
+                d = np.maximum(wl - self.zgr, 0)
+                T = 10
+                
+            # determine convective transport from water (formulation from Kobayashi, 1999)
+            hc = Simulation._calculate_sensible_heat_flux_water(
+                H, T, d, self.config.xbeach.rho_sea_water,
+                CW=3989, alpha=0.5, nu=1.848*10**-6, ks=2.5*1.90*10**-3, Pr=13.4
+            )
+        
+        # scale hc with temperature difference
+        convective_transport_water = hc * (sea_temp - self.temp_matrix[:,0])
+            
+        # compute total convective transport
+        convective_transport = dry_mask * convective_transport_air + wet_mask * convective_transport_water
         
         # determine radiation, assuming radiation only influences the dry domain
         latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0
@@ -741,47 +782,11 @@ class Simulation():
         # determine temperature of the ghost nodes
         ghost_nodes_temperature = self.temp_matrix[:,0] + heat_flux * self.dz / self.k_matrix[:,0]
         
-        
-        # # apply boundary conditions
-        # frozen_mask = (self.temp_matrix[:,0] < self.config.thermal.T_melt)
-        # unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
-
-        # cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
-        
-        # calculate the new enthalpy
-            # 1) calculate temperature diffusion
-        # ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.temp_matrix[:,1])
-
-            # 2) add radiation, assuming radiation only influences the dry domain
-
-        
-        # ghost_nodes_enth += \
-        #     (self.config.model.timestep*3600) * dry_mask * \
-        #     (latent_flux + sw_flux + lw_flux) / \
-        #     (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
-        
-            # 3) add convective heat transfer from water and air
-        # ghost_nodes_enth += \
-        #     (self.config.model.timestep*3600) * \
-        #     temp_diff_at_interface * \
-        #         (frozen_mask * self.config.thermal.k_soil_frozen + unfrozen_mask * self.config.thermal.k_soil_unfrozen) * \
-        #     self.dz / \
-        #         (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
-        
-        # determine the temperature distribution
-        # ghost_nodes_temperature = \
-        #     frozen_mask * \
-        #         (ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
-        #     unfrozen_mask * \
-        #         (ghost_nodes_enth - \
-        #         (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_frozen * self.config.thermal.T_melt - \
-        #         self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) \
-        #             / (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
-        
         return ghost_nodes_temperature
     
     def _get_bottom_boundary_temperature(self):
-        """This function returns a bottom boundary condition temperature, based on the geothermal gradient.
+        """This function returns a bottom boundary condition temperature, based on the geothermal gradient. It accounts for the
+        angle that each 1D thermal grid makes with the horizontal.
 
         Returns:
             array: bottom temperature
@@ -791,6 +796,91 @@ class Simulation():
         vertical_dist = np.cos(np.abs(self.angles)) * self.dz
         
         return bottom_temp + vertical_dist * self.config.thermal.geothermal_gradient
+    
+    @classmethod
+    def _calculate_sensible_heat_flux_air(v_w, T_soil_surface, T_air, L_e=0.003, nu_air=1.33*10**-5, Pr=0.71, k_air=0.024):
+        """This function computes the sensible heat flux Qs [W/m2] at the soil surface, using a formulation described by Man (2023).
+            A positive flux means that the flux is directed into the soil.
+
+        Args:
+            v_w (float): wind speed at 10-meter height [m/s],
+            T_soil_surface (array): an array containing the soil surface temperature [K],
+            T_air (float): air temperature [K],
+            L_e (float): convective length scale [m]. Defaults to 0.003.
+            nu_air (float, optional): air kinematic viscosity. Defaults to 1.33*10**-5.
+            Pr (float, optional): Prandtl number. Defaults to 0.71.
+            k_air (float, optional): thermal conductivity of air. Defaults to 0.024.
+
+        Returns:
+            array: array containing the sensible heat flux for each point for which a soil surface temperature was provided.
+        """
+       
+        Qs =  0.0296 * (v_w * L_e / nu_air)**(4/5) * Pr**(1/3) * k_air / L_e * (T_air - T_soil_surface)
+       
+        return Qs
+    
+    @classmethod
+    def _calculate_sensible_heat_flux_water(
+        H, T, d, rho_seawater, CW=3989, alpha=0.5, nu=1.848*10**-6, ks=2.5*1.90*10**-3, Pr=13.4
+        ):
+        """This function calculates the sensible heat flux between (sea) water and soil. The computation is based on Kobayashi 
+        et al (1999) for the general formulation of the heat flux, Kobayashi & Aktan (1986) for specific formulations of 
+        parameters, and Jonsson (1966) for specific parameter values. Note: the formulation by Kobayashi et al (1999) is meant
+        specifically for breaking waves. A positive flux means that the flux is directed into the soil."""
+        # check for nan values in H array
+        mask = np.nonzero(1 - np.isnan(H))
+        
+        # calculate k based on linear wave theory
+        kr = []
+        for dr in d[mask]:
+            
+            kr.append(dispersion(2 * np.pi / T, dr))
+        
+        # convert to array
+        kr = np.array(kr)
+        
+        # compute volumetric heat capacity
+        cw = CW * rho_seawater
+        
+        # compute representative fluid velocity immediately outside the boundary layer
+        u_b = np.pi * H[mask] / (T * np.sinh(kr * dr))
+        
+        # fw is set to 0.05
+        fw = Simulation._get_fw()
+        
+        # calculate u-star, which is necessary for determining the final coefficient
+        u_star = np.sqrt(0.5 * fw) * u_b
+        
+        # the roughness should be checked to be above 70, otherwise another formulation should be used for the coefficient E
+        roughness = u_star * ks / nu
+        
+        # parameter depending on whether the turbulent boundary layer flow is hydraulically smooth or fully rough
+        E = 0.52 * roughness**0.45 * Pr**0.8
+        
+        # sensible heat flux factor [W/m2/K]
+        hc = alpha * fw * cw * u_b / (1 + np.sqrt(0.5 * fw) * E)
+        
+        return hc
+        
+    @classmethod
+    def _get_fw():
+        """this computation is required to get values from the graph providing fw in Jonsson (1966)"""
+        # Reynolds number
+        # Re = np.max(d[mask]) * u_b / nu
+        
+        # maximum surface elevation, and particle amplitude.
+        # a = H[mask] / 2
+        
+        # z0 = - d[mask] + h_bed
+        # amx = a * np.cosh(kr * (d[mask] + z0)) / np.sinh(kr * d[mask])
+        # amz = a * np.sinh(kr * (d[mask] + z0)) / np.sinh(kr * d[mask])
+        
+        # with the Reynolds number and the maximum particle displacement divided by k, a value for fw can be read.
+        # this value has a high uncertainty. 
+        # a value of 0.05 is used here, which was found to be somewhat representible
+        
+        return 0.05
+
     
     def update_grid(self, fp_xbeach_output="sedero.txt"):
         """This function updates the current grid, calculates the angles of the new grid with the horizontal, generates a new thermal grid 
@@ -921,7 +1011,7 @@ class Simulation():
         
         # 1) latitude and orientation
         phi = self.config.model.latitude / 360 * 2 * np.pi
-        beta = (90 - self.config.bathymetry.grid_orientation) / 360 * 2 * np.pi
+        beta = (90 - self.config.bathymetry.grid_orientation) / 360 * 2 * np.pi  # clockwise from the north
         
         # 2) local angles
         alpha = angle / 360 * 2 * np.pi
@@ -929,47 +1019,61 @@ class Simulation():
         # 3) declination, Sarbu (2017)
         delta = 23.45 * np.sin(
             (360/365 * (284 + daterange.dayofyear.values)) / 360 * 2 * np.pi
-            )
+            ) / 360 * 2 * np.pi
         
-        # 4) hour angle, for Alaska timezone difference w.r.t. UTC is -8h
+        # 4) hour angle (for Alaska timezone difference w.r.t. UTC is -8h)
         local_hour_of_day = daterange.hour.values + timezone_diff
-        # convert to hour angle
+            # convert to hour angle
         h = (((local_hour_of_day - 12) % 24)/24) * 2 * np.pi
-        # convert angles to range [-pi, pi]
+            # convert angles to range [-pi, pi]
         mask = np.nonzero(h>=np.pi)
         h[mask] = -((2 * np.pi) - h[mask])
         
         # 5) calculate altitude angle off of the horizontal that the suns rays strike a horizontal surface
-        A = np.arcsin(np.sin(phi) * np.sin(delta) + np.cos(phi) * np.cos(delta) * np.cos(h))
+        A = np.arcsin(np.cos(phi) * np.cos(delta) * np.cos(h) + np.sin(phi) * np.sin(delta))
         
-        # 6) calculate the azimuth
-        AZ = np.cos(delta) * (np.sin(h)) / np.cos(A)
+        # 6) calculate the (unmodified) azimuth
+        AZ_no_mod = np.arcsin((np.cos(delta) * (np.sin(h)) / np.cos(A)))
+        
+        AZ_mod = np.copy(AZ_no_mod)  # create a copy of the unmodified azimuth, which will be modified
         
         # correct azimuth for when close to solstices (“Central Beaufort Sea Wave and Hydrodynamic Modeling Study Report 1: Field Measurements and Model Development,” n.d.)
-        ew_AM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day <= 12)) # east-west AM mask
-        ew_PM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day > 12)) # east-west PM mask
-
-        AZ[ew_AM_mask] = -np.pi + np.abs(AZ[ew_AM_mask])
-        AZ[ew_PM_mask] = np.pi - np.abs(AZ[ew_PM_mask])
+        ew_AM_mask = np.nonzero(
+            (A > 0) * (np.cos(h) <= np.tan(delta) / np.tan(phi)) * (local_hour_of_day <= 12)
+            ) # east-west AM mask
+        ew_PM_mask = np.nonzero(
+            (A > 0) * (np.cos(h) <= np.tan(delta) / np.tan(phi)) * (local_hour_of_day > 12)
+            ) # east-west PM mask
         
-        # convert to azimuth measured clockwise from the east
-        Z = np.arcsin(np.cos(delta) * np.sin(h) / np.cos(A)) + 1/2 * np.pi
+        # modify azimuth
+        AZ_mod[ew_AM_mask] = -np.pi + np.abs(AZ_no_mod[ew_AM_mask])
+        AZ_mod[ew_PM_mask] = np.pi - AZ_no_mod[ew_PM_mask]
+        
+        # convert from (clockwise from south) to (clockwise from east)
+        Z = AZ_mod + 1/2 * np.pi
 
         # 7) calculate multiplication factor for computational domain
         sin_theta = np.sin(A) * np.cos(alpha) - np.cos(A) * np.sin(alpha) * np.sin(Z - beta)
+        theta = np.arcsin(sin_theta)
         
         # 8) calculate multiplication factor for flat surface
         sin_0 = np.sin(A) * np.cos(0) - np.cos(A) * np.sin(0) * np.sin(Z - beta)
         
         # 9) in order to avoid very peaky scales, let us take the daily maximum and use that for scaling.
         sin_theta_2d = sin_theta.reshape((-1, 24))
-        sin_theta_daily_max = np.max(sin_theta_2d, axis=1).flatten()
+        sin_theta_daily_max_2d = np.max(sin_theta_2d, axis=1)
+        sin_theta_daily_max = np.repeat(sin_theta_daily_max_2d.flatten(), 24)
 
         sin_0_2d = sin_0.reshape((-1, 24))
-        sin_0_daily_max = np.max(sin_0_2d, axis=1).flatten()
-        
+        sin_0_daily_max_2d = np.max(sin_0_2d, axis=1)
+        sin_0_daily_max = np.repeat(sin_0_daily_max_2d.flatten(), 24)
+
         # 10) calculate enhancement factor
         factor = sin_theta_daily_max / sin_0_daily_max
+        
+        # 11) filter out values where it the angle theta is negative (as that means radiation hits the surface from below)
+        shadow_mask = np.nonzero(theta < 0)
+        factor[shadow_mask] = 0
         
         return factor
         
@@ -1118,6 +1222,45 @@ class Simulation():
     ##            # LEGACY CODE                   ##
     ##                                            ##
     ################################################
+    
+    # Old code from ghost nodes
+    # temperature difference for convective heat transfer (define temperature flux as positive when it is directed into the ground)
+    # temp_diff_at_interface = (air_temp - self.temp_matrix[:,0]) * dry_mask + (sea_temp - self.temp_matrix[:,0]) * wet_mask
+    # # apply boundary conditions
+    # frozen_mask = (self.temp_matrix[:,0] < self.config.thermal.T_melt)
+    # unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+
+    # cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
+    
+    # calculate the new enthalpy
+        # 1) calculate temperature diffusion
+    # ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.temp_matrix[:,1])
+
+        # 2) add radiation, assuming radiation only influences the dry domain
+    
+    # ghost_nodes_enth += \
+    #     (self.config.model.timestep*3600) * dry_mask * \
+    #     (latent_flux + sw_flux + lw_flux) / \
+    #     (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
+    
+        # 3) add convective heat transfer from water and air
+    # ghost_nodes_enth += \
+    #     (self.config.model.timestep*3600) * \
+    #     temp_diff_at_interface * \
+    #         (frozen_mask * self.config.thermal.k_soil_frozen + unfrozen_mask * self.config.thermal.k_soil_unfrozen) * \
+    #     self.dz / \
+    #         (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
+    
+    # determine the temperature distribution
+    # ghost_nodes_temperature = \
+    #     frozen_mask * \
+    #         (ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
+    #     unfrozen_mask * \
+    #         (ghost_nodes_enth - \
+    #         (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_frozen * self.config.thermal.T_melt - \
+    #         self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) \
+    #             / (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
+    
     
     # Old code from solar flux calculator:
     # def solar_flux_calculator(self, timestep_id, I0, timezone_diff):

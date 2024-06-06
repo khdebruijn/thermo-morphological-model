@@ -102,11 +102,6 @@ def main(sim, print_report=False):
         # write output variables to output file every output interval
         if timestep_id in sim.temp_output_ids:
             sim.write_output(timestep_id)
-        
-        # loop through thermal subgrid timestep
-        for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
-            
-            sim.thermal_update(timestep_id, subgrid_timestep_id)
             
         # check if xbeach is enabled for current timestep
         if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
@@ -140,6 +135,12 @@ def main(sim, print_report=False):
             
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid("xboutput.nc")
+            
+        # loop through thermal subgrid timestep
+        for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
+            
+            sim.thermal_update(timestep_id, subgrid_timestep_id)
+            
 
     print(textbox("SIMULATION FINISHED"))
     
