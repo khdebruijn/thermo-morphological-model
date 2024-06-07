@@ -36,8 +36,8 @@ bathymetry:
   offshore_max_depth          :  5  # [m] maximum offshore depth
   offshore_slope              :  0.007  # [-] slope of the offshore section, i.e., height/width
   continental_flat_width      :  400  # [m] width of the continental flat section
-  with_artificial             :  False  # whether or not to extend to bathymetry with an artificial depth increase (if required by xbeach)
-  artificial_max_depth        :  15  # [m] maximum depth of the artificial section
+  with_artificial             :  True  # whether or not to extend to bathymetry with an artificial depth increase (if required by xbeach)
+  artificial_max_depth        :  10  # [m] maximum depth of the artificial section
   artificial_slope            :  0.02  # [-] slope of the artificial section, i.e., height/width
   N                           :  100 # number of points of each section
 

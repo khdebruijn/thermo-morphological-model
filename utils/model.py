@@ -205,7 +205,7 @@ class Simulation():
         self.xb_setup.set_grid(self.xgr, None, self.zgr, posdwn=-1)
         self.xb_setup.set_waves('parametric', {
             # need to give each parameter as series (in this case, with length 1)
-            "Hm0":self.conditions[timestep_id]["Hs(m)"],
+            "Hm0":self.conditions[timestep_id]["Hs(m)"],  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
             "Tp":self.conditions[timestep_id]["Tp(s)"],
             "mainang":self.conditions[timestep_id]["Dp(deg)"],  # relative to true north
             "gammajsp": 1.3,  # placeholder
@@ -240,7 +240,7 @@ class Simulation():
             
             # grid parameters
             # most already specified with xb_setup.set_grid(...)
-            "alfa": self.config.bathymetry.grid_orientation,
+            "alfa": self.config.bathymetry.grid_orientation,  # counter-clockwise from the east
             "thetamin": -90,
             "thetamax": 90,
             "dtheta": 15,
