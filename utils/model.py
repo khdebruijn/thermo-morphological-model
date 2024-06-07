@@ -717,8 +717,9 @@ class Simulation():
         wet_mask = (self.zgr < water_level)
         
         # determine convective transport from air (formulation from Man, 2023)
+        ___, wind_velocity = self._get_wind_conditions(timestep_id=timestep_id)
         convective_transport_air = Simulation._calculate_sensible_heat_flux_air(
-            self._get_wind_conditions(timestep_id=timestep_id)[1], 
+            wind_velocity, 
             self.temp_matrix[:,0], 
             air_temp, 
             )
@@ -798,7 +799,7 @@ class Simulation():
         return bottom_temp + vertical_dist * self.config.thermal.geothermal_gradient
     
     @classmethod
-    def _calculate_sensible_heat_flux_air(v_w, T_soil_surface, T_air, L_e=0.003, nu_air=1.33*10**-5, Pr=0.71, k_air=0.024):
+    def _calculate_sensible_heat_flux_air(self, v_w, T_soil_surface, T_air, L_e=0.003, nu_air=1.33*10**-5, Pr=0.71, k_air=0.024):
         """This function computes the sensible heat flux Qs [W/m2] at the soil surface, using a formulation described by Man (2023).
             A positive flux means that the flux is directed into the soil.
 
