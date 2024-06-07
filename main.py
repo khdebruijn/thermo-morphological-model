@@ -7,7 +7,9 @@ import numpy as np
 import pandas as pd
 
 from utils.model import Simulation
+from utils.bathymetry import generate_schematized_bathymetry
 from utils.miscellaneous import textbox
+
 
 def main(sim, print_report=False):
     """run this function to perform a simulation
@@ -39,10 +41,42 @@ def main(sim, print_report=False):
         )
     print("succesfully generated xbeach times")
     
+    
+    if sim.config.bathymetry.with_schematized_bathymetry:
+        xgr, zgr = generate_schematized_bathymetry(
+            bluff_flat_length=sim.config.bathymetry.bluff_flat_length,
+        
+            bluff_height=sim.config.bathymetry.bluff_height, 
+            bluff_slope=sim.config.bathymetry.bluff_slope,
+            
+            beach_width=sim.config.bathymetry.beach_width, 
+            beach_slope=sim.config.bathymetry.beach_slope,
+            
+            nearshore_max_depth=sim.config.bathymetry.nearshore_max_depth, 
+            nearshore_slope=sim.config.bathymetry.nearshore_slope,
+            
+            offshore_max_depth=sim.config.bathymetry.offshore_max_depth, 
+            offshore_slope=sim.config.bathymetry.offshore_slope,
+            
+            contintental_flat_width=sim.config.bathymetry.continental_flat_width,
+            
+            with_artificial=sim.config.bathymetry.with_artificial,
+            artificial_max_depth=sim.config.bathymetry.artificial_max_depth,
+            artificial_slope=sim.config.bathymetry.artificial_slope,
+            
+            N=sim.config.bathymetry.N
+        )
+        
+        np.savetxt("x.grd", xgr)
+        np.savetxt("bed.dep", zgr)
+        
+        print("succesfully generated schematized bathymetry")
+    
+    
     # generate initial grid files and save them
     xgr, zgr, ne_layer = sim.generate_initial_grid(
-        bathy_path="bed.dep",
-        bathy_grid_path="x.grd"
+        bathy_path=sim.config.bathymetry.depfile,
+        bathy_grid_path=sim.config.bathymetry.xfile
         )
     print("succesfully generated grid")
     
@@ -50,9 +84,14 @@ def main(sim, print_report=False):
     sim.initialize_thermal_module()
     print("succesfully initialized thermal module\n")
     
+    # initialize solar flux calculator
+    if sim.config.thermal.with_solar_flux_calculator:
+        sim.initialize_solar_flux_calculator(sim.config.model.time_zone_diff)
+    print("succesfully initialized solar flux calculator")
+    
+    # show CFL values (they have already been checked to be below 0.5)
     print(textbox("CFL VALUES (for 1D thermal models)"))
-    print(f"CFL frozen soil: {sim.cfl_frozen:.4f}")
-    print(f"CFL unfrozen soil: {sim.cfl_unfrozen:.4f}\n")
+    print(f"current maximum CFL: {np.max(sim.cfl_matrix):.4f}\n")
 
     # loop through (xbeach) timesteps
     print(textbox("STARTING SIMULATION"))
@@ -63,14 +102,9 @@ def main(sim, print_report=False):
         # write output variables to output file every output interval
         if timestep_id in sim.temp_output_ids:
             sim.write_output(timestep_id)
-        
-        # loop through thermal subgrid timestep
-        for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
-            
-            sim.thermal_update(timestep_id, subgrid_timestep_id)
             
         # check if xbeach is enabled for current timestep
-        if xb_times[timestep_id]:
+        if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
             
             # calculate the current thaw depth
             sim.find_thaw_depth()
@@ -101,6 +135,12 @@ def main(sim, print_report=False):
             
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid("xboutput.nc")
+            
+        # loop through thermal subgrid timestep
+        for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
+            
+            sim.thermal_update(timestep_id, subgrid_timestep_id)
+            
 
     print(textbox("SIMULATION FINISHED"))
     

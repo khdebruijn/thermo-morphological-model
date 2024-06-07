@@ -8,7 +8,7 @@
   **********************************************************
  
   Simulation started: YYYYMMDD    hh:mm:ss     time zone (UTC)
-                      20240520  11:56:30     +0200
+                      20240531  17:37:53     +0200
  
   General Input Module
   Reading input parameters:
@@ -38,7 +38,7 @@
                       xori =.0000
                       yori =.0000
                       alfa =.0000
-                        nx =237
+                        nx =186
                         ny =0
                     posdwn =-1.0000
                    depfile =bed.dep
@@ -315,6 +315,8 @@
   Overall Trep from all spectra calculated:8.75 s
    No dispersion convergence found for wave train           1  in boundary condi
  tion generation
+   No dispersion convergence found for wave train           2  in boundary condi
+ tion generation
    No dispersion convergence found for wave train           3  in boundary condi
  tion generation
    No dispersion convergence found for wave train           4  in boundary condi
@@ -455,18 +457,6 @@
  tion generation
    No dispersion convergence found for wave train          72  in boundary condi
  tion generation
-   No dispersion convergence found for wave train          73  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          74  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          75  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          76  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          77  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          78  in boundary condi
- tion generation
   Calculating Fourier components
   5.0% done
   10.0% done
@@ -510,22 +500,22 @@
  Calculating wave energy envelope at boundary.
   100.0% done
   Wave bin1 contains.00% of total energy
-  Wave bin2 contains.13% of total energy
-  Wave bin3 contains.71% of total energy
-  Wave bin4 contains.57% of total energy
-  Wave bin5 contains2.03% of total energy
-  Wave bin6 contains9.71% of total energy
-  Wave bin7 contains12.32% of total energy
-  Wave bin8 contains9.43% of total energy
-  Wave bin9 contains20.65% of total energy
-  Wave bin10 contains12.40% of total energy
-  Wave bin11 contains9.92% of total energy
-  Wave bin12 contains11.84% of total energy
-  Wave bin13 contains7.36% of total energy
-  Wave bin14 contains1.69% of total energy
-  Wave bin15 contains.10% of total energy
-  Wave bin16 contains.84% of total energy
-  Wave bin17 contains.31% of total energy
+  Wave bin2 contains.11% of total energy
+  Wave bin3 contains.24% of total energy
+  Wave bin4 contains1.16% of total energy
+  Wave bin5 contains1.38% of total energy
+  Wave bin6 contains6.53% of total energy
+  Wave bin7 contains12.22% of total energy
+  Wave bin8 contains9.32% of total energy
+  Wave bin9 contains14.59% of total energy
+  Wave bin10 contains16.67% of total energy
+  Wave bin11 contains11.80% of total energy
+  Wave bin12 contains10.46% of total energy
+  Wave bin13 contains7.32% of total energy
+  Wave bin14 contains6.44% of total energy
+  Wave bin15 contains1.62% of total energy
+  Wave bin16 contains.00% of total energy
+  Wave bin17 contains.15% of total energy
   Wave bin18 contains.00% of total energy
    Writing wave energy toE_reuse.bcf ...
   file done
@@ -558,8 +548,8 @@
   Spectral wave boundary conditions complete
   --------------------------------
   Boundary conditions complete, starting computation
-   Duration   :  0.171875000000000       seconds
-   Timesteps  :           8
-   Average dt :  0.125000000000000       seconds
-   Unit speed :  9.027048319327732E-005  seconds/1
+   Duration   :  0.218750000000000       seconds
+   Timesteps  :           7
+   Average dt :  0.142857142857143       seconds
+   Unit speed :  1.671122994652406E-004  seconds/1
   End of program xbeach

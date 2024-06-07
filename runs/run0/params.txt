@@ -1,5 +1,5 @@
 %% XBeach model: Run C:\Users\bruij_kn\OneDrive - Stichting Deltares\Documents\GitHub\thermo-morphological-model\runs\run0: timestep 0 
-%% Params created on 2024-05-20 11H:05m 
+%% Params created on 2024-05-31 17H:05m 
 %% Params created by bruij_kn 
 
 %% General 
@@ -11,7 +11,7 @@ wbctype             = parametric
 
 vardx               = 1
 posdwn              = -1
-nx                  = 237
+nx                  = 186
 ny                  = 0
 xori                = 0
 yori                = 0

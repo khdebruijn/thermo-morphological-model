@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from utils.miscellaneous import calculate_bluff_edge_toe_position, calculate_shoreline_position
+from utils.bathymetry import calculate_bluff_edge_toe_position, calculate_shoreline_position
 
 
 def block_print():

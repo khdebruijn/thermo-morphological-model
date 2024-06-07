@@ -18,6 +18,7 @@ import xbTools
 from xbTools.grid.creation import xgrid, ygrid
 from xbTools.xbeachtools import XBeachModelSetup
 from xbTools.general.executing_runs import xb_run_script_win
+from xbTools.general.wave_functions import dispersion
 
 from utils.visualization import block_print, enable_print
 from utils.miscellaneous import interpolate_points, get_A_matrix, count_nonzero_until_zero, generate_perpendicular_grids, linear_interp_with_nearest
@@ -105,7 +106,7 @@ class Simulation():
         self.t_end = pd.to_datetime(t_end)
         
         # this variable will be used to keep track of time
-        self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h')
+        self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left')
         
         # time indexing is easier for numerical models    
         self.T = np.arange(0, len(self.timestamps), 1) 
@@ -239,7 +240,7 @@ class Simulation():
             
             # grid parameters
             # most already specified with xb_setup.set_grid(...)
-            "alfa": self.config.model.grid_orientation,
+            "alfa": self.config.bathymetry.grid_orientation,
             "thetamin": -90,
             "thetamax": 90,
             "dtheta": 15,
@@ -450,7 +451,7 @@ class Simulation():
                     }
         
         mask = np.nonzero((ct==1) * (self.conditions==0))
-        print(mask)
+
         self.conditions[mask] = zero_conditions
         
         return ct
@@ -494,7 +495,7 @@ class Simulation():
         self.temp_matrix = np.zeros((len(self.xgr), self.config.thermal.grid_resolution))
         
         # initialize the associated grid
-        self.abs_xgr_new, self.abs_zgr_new = generate_perpendicular_grids(self.xgr, self.zgr)
+        self.abs_xgr, self.abs_zgr = generate_perpendicular_grids(self.xgr, self.zgr)
         
         # set the above determined initial conditions for the xgr
         for i in range(len(self.temp_matrix)):
@@ -502,7 +503,10 @@ class Simulation():
                 self.temp_matrix[i,:] = ground_temp_distr_dry[:,1]
             else:
                 self.temp_matrix[i,:] = ground_temp_distr_wet[:,1]
-                
+        
+        # set initial ghost node temperature as a copy of the surface node of the temperature matrix
+        self.ghost_nodes_temperature = self.temp_matrix[:,0]
+        
         # find and write the initial thaw depth
         self.find_thaw_depth()
         self.write_ne_layer()
@@ -510,32 +514,59 @@ class Simulation():
         # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
         frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+                    
+        # initialize linear distribution of k, starting at min value and ending at max value (at a depth of 1m)
+        id_kmax = np.argmin(np.abs(self.thermal_zgr - self.config.thermal.depth_constant_k))  # id of the grid point at which the maximum k should be reached
+        self.k_unfrozen_distr = np.append(
+            np.linspace(
+                self.config.thermal.k_soil_unfrozen_min, 
+                self.config.thermal.k_soil_unfrozen_max,
+                len(self.thermal_zgr[:id_kmax])), 
+            np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_unfrozen_max)
+        self.k_frozen_distr = np.append(
+            np.linspace(
+                self.config.thermal.k_soil_frozen_min, 
+                self.config.thermal.k_soil_frozen_max,
+                len(self.thermal_zgr[:id_kmax])), 
+            np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_frozen_max)
+        
+        # initialize distribution of ground ice content, uniform for now (placeholder)
+        self.nb_distr = np.ones(self.thermal_zgr.shape) * self.config.thermal.nb
         
         # using the states, the initial enthalpy can be determined. The enthalpy matrix is used as the 'preserved' quantity, and is used to numerically solve the
         # heat balance equation. Enthalpy formulation from Ravens et al. (2023).
         self.enthalpy_matrix = \
             frozen_mask * \
-                self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen * self.temp_matrix + \
+                self.config.thermal.c_soil_frozen * self.temp_matrix + \
             unfrozen_mask * \
-                (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen * self.temp_matrix + \
-                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen * self.config.thermal.T_melt + \
-                self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb)
+                (self.config.thermal.c_soil_unfrozen * self.temp_matrix + \
+                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) * self.config.thermal.T_melt + \
+                self.config.thermal.L_water_ice * self.config.thermal.nb)
 
-        # calculate the courant-friedlichs-lewy number and check that it is < 0.5, which is required for this discretization of the 1D heat equation
-        self.cfl_frozen = (self.config.thermal.k_soil_frozen / self.config.thermal.rho_soil_frozen) * (self.config.thermal.dt / (self.dz)**2)
-        self.cfl_unfrozen = (self.config.thermal.k_soil_unfrozen / self.config.thermal.rho_soil_unfrozen) * (self.config.thermal.dt / (self.dz)**2)
+        # initialize c-matrix
+        self.c_matrix = frozen_mask * self.config.thermal.c_soil_frozen + unfrozen_mask * self.config.thermal.c_soil_unfrozen
         
-        if self.cfl_frozen >= 0.5:
-            raise ValueError("CFL should be smaller than 0.5!")
-        if self.cfl_unfrozen >= 0.5:
-            raise ValueError("CFL should be smaller than 0.5!")
+        # initialize k-matrix
+        self.k_matrix = frozen_mask * np.tile(self.k_frozen_distr, (len(self.xgr), 1)) + unfrozen_mask * np.tile(self.k_unfrozen_distr, (len(self.xgr), 1))
+        
+        # calculate the courant-friedlichs-lewy number matrix
+        self.cfl_matrix = self.k_matrix / self.c_matrix * self.config.thermal.dt / self.dz**2
+        
+        # check that all cfl's are <0.5, which is required for this discretization of the 1D heat equation
+        # self.cfl_frozen = (self.config.thermal.k_soil_frozen / self.rho_frozen / self.config.thermal.c_soil_frozen) * (self.config.thermal.dt / (self.dz)**2)
+        # self.cfl_unfrozen = (self.config.thermal.k_soil_unfrozen / self.rho_unfrozen / self.config.thermal.c_soil_unfrozen) * (self.config.thermal.dt / (self.dz)**2)
+        
+        if np.max(self.cfl_matrix >= 0.5):
+            raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
         
         # get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points
         # at the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative
         self.A_matrix = get_A_matrix(self.config.thermal.grid_resolution)
         
-        # which timesteps should have thermal output (i.e., thaw depth, and temperature distribution)
-        self.thermal_output_ids = self.T[::self.config.output.output_res]
+        # initialize angles
+        self._update_angles()
+
+        return None
     
     def print_and_return_A_matrix(self):
         """This function prints and returns the A_matrix"""
@@ -560,7 +591,7 @@ class Simulation():
         Temperature is linearly interpolated for the entire depth, and assumed constant below the center of Layer 4, as well as constant above the center 
         of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
         exchange from the lower layers.
-        """
+        """                                     
         dry_points = np.array([
             [0, df.soil_temperature_level_1.values[0]],
             [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
@@ -584,35 +615,77 @@ class Simulation():
         ground_temp_distr_wet = interpolate_points(wet_points[0,:], wet_points[1,:], n)
         
         return ground_temp_distr_dry, ground_temp_distr_wet
-    
+        
     def thermal_update(self, timestep_id, subgrid_timestep_id):
-        # Only update boundary condition if it's the first time step of the thermal subgrid,
-        # as the boundary condition is constant over the subgrid
-        if subgrid_timestep_id == 0:
-            
-            # get the new boundary condition
-            self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id)
+        """This function is called each subgrid timestep of each timestep, and performs the thermal update of the model.
+
+        Args:
+            timestep_id (int): id of the current timestep
+            subgrid_timestep_id (int): id of the current subgrid timestep
+        """
+        # get the new boundary condition
+        self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id)
+        self.bottom_boundary_temperature = self._get_bottom_boundary_temperature()
         
-        # determine which part of the domain is frozen and unfrozen (needed to later calculate temperature from enthalpy)
-        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
-        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+        # aggregate temperature matrix
+        aggregated_temp_matrix = np.concatenate((
+            self.ghost_nodes_temperature.reshape(len(self.xgr), 1),
+            self.temp_matrix,
+            self.bottom_boundary_temperature.reshape(len(self.xgr), 1)
+            ), axis=1)
         
-        # CFL number is different for different phases
-        cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
+        # determine which part of the domain is frozen and unfrozen (for the aggregated temperature matrix)
+        frozen_mask_aggr = (aggregated_temp_matrix < self.config.thermal.T_melt)
+        unfrozen_mask_aggr = np.ones(frozen_mask_aggr.shape) - frozen_mask_aggr
+        
+        # determine c-matrix
+        self.c_matrix = frozen_mask_aggr * self.config.thermal.c_soil_frozen + \
+                        unfrozen_mask_aggr * self.config.thermal.c_soil_unfrozen
+        
+        # determine k-matrix (extend k-distribution with one copied value at the top and bottom boundary to include ghost nodes)
+        k_frozen_distr_aggr = np.concatenate((
+            np.array([self.k_frozen_distr[0]]),
+            self.k_frozen_distr,
+            np.array([self.k_frozen_distr[-1]])))
+        k_unfrozen_distr_aggr = np.concatenate((
+            np.array([self.k_unfrozen_distr[0]]),
+            self.k_frozen_distr,
+            np.array([self.k_unfrozen_distr[-1]])))
+        
+        self.k_matrix = frozen_mask_aggr * np.tile(k_frozen_distr_aggr, (len(self.xgr), 1)) + \
+                        unfrozen_mask_aggr * np.tile(k_unfrozen_distr_aggr, (len(self.xgr), 1))
+        
+        # determine the courant-friedlichs-lewy number matrix
+        self.cfl_matrix = self.k_matrix / self.c_matrix * self.config.thermal.dt / self.dz**2
+        
+        if np.max(self.cfl_matrix >= 0.5):
+            raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
         
         # get the new enthalpy matrix
-        self.enthalpy_matrix = self.enthalpy_matrix + cfl_matrix * (np.column_stack((self.ghost_nodes_temperature, self.temp_matrix)) @ self.A_matrix)
+        self.enthalpy_matrix = self.enthalpy_matrix + \
+                               (self.cfl_matrix * self.c_matrix * aggregated_temp_matrix) @ self.A_matrix
+        
+        # determine state masks (which part of the domain is frozen, in between, or unfrozen (needed to later calculate temperature from enthalpy))
+        frozen_mask = (self.enthalpy_matrix / self.config.thermal.c_soil_frozen < self.config.thermal.T_melt)
+        inbetween_mask = ((self.enthalpy_matrix / self.config.thermal.c_soil_frozen) >= self.config.thermal.T_melt) * \
+                         ((self.enthalpy_matrix - \
+                             (self.config.thermal.c_soil_frozen - self.config.thermal.c_soil_unfrozen) * self.config.thermal.T_melt - \
+                              self.config.thermal.L_water_ice * self.config.thermal.nb) < self.config.thermal.T_melt)
+                          
+        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask - inbetween_mask
         
         # from this new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
         # again, the state masks are used to make this calculation faster
         self.temp_matrix = \
             frozen_mask * \
-                (self.enthalpy_matrix / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
+                (self.enthalpy_matrix / (self.config.thermal.c_soil_frozen)) + \
+            inbetween_mask * \
+                (self.config.thermal.T_melt) * \
             unfrozen_mask * \
                 (self.enthalpy_matrix - \
-                ((self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen) * self.config.thermal.T_melt - \
-                self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) / \
-                    (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
+                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) * self.config.thermal.T_melt - \
+                self.config.thermal.L_water_ice * self.config.thermal.nb) / \
+                    (self.config.thermal.c_soil_unfrozen)
         
         return None
      
@@ -643,54 +716,171 @@ class Simulation():
         dry_mask = (self.zgr >= water_level)
         wet_mask = (self.zgr < water_level)
         
-        # temperature difference for convective heat transfer (define temperature flux as positive when it is directed into the ground)
-        temp_diff_at_interface = (air_temp - self.temp_matrix[:,0]) * dry_mask + (sea_temp - self.temp_matrix[:,0]) * wet_mask
+        # determine convective transport from air (formulation from Man, 2023)
+        convective_transport_air = Simulation._calculate_sensible_heat_flux_air(
+            self._get_wind_conditions(timestep_id=timestep_id)[1], 
+            self.temp_matrix[:,0], 
+            air_temp, 
+            )
         
-        # apply boundary conditions
-        frozen_mask = (self.temp_matrix[:,0] < self.config.thermal.T_melt)
-        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+        # use either an educated guess from Kobayashi et al (1999), or their entire formulation
+        # the entire formulation is a bit slower because of the dispersion relation that needs to be solved
+        if self.config.thermal.with_convective_transport_water_guess:
+            hc = self.config.thermal.hc_guess
+        else:
+            # determine hydraulic parameters for convective heat transfer computation
+            if self.xb_times[timestep_id]:
+                
+                data_path = os.path.join(self.cwd, "xboutput.nc")
+                
+                ds = xr.load_dataset(data_path)
+                
+                H = ds.H.values.flatten()
 
-        cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
+                wl = self.config.thermal.wl_switch + ds.runup.values.flatten()
+                
+                d = np.maximum(wl - ds.zb.values.flatten(), np.zeros(H.shape))
+                T = self.conditions[timestep_id]["Tp(s)"]
+                                
+            else:
+                H = np.ones(self.xgr.shape) * 0.001
+                
+                wl = self.config.thermal.wl_switch
+                
+                d = np.maximum(wl - self.zgr, 0)
+                T = 10
+                
+            # determine convective transport from water (formulation from Kobayashi, 1999)
+            hc = Simulation._calculate_sensible_heat_flux_water(
+                H, T, d, self.config.xbeach.rho_sea_water,
+                CW=3989, alpha=0.5, nu=1.848*10**-6, ks=2.5*1.90*10**-3, Pr=13.4
+            )
         
-        # calculate the new enthalpy
-            # 1) calculate temperature diffusion
-        ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.temp_matrix[:,1])
-
-            # 2) add radiation, assuming radiation only influences the dry domain
+        # scale hc with temperature difference
+        convective_transport_water = hc * (sea_temp - self.temp_matrix[:,0])
+            
+        # compute total convective transport
+        convective_transport = dry_mask * convective_transport_air + wet_mask * convective_transport_water
+        
+        # determine radiation, assuming radiation only influences the dry domain
         latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0
         lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0
+        
         if self.config.thermal.with_solar:
+            I0 = row["mean_surface_net_short_wave_radiation_flux"]
+            
             if self.config.thermal.with_solar_flux_calculator:
-                sw_flux = self.solar_flux_calculator(timestep_id, row["mean_surface_net_short_wave_radiation_flux"], )
+                sw_flux = self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
             else:
-                sw_flux = row["mean_surface_net_short_wave_radiation_flux"]
+                sw_flux = I0
         else:
             sw_flux = 0
         
-        ghost_nodes_enth += \
-            self.config.thermal.dt * dry_mask * \
-            (latent_flux + sw_flux + lw_flux) / \
-            (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
+        # add all heat fluxes  together
+        heat_flux = convective_transport + latent_flux + lw_flux + sw_flux
         
-            # 3) add convective heat transfer from water and air
-        ghost_nodes_enth += \
-            self.config.thermal.dt * \
-            temp_diff_at_interface * \
-                (frozen_mask * self.config.thermal.k_soil_frozen + unfrozen_mask * self.config.thermal.k_soil_unfrozen) * \
-            self.dz / \
-                (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
-        
-        # determine the temperature distribution
-        ghost_nodes_temperature = \
-            frozen_mask * \
-                (ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
-            unfrozen_mask * \
-                (ghost_nodes_enth - \
-                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_unfrozen * self.config.thermal.T_melt - \
-                self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) \
-                    / (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
+        # determine temperature of the ghost nodes
+        ghost_nodes_temperature = self.temp_matrix[:,0] + heat_flux * self.dz / self.k_matrix[:,0]
         
         return ghost_nodes_temperature
+    
+    def _get_bottom_boundary_temperature(self):
+        """This function returns a bottom boundary condition temperature, based on the geothermal gradient. It accounts for the
+        angle that each 1D thermal grid makes with the horizontal.
+
+        Returns:
+            array: bottom temperature
+        """
+        bottom_temp = self.temp_matrix[:,-1]
+        
+        vertical_dist = np.cos(np.abs(self.angles)) * self.dz
+        
+        return bottom_temp + vertical_dist * self.config.thermal.geothermal_gradient
+    
+    @classmethod
+    def _calculate_sensible_heat_flux_air(v_w, T_soil_surface, T_air, L_e=0.003, nu_air=1.33*10**-5, Pr=0.71, k_air=0.024):
+        """This function computes the sensible heat flux Qs [W/m2] at the soil surface, using a formulation described by Man (2023).
+            A positive flux means that the flux is directed into the soil.
+
+        Args:
+            v_w (float): wind speed at 10-meter height [m/s],
+            T_soil_surface (array): an array containing the soil surface temperature [K],
+            T_air (float): air temperature [K],
+            L_e (float): convective length scale [m]. Defaults to 0.003.
+            nu_air (float, optional): air kinematic viscosity. Defaults to 1.33*10**-5.
+            Pr (float, optional): Prandtl number. Defaults to 0.71.
+            k_air (float, optional): thermal conductivity of air. Defaults to 0.024.
+
+        Returns:
+            array: array containing the sensible heat flux for each point for which a soil surface temperature was provided.
+        """
+       
+        Qs =  0.0296 * (v_w * L_e / nu_air)**(4/5) * Pr**(1/3) * k_air / L_e * (T_air - T_soil_surface)
+       
+        return Qs
+    
+    @classmethod
+    def _calculate_sensible_heat_flux_water(
+        H, T, d, rho_seawater, CW=3989, alpha=0.5, nu=1.848*10**-6, ks=2.5*1.90*10**-3, Pr=13.4
+        ):
+        """This function calculates the sensible heat flux between (sea) water and soil. The computation is based on Kobayashi 
+        et al (1999) for the general formulation of the heat flux, Kobayashi & Aktan (1986) for specific formulations of 
+        parameters, and Jonsson (1966) for specific parameter values. Note: the formulation by Kobayashi et al (1999) is meant
+        specifically for breaking waves. A positive flux means that the flux is directed into the soil."""
+        # check for nan values in H array
+        mask = np.nonzero(1 - np.isnan(H))
+        
+        # calculate k based on linear wave theory
+        kr = []
+        for dr in d[mask]:
+            
+            kr.append(dispersion(2 * np.pi / T, dr))
+        
+        # convert to array
+        kr = np.array(kr)
+        
+        # compute volumetric heat capacity
+        cw = CW * rho_seawater
+        
+        # compute representative fluid velocity immediately outside the boundary layer
+        u_b = np.pi * H[mask] / (T * np.sinh(kr * dr))
+        
+        # fw is set to 0.05
+        fw = Simulation._get_fw()
+        
+        # calculate u-star, which is necessary for determining the final coefficient
+        u_star = np.sqrt(0.5 * fw) * u_b
+        
+        # the roughness should be checked to be above 70, otherwise another formulation should be used for the coefficient E
+        roughness = u_star * ks / nu
+        
+        # parameter depending on whether the turbulent boundary layer flow is hydraulically smooth or fully rough
+        E = 0.52 * roughness**0.45 * Pr**0.8
+        
+        # sensible heat flux factor [W/m2/K]
+        hc = alpha * fw * cw * u_b / (1 + np.sqrt(0.5 * fw) * E)
+        
+        return hc
+        
+    @classmethod
+    def _get_fw():
+        """this computation is required to get values from the graph providing fw in Jonsson (1966)"""
+        # Reynolds number
+        # Re = np.max(d[mask]) * u_b / nu
+        
+        # maximum surface elevation, and particle amplitude.
+        # a = H[mask] / 2
+        
+        # z0 = - d[mask] + h_bed
+        # amx = a * np.cosh(kr * (d[mask] + z0)) / np.sinh(kr * d[mask])
+        # amz = a * np.sinh(kr * (d[mask] + z0)) / np.sinh(kr * d[mask])
+        
+        # with the Reynolds number and the maximum particle displacement divided by k, a value for fw can be read.
+        # this value has a high uncertainty. 
+        # a value of 0.05 is used here, which was found to be somewhat representible
+        
+        return 0.05
+
     
     def update_grid(self, fp_xbeach_output="sedero.txt"):
         """This function updates the current grid, calculates the angles of the new grid with the horizontal, generates a new thermal grid 
@@ -751,6 +941,141 @@ class Simulation():
         self.bathy_current += interpolated_cum_sedero
         
         return cum_sedero
+    
+    def _get_solar_flux(self, I0, timestep_id):
+        """This function is used to obtain an array of incoming solar radiation for some timestep_id, with values for each grid point in the computational domain.
+
+        Args:
+            I0 (float): incoming radiation (flat surface)
+            timestep_id (int): index of the current timestep
+
+        Returns:
+            array: incoming solar radiation for each grid point in the computational domain
+        """
+        
+        factors = np.zeros(self.angles.shape)
+        
+        for i in range(len(self.angles)):
+            
+            factors[i] = self.solar_flux_map[int(self.angles[i])][int(self.timestamps[timestep_id].day_of_year - 1)]  # index starts at 0, while day_of_year starts at 1, hence -1
+        
+        solar_flux = I0 * factors
+        
+        return solar_flux
+        
+    def initialize_solar_flux_calculator(self, timezone_diff, angle_min=-89, angle_max=89, delta_angle=1, t_start='2000-01-01', t_end='2001-01-01'):
+        """This function initializes a mapping variable for the solar flux calculator. This is required because the enhancement factor is calculated using the
+        maximum insolance per day, making it impossible to calculate each hour seperately. Specific values for enhancement factor are indexed using an angle,
+        followed by the number of the current day of the year minus 1.
+
+        Args:
+            timezone_diff (int): describes the difference in timezone between UTC and the area of interest
+            angle_min (int, optional): minimum angle in the mapping variable. Defaults to -89.
+            angle_max (int, optional): maximum angle in the mapping. Defaults to 89.
+            delta_angle (int, optional): diffence between mapped angles. Defaults to 1.
+            t_start (str, optional): start of the daterange used to calculate the enhancement factor. It is recommended to use a full leap year. Defaults to '2000-01-01'.
+            t_end (str, optional): end of the daterange used to calculate the enhancement factor. It is recommended to use a full leap year.. Defaults to '2001-01-01'.
+
+        Returns:
+            dictionary: the mapping variable used to quickly obtain solar flux enhancement factor values.
+        """
+        self.solar_flux_map = {}
+        
+        for angle in np.arange(angle_min, angle_max+1, delta_angle):
+            
+            t_start_datetime = pd.to_datetime(t_start)
+            t_end_datetime = pd.to_datetime(t_end)
+            
+            t = pd.date_range(t_start_datetime, t_end_datetime, freq='1h', inclusive='left')
+            
+            # for each integer angle in the angle range, an array of enhancement factors is saved, indexable by N (i.e., the N-th day of the year)
+            self.solar_flux_map[angle] = self._calculate_solar_flux_factors(t, angle, timezone_diff)
+        
+        return self.solar_flux_map
+    
+    def _calculate_solar_flux_factors(self, daterange, angle, timezone_diff):
+        """
+        This function calculates the effective solar radiation flux on a sloped surface. The method from Buffo (1972) is used, 
+        assuming that the radiaton on the surface already includes the atmospheric transmission coefficient. Using the radiation data for a flat surface 
+        and the angle of the incoming rays with the flat sruface, the intensity of the incoming rays can be estimated, which can then be projected on an inclined
+        surface.
+
+        Args:
+            daterange (daterange): the dates for which to calculate the solar flux.
+            angle (float): incline of the surface for which to calculate the enhancement factors.
+            timezone_diff (float): difference in hours for the timezone which is modelled relative to UTC.
+
+        Returns:
+            array: enhancement factors for radiation for the given angle for each day in the daterange
+        """       
+        
+        # 1) latitude and orientation
+        phi = self.config.model.latitude / 360 * 2 * np.pi
+        beta = (90 - self.config.bathymetry.grid_orientation) / 360 * 2 * np.pi  # clockwise from the north
+        
+        # 2) local angles
+        alpha = angle / 360 * 2 * np.pi
+        
+        # 3) declination, Sarbu (2017)
+        delta = 23.45 * np.sin(
+            (360/365 * (284 + daterange.dayofyear.values)) / 360 * 2 * np.pi
+            ) / 360 * 2 * np.pi
+        
+        # 4) hour angle (for Alaska timezone difference w.r.t. UTC is -8h)
+        local_hour_of_day = daterange.hour.values + timezone_diff
+            # convert to hour angle
+        h = (((local_hour_of_day - 12) % 24)/24) * 2 * np.pi
+            # convert angles to range [-pi, pi]
+        mask = np.nonzero(h>=np.pi)
+        h[mask] = -((2 * np.pi) - h[mask])
+        
+        # 5) calculate altitude angle off of the horizontal that the suns rays strike a horizontal surface
+        A = np.arcsin(np.cos(phi) * np.cos(delta) * np.cos(h) + np.sin(phi) * np.sin(delta))
+        
+        # 6) calculate the (unmodified) azimuth
+        AZ_no_mod = np.arcsin((np.cos(delta) * (np.sin(h)) / np.cos(A)))
+        
+        AZ_mod = np.copy(AZ_no_mod)  # create a copy of the unmodified azimuth, which will be modified
+        
+        # correct azimuth for when close to solstices (“Central Beaufort Sea Wave and Hydrodynamic Modeling Study Report 1: Field Measurements and Model Development,” n.d.)
+        ew_AM_mask = np.nonzero(
+            (A > 0) * (np.cos(h) <= np.tan(delta) / np.tan(phi)) * (local_hour_of_day <= 12)
+            ) # east-west AM mask
+        ew_PM_mask = np.nonzero(
+            (A > 0) * (np.cos(h) <= np.tan(delta) / np.tan(phi)) * (local_hour_of_day > 12)
+            ) # east-west PM mask
+        
+        # modify azimuth
+        AZ_mod[ew_AM_mask] = -np.pi + np.abs(AZ_no_mod[ew_AM_mask])
+        AZ_mod[ew_PM_mask] = np.pi - AZ_no_mod[ew_PM_mask]
+        
+        # convert from (clockwise from south) to (clockwise from east)
+        Z = AZ_mod + 1/2 * np.pi
+
+        # 7) calculate multiplication factor for computational domain
+        sin_theta = np.sin(A) * np.cos(alpha) - np.cos(A) * np.sin(alpha) * np.sin(Z - beta)
+        theta = np.arcsin(sin_theta)
+        
+        # 8) calculate multiplication factor for flat surface
+        sin_0 = np.sin(A) * np.cos(0) - np.cos(A) * np.sin(0) * np.sin(Z - beta)
+        
+        # 9) in order to avoid very peaky scales, let us take the daily maximum and use that for scaling.
+        sin_theta_2d = sin_theta.reshape((-1, 24))
+        sin_theta_daily_max_2d = np.max(sin_theta_2d, axis=1)
+        sin_theta_daily_max = np.repeat(sin_theta_daily_max_2d.flatten(), 24)
+
+        sin_0_2d = sin_0.reshape((-1, 24))
+        sin_0_daily_max_2d = np.max(sin_0_2d, axis=1)
+        sin_0_daily_max = np.repeat(sin_0_daily_max_2d.flatten(), 24)
+
+        # 10) calculate enhancement factor
+        factor = sin_theta_daily_max / sin_0_daily_max
+        
+        # 11) filter out values where it the angle theta is negative (as that means radiation hits the surface from below)
+        shadow_mask = np.nonzero(theta < 0)
+        factor[shadow_mask] = 0
+        
+        return factor
         
     def write_ne_layer(self):
         """This function writes the thaw depth obtained from the thermal update to a file to be used by xbeach.
@@ -760,7 +1085,7 @@ class Simulation():
         return None
         
     def find_thaw_depth(self):
-        """Finds thaw depth based on the maximum z-value close to the x-grid coordinate (i.e., +-0.5*dx) that is unthawed."""
+        """Finds thaw depth based on the z-values of the two nearest thaw points."""
         # initialize thaw depth array
         self.thaw_depth = np.zeros(self.xgr.shape)
 
@@ -801,79 +1126,6 @@ class Simulation():
                 self.thaw_depth[i] = 0
         
         return self.thaw_depth
-    
-    def solar_flux_calculator(self, timestep_id, I0, timezone_diff):
-        """
-        This function calculates the effective solar radiation flux on a sloped surface. The method from Buffo (1972) is used, 
-        assuming that the radiaton on the surface already includes the atmospheric transmission coefficient. Using the radiation data for a flat surface 
-        and the angle of the incoming rays with the flat sruface, the intensity of the incoming rays can be estimated, which can then be projected on an inclined
-        surface.
-
-        Args:
-            timestep_id (int): index of the current timestep.
-            I0 (float): incoming radiation for the current timestep on a flat surface
-            timezone_diff (float): difference in hours for the timezone which is modelled relative to UTC.
-
-        Returns:
-            array: incoming radiation for sloped surfaces for the computational domain for the current timestep.
-        """       
-        # 1) current timestamp
-        current_timestamp = self.timestamps[timestep_id]
-        
-        # 2) latitude and orientation
-        phi = self.config.model.latitude / 360 * 2 * np.pi
-        beta = (90 - self.model.grid_orientation) / 360 * 2 * np.pi
-        
-        # 3) local angles
-        alpha = -self.angles 
-        
-        # 4) declination, Sarbu (2017)
-        delta = 23.45 * np.sin(
-            (360/365 * (284 + current_timestamp.dayofyear)) / 360 * 2 * np.pi
-            )
-        
-        # 5) hour angle, for Alaska timezone difference w.r.t. UTC is -8h
-        local_hour_of_day = current_timestamp.hour + timezone_diff
-        # convert to hour angle
-        h = (((local_hour_of_day - 12) % 24)/24) * 2 * np.pi
-        # convert angles to range [-pi, pi]
-        mask = np.nonzero(h>=np.pi)
-        h[mask] = -((2 * np.pi) - h[mask])
-        
-        # 6) calculate altitude angle off of the horizontal that the suns rays strike a horizontal surface
-        A = np.arcsin(np.sin(phi) * np.sin(delta) + np.cos(phi) * np.cos(delta) * np.cos(h))
-        
-        # 7) calculate the azimuth
-        AZ = np.cos(delta) * (np.sin(h)) / np.cos(A)
-        
-        # correct azimuth for when close to solstices (“Central Beaufort Sea Wave and Hydrodynamic Modeling Study Report 1: Field Measurements and Model Development,” n.d.)
-        ew_AM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day <= 12))# east-west AM mask
-        ew_PM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day > 12))# east-west PM mask
-
-        AZ[ew_AM_mask] = -np.pi + np.abs(AZ[ew_AM_mask])
-        AZ[ew_PM_mask] = np.pi - np.abs(AZ[ew_PM_mask])
-        
-        # convert to azimuth measured clockwise from the east
-        Z = np.arcsin(np.cos(delta) * np.sin(h) / np.cos(A)) + 1/2 * np.pi
-
-        # 8) calculate multiplication factor for computational domain
-        sin_theta = np.sin(A) * np.cos(alpha) - np.cos(A) * np.sin(alpha) * np.sin(Z - beta)
-        # filter out values larger than 1 (this is only relevant when theta is actually calculated with the arcsin())
-        sin_theta[np.nonzero(sin_theta>1)] = 1
-        # filter out values smaller than 0 (these do not reach the surface)
-        sin_theta[np.nonzero(sin_theta<0)] = 0
-        
-        # 9) calculate multiplication factor for flat surface
-        sin_0 = np.sin(A) * np.cos(0) - np.cos(A) * np.sin(0) * np.sin(Z - beta)
-        # filter out values larger than 1 (this is only relevant when theta is actually calculated with the arcsin())
-        sin_0[np.nonzero(sin_0>1)] = 1
-        # filter out values smaller than 0 (these do not reach the surface)
-        sin_0[np.nonzero(sin_0<0)] = 0
-        
-        # 10) compute corrected values for incoming solar radiation
-        I_theta = sin_theta / sin_0 * I0
-        
-        return I_theta
         
         
     def write_output(self, timestep_id):
@@ -891,8 +1143,8 @@ class Simulation():
             np.savetxt(os.path.join(result_dir_timestep, "zgr.txt"), self.zgr)
         
         if "ground_temperature_distribution" in self.config.output.output_vars:
-            np.savetxt(os.path.join(result_dir_timestep, "xgrid_ground_temperature_distribution.txt"), self.abs_xgr_new.flatten())
-            np.savetxt(os.path.join(result_dir_timestep, "zgrid_ground_temperature_distribution.txt"), self.abs_zgr_new.flatten())
+            np.savetxt(os.path.join(result_dir_timestep, "xgrid_ground_temperature_distribution.txt"), self.abs_xgr.flatten())
+            np.savetxt(os.path.join(result_dir_timestep, "zgrid_ground_temperature_distribution.txt"), self.abs_zgr.flatten())
             np.savetxt(os.path.join(result_dir_timestep, "ground_temperature_distribution.txt"), self.temp_matrix.flatten())
         
         if "thaw_depth" in self.config.output.output_vars:
@@ -932,7 +1184,7 @@ class Simulation():
         with open(fpath) as f:
             df = pd.read_csv(f, parse_dates=['time'])
                     
-            mask = (df["time"] >= tstart) * (df["time"] <= tend)
+            mask = (df["time"] >= tstart) * (df["time"] < tend)
             
             df = df[mask]
                         
@@ -971,7 +1223,127 @@ class Simulation():
     ##                                            ##
     ################################################
     
+    # Old code from ghost nodes
+    # temperature difference for convective heat transfer (define temperature flux as positive when it is directed into the ground)
+    # temp_diff_at_interface = (air_temp - self.temp_matrix[:,0]) * dry_mask + (sea_temp - self.temp_matrix[:,0]) * wet_mask
+    # # apply boundary conditions
+    # frozen_mask = (self.temp_matrix[:,0] < self.config.thermal.T_melt)
+    # unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+
+    # cfl_matrix = frozen_mask * self.cfl_frozen + unfrozen_mask * self.cfl_unfrozen
+    
+    # calculate the new enthalpy
+        # 1) calculate temperature diffusion
+    # ghost_nodes_enth = self.enthalpy_matrix[:,0] + cfl_matrix * (-self.temp_matrix[:,0] + self.temp_matrix[:,1])
+
+        # 2) add radiation, assuming radiation only influences the dry domain
+    
+    # ghost_nodes_enth += \
+    #     (self.config.model.timestep*3600) * dry_mask * \
+    #     (latent_flux + sw_flux + lw_flux) / \
+    #     (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
+    
+        # 3) add convective heat transfer from water and air
+    # ghost_nodes_enth += \
+    #     (self.config.model.timestep*3600) * \
+    #     temp_diff_at_interface * \
+    #         (frozen_mask * self.config.thermal.k_soil_frozen + unfrozen_mask * self.config.thermal.k_soil_unfrozen) * \
+    #     self.dz / \
+    #         (frozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_frozen + unfrozen_mask * (0.5 * self.dz) * 1 * 1 * self.config.thermal.rho_soil_unfrozen)
+    
+    # determine the temperature distribution
+    # ghost_nodes_temperature = \
+    #     frozen_mask * \
+    #         (ghost_nodes_enth / (self.config.thermal.c_soil_frozen / self.config.thermal.rho_soil_frozen)) + \
+    #     unfrozen_mask * \
+    #         (ghost_nodes_enth - \
+    #         (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) / self.config.thermal.rho_soil_frozen * self.config.thermal.T_melt - \
+    #         self.config.thermal.L_water_ice / self.config.thermal.rho_ice * self.config.thermal.nb) \
+    #             / (self.config.thermal.c_soil_unfrozen / self.config.thermal.rho_soil_unfrozen)
+    
+    
     # Old code from solar flux calculator:
+    # def solar_flux_calculator(self, timestep_id, I0, timezone_diff):
+    #     """
+    #     This function calculates the effective solar radiation flux on a sloped surface. The method from Buffo (1972) is used, 
+    #     assuming that the radiaton on the surface already includes the atmospheric transmission coefficient. Using the radiation data for a flat surface 
+    #     and the angle of the incoming rays with the flat sruface, the intensity of the incoming rays can be estimated, which can then be projected on an inclined
+    #     surface.
+
+    #     Args:
+    #         timestep_id (int): index of the current timestep.
+    #         I0 (float): incoming radiation for the current timestep on a flat surface
+    #         timezone_diff (float): difference in hours for the timezone which is modelled relative to UTC.
+
+    #     Returns:
+    #         array: incoming radiation for sloped surfaces for the computational domain for the current timestep.
+    #     """       
+    #     # 1) current timestamp
+    #     current_timestamp = self.timestamps[timestep_id]
+        
+    #     # 2) latitude and orientation
+    #     phi = self.config.model.latitude / 360 * 2 * np.pi
+    #     beta = (90 - self.model.grid_orientation) / 360 * 2 * np.pi
+        
+    #     # 3) local angles
+    #     alpha = -self.angles 
+        
+    #     # 4) declination, Sarbu (2017)
+    #     delta = 23.45 * np.sin(
+    #         (360/365 * (284 + current_timestamp.dayofyear)) / 360 * 2 * np.pi
+    #         )
+        
+    #     # 5) hour angle, for Alaska timezone difference w.r.t. UTC is -8h
+    #     local_hour_of_day = current_timestamp.hour + timezone_diff
+    #     # convert to hour angle
+    #     h = (((local_hour_of_day - 12) % 24)/24) * 2 * np.pi
+    #     # convert angles to range [-pi, pi]
+    #     mask = np.nonzero(h>=np.pi)
+    #     h[mask] = -((2 * np.pi) - h[mask])
+        
+    #     # 6) calculate altitude angle off of the horizontal that the suns rays strike a horizontal surface
+    #     A = np.arcsin(np.sin(phi) * np.sin(delta) + np.cos(phi) * np.cos(delta) * np.cos(h))
+        
+    #     # 7) calculate the azimuth
+    #     AZ = np.cos(delta) * (np.sin(h)) / np.cos(A)
+        
+    #     # correct azimuth for when close to solstices (“Central Beaufort Sea Wave and Hydrodynamic Modeling Study Report 1: Field Measurements and Model Development,” n.d.)
+    #     ew_AM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day <= 12))# east-west AM mask
+    #     ew_PM_mask = np.nonzero((np.cos(h) > np.tan(delta) / np.tan(phi)) + (local_hour_of_day > 12))# east-west PM mask
+
+    #     AZ[ew_AM_mask] = -np.pi + np.abs(AZ[ew_AM_mask])
+    #     AZ[ew_PM_mask] = np.pi - np.abs(AZ[ew_PM_mask])
+        
+    #     # convert to azimuth measured clockwise from the east
+    #     Z = np.arcsin(np.cos(delta) * np.sin(h) / np.cos(A)) + 1/2 * np.pi
+
+    #     # 8) calculate multiplication factor for computational domain
+    #     sin_theta = np.sin(A) * np.cos(alpha) - np.cos(A) * np.sin(alpha) * np.sin(Z - beta)
+    #     # # filter out values larger than 1 (this is only relevant when theta is actually calculated with the arcsin())
+    #     # sin_theta[np.nonzero(sin_theta>1)] = 1
+    #     # # filter out values smaller than 0 (these do not reach the surface)
+    #     # sin_theta[np.nonzero(sin_theta<0)] = 0
+        
+    #     # 9) calculate multiplication factor for flat surface
+    #     sin_0 = np.sin(A) * np.cos(0) - np.cos(A) * np.sin(0) * np.sin(Z - beta)
+    #     # # filter out values larger than 1 (this is only relevant when theta is actually calculated with the arcsin())
+    #     # sin_0[np.nonzero(sin_0>1)] = 1
+    #     # # filter out values smaller than 0 (these do not reach the surface)
+    #     # sin_0[np.nonzero(sin_0<0)] = 0
+        
+    #     # 10) in order to avoid very peaky scales, let us take the daily maximum and use that for scaling.
+    #     sin_theta_2d = sin_theta[:-1].reshape((-1, 24))
+    #     sin_theta_daily_max_2d = np.max(sin_theta_2d, axis=1)
+    #     sin_theta_daily_max = np.repeat(sin_theta_daily_max_2d.flatten(), 24)
+
+    #     sin_0_2d = sin_0[:-1].reshape((-1, 24))
+    #     sin_0_daily_max_2d = np.max(sin_0_2d, axis=1)
+    #     sin_0_daily_max = np.repeat(sin_0_daily_max_2d.flatten(), 24)
+        
+    #     # 10) compute corrected values for incoming solar radiation
+    #     I_theta = sin_theta / sin_0 * I0
+        
+    #     return I_theta
     
         # # slope aspect clockwise from the north
         # beta = (90 - self.config.model.grid_orientation) / 360 * 2 * np.pi

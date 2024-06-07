@@ -12,6 +12,8 @@
    Unknown, unused or multiple statements of parameterTHETANAUT inparams.txt
    No dispersion convergence found for wave train           1  in boundary condi
  tion generation
+   No dispersion convergence found for wave train           2  in boundary condi
+ tion generation
    No dispersion convergence found for wave train           3  in boundary condi
  tion generation
    No dispersion convergence found for wave train           4  in boundary condi
@@ -151,16 +153,4 @@
    No dispersion convergence found for wave train          71  in boundary condi
  tion generation
    No dispersion convergence found for wave train          72  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          73  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          74  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          75  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          76  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          77  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          78  in boundary condi
  tion generation
