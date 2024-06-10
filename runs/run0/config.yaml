@@ -2,6 +2,7 @@
 dataset_parameters:
   database_folder: 'database/datasets'  # datasets location
 
+
 # model settings
 model:
   # nx: 100  # number of points in x-direction
@@ -13,10 +14,12 @@ model:
   call_xbeach_inter:  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
   time_zone_diff: -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
 
+
 # wrapper parameters:
 wrapper:
   dir:  'runs/...'         # location of model run
   sea_ice_threshold: 0.15  # Only run xbeach if sea ice fraction is below threshold, otherwise assume all wave action attenuated
+
 
 # bathymetry parameters
 bathymetry:
@@ -37,9 +40,10 @@ bathymetry:
   offshore_slope              :  0.007  # [-] slope of the offshore section, i.e., height/width
   continental_flat_width      :  400  # [m] width of the continental flat section
   with_artificial             :  True  # whether or not to extend to bathymetry with an artificial depth increase (if required by xbeach)
-  artificial_max_depth        :  10  # [m] maximum depth of the artificial section
+  artificial_max_depth        :  10  # [m] maximum depth of the artificial section (wave heights in dataset are defined at a depth of 10m, so that value is recommended)
   artificial_slope            :  0.02  # [-] slope of the artificial section, i.e., height/width
   N                           :  100 # number of points of each section
+
 
 # xbeach parameters
 xbeach:
