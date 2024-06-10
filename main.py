@@ -90,7 +90,14 @@ def main(sim, print_report=False):
     
     # initialize solar flux calculator
     if sim.config.thermal.with_solar_flux_calculator:
-        sim.initialize_solar_flux_calculator(sim.config.model.time_zone_diff)
+        sim.initialize_solar_flux_calculator(
+            sim.config.model.time_zone_diff,
+            angle_min=sim.config.thermal.angle_min,
+            angle_max=sim.config.thermal.angle_max,
+            delta_angle=sim.config.thermal.delta_angle,
+            t_start=sim.config.thermal.t_start,
+            t_end=sim.config.thermal.t_end,
+            )
     print("succesfully initialized solar flux calculator\n")
     
     # show CFL values (they have already been checked to be below 0.5)

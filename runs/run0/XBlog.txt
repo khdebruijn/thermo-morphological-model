@@ -8,7 +8,7 @@
   **********************************************************
  
   Simulation started: YYYYMMDD    hh:mm:ss     time zone (UTC)
-                      20240610  17:49:28     +0200
+                      20240610  18:01:59     +0200
  
   General Input Module
   Reading input parameters:
@@ -515,21 +515,21 @@
   100.0% done
   Wave bin1 contains.00% of total energy
   Wave bin2 contains.00% of total energy
-  Wave bin3 contains1.28% of total energy
-  Wave bin4 contains.00% of total energy
-  Wave bin5 contains6.27% of total energy
-  Wave bin6 contains4.64% of total energy
-  Wave bin7 contains4.24% of total energy
-  Wave bin8 contains23.68% of total energy
-  Wave bin9 contains16.43% of total energy
-  Wave bin10 contains13.96% of total energy
-  Wave bin11 contains9.84% of total energy
-  Wave bin12 contains11.14% of total energy
-  Wave bin13 contains4.52% of total energy
-  Wave bin14 contains2.39% of total energy
-  Wave bin15 contains1.61% of total energy
-  Wave bin16 contains.00% of total energy
-  Wave bin17 contains.00% of total energy
+  Wave bin3 contains.00% of total energy
+  Wave bin4 contains.19% of total energy
+  Wave bin5 contains5.34% of total energy
+  Wave bin6 contains3.33% of total energy
+  Wave bin7 contains10.25% of total energy
+  Wave bin8 contains14.65% of total energy
+  Wave bin9 contains16.99% of total energy
+  Wave bin10 contains19.11% of total energy
+  Wave bin11 contains13.69% of total energy
+  Wave bin12 contains6.30% of total energy
+  Wave bin13 contains6.04% of total energy
+  Wave bin14 contains.96% of total energy
+  Wave bin15 contains2.47% of total energy
+  Wave bin16 contains.57% of total energy
+  Wave bin17 contains.12% of total energy
   Wave bin18 contains.00% of total energy
    Writing wave energy toE_reuse.bcf ...
   file done
@@ -562,8 +562,8 @@
   Spectral wave boundary conditions complete
   --------------------------------
   Boundary conditions complete, starting computation
-   Duration   :  0.187500000000000       seconds
+   Duration   :  0.265625000000000       seconds
    Timesteps  :          10
    Average dt :  0.100000000000000       seconds
-   Unit speed :  8.187772925764192E-005  seconds/1
+   Unit speed :  1.159934497816594E-004  seconds/1
   End of program xbeach

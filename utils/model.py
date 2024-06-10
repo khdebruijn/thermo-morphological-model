@@ -1064,7 +1064,9 @@ class Simulation():
         self.solar_flux_map = np.zeros(len(self.solar_flux_times) / 24, len(self.solar_flux_angles))
         
         for angle in self.solar_flux_angles:
+            
             angle_id = np.nonzero(angle==self.solar_flux_angles)
+            
             # for each integer angle in the angle range, an array of enhancement factors is saved, indexable by N (i.e., the N-th day of the year)
             self.solar_flux_map[:, angle_id] = self._calculate_solar_flux_factors(self.solar_flux_times, angle, timezone_diff)
         
@@ -1258,8 +1260,8 @@ class Simulation():
         # heat flux variables
         self._check_and_write('solar_radiation_factor', self.factors, dirname=result_dir_timestep)  # 1D series of factors
         self._check_and_write('solar_radiation_flux', self.sw_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
-        self._check_and_write('long_wave_radiation_flux', self.lw_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
-        self._check_and_write('latent_heat_flux', self.latent_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        self._check_and_write('long_wave_radiation_flux', np.ones(1) * (self.lw_flux), dirname=result_dir_timestep)  # single value of heat flux
+        self._check_and_write('latent_heat_flux',np.ones(1) * (self.latent_flux), dirname=result_dir_timestep)  # single value of heat flux
         self._check_and_write('convective_heat_flux', self.convective_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
         self._check_and_write('total_heat_flux', self.heat_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
         
