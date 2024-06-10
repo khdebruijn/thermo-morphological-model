@@ -114,6 +114,11 @@ class Simulation():
         # this array defines when to generate output files
         self.temp_output_ids = np.arange(0, len(self.timestamps), self.config.output.output_res)
         
+        # output timestep ids and timestamps to results directory
+        self._check_and_write("timestamps", self.timestamps, self.result_dir)
+        self._check_and_write("timestep_ids", self.T, self.result_dir)
+        self._check_and_write("timestep_output_ids", self.temp_output_ids, self.result_dir)
+        
     def generate_initial_grid(self, 
                               nx=None, 
                               len_x=None, 
@@ -216,6 +221,7 @@ class Simulation():
         })
         
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
+        self.current_storm_surge = self.conditions[timestep_id]["SS(m)"]  # used for output
         
         # (including: grid/bathymetry, waves input, flow, tide and surge,
         # water level, wind input, sediment input, avalanching, vegetation, 
@@ -280,14 +286,27 @@ class Simulation():
             "break":"roelvink1",
             
             # wind boundary condition
-            "windh": wind_direction,
+            "windth": wind_direction,  # degrees clockwise from the north
             "windv": wind_velocity,
             
             # output variables
             "outputformat":"netcdf",
             "tint":3600,
             "tstart":0,
-            "nglobalvar":["zb","zs","H","runup","sedero"]
+            "nglobalvar":[
+                "zb",  # bed level (1D array)
+                "zs",  # water level (1D array)
+                "H",  # wave height (1D array)
+                "runup",  # run up (value)
+                "sedero",  # cumulative erosion/sedimentation (1D array)
+                "E",  # wave energy (1D array)
+                "Sxx",  # radiation stress (1D array)
+                "Sxy",  # radiation stress (1D array)
+                "Syy",  # radiation stress (1D array)
+                "thetamean",  # mean wave angle  (radians)
+                "vmag",  # Velocity magnitude in cell centre (1D array)
+                "urms",  # Orbital velocity (1D array)
+                ]
         })
         
         # block printing while writing the output (the xbeach toolbox by default prints that it can't plot parametric conditions)
@@ -339,7 +358,8 @@ class Simulation():
     #         pass
         
     def _get_wind_conditions(self, timestep_id):
-        """This function gets the wind conditions from the forcing dataset.
+        """This function gets the wind conditions from the forcing dataset. Wind direction is defined in degrees
+        clockwise from the north (i.e., east = 90 degrees)
 
         Args:
             timestep_id (int): timestep id for the current timestep for which wind dta is requested
@@ -352,7 +372,7 @@ class Simulation():
         u = row["10m_u_component_of_wind"]
         v = row["10m_v_component_of_wind"]
         
-        direction = math.atan2(u, v) / (2*np.pi) * 360
+        direction = math.atan2(u, v) / (2*np.pi) * 360  # clockwise from the nord
         
         velocity = math.sqrt(u**2 + v**2)
         
@@ -380,6 +400,9 @@ class Simulation():
 
         # ran xbeach for storm and inter-storm timesteps, but never when too much sea ice
         self.xbeach_times = self.storm_timing * self.xbeach_sea_ice + self.xbeach_inter
+        
+        # output these xbeach timestep ids
+        self._check_and_write('timestep_xbeach_ids', self.xbeach_times, self.result_dir)
 
         return self.xbeach_times
     
@@ -702,26 +725,36 @@ class Simulation():
         row = self.forcing_data.iloc[timestep_id]
         
         # with associated forcing values
-        air_temp = row["2m_temperature"]
-        sea_temp = row['sea_surface_temperature']
+        self.current_air_temp = row["2m_temperature"]  # also used in output
+        self.current_sea_temp = row['sea_surface_temperature']  # also used in output
+        self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
         
-        # check wether or not this will be a storm timestep. If it is, use the storm surge water level.
-        # otherwise, use a water level of z=0
-        if self.xbeach_times[timestep_id]:
+        # check wether or not this will be a storm timestep.
+        if self.xbeach_times[timestep_id]:  # If it is, use (storm surge water level + runup)
+            
+            # get storm surge
+            surge = self.conditions[timestep_id]["SS(m)"]
+            
+            # get runup
+            ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))
+            runup = ds.runup.values.flatten()
+            ds.close()
+            
             # get water level to check whether to use convective heat transfer from air or sea
-            water_level = self.conditions[timestep_id]["SS(m)"]
-        else:
+            water_level = surge + runup
+            
+        else:  # otherwise, use a water level of z=0
             water_level = 0
         
         dry_mask = (self.zgr >= water_level)
         wet_mask = (self.zgr < water_level)
         
         # determine convective transport from air (formulation from Man, 2023)
-        ___, wind_velocity = self._get_wind_conditions(timestep_id=timestep_id)
+        self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=timestep_id)  # also used in output
         convective_transport_air = Simulation._calculate_sensible_heat_flux_air(
-            wind_velocity, 
+            self.wind_velocity, 
             self.temp_matrix[:,0], 
-            air_temp, 
+            self.current_air_temp, 
             )
         
         # use either an educated guess from Kobayashi et al (1999), or their entire formulation
@@ -742,6 +775,8 @@ class Simulation():
                 
                 d = np.maximum(wl - ds.zb.values.flatten(), np.zeros(H.shape))
                 T = self.conditions[timestep_id]["Tp(s)"]
+                
+                ds.close()
                                 
             else:
                 H = np.ones(self.xgr.shape) * 0.001
@@ -758,30 +793,33 @@ class Simulation():
             )
         
         # scale hc with temperature difference
-        convective_transport_water = hc * (sea_temp - self.temp_matrix[:,0])
+        convective_transport_water = hc * (self.current_sea_temp - self.temp_matrix[:,0])
             
         # compute total convective transport
-        convective_transport = dry_mask * convective_transport_air + wet_mask * convective_transport_water
+        self.convective_flux = dry_mask * convective_transport_air + wet_mask * convective_transport_water  # also used in output
         
         # determine radiation, assuming radiation only influences the dry domain
-        latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0
-        lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0
+        self.latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0  # also used in output
+        self.lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0  # also used in output
         
-        if self.config.thermal.with_solar:
+        if self.config.thermal.with_solar:  # also used in output
             I0 = row["mean_surface_net_short_wave_radiation_flux"]
             
             if self.config.thermal.with_solar_flux_calculator:
-                sw_flux = self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
+                self.sw_flux = self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
             else:
-                sw_flux = I0
+                self.sw_flux = I0
         else:
-            sw_flux = 0
+            self.sw_flux = 0
         
-        # add all heat fluxes  together
-        heat_flux = convective_transport + latent_flux + lw_flux + sw_flux
+        # add all heat fluxes  together (also used in output)
+        self.heat_flux = self.convective_flux + \
+                         self.latent_flux + \
+                         self.lw_flux + \
+                         self.sw_flux
         
         # determine temperature of the ghost nodes
-        ghost_nodes_temperature = self.temp_matrix[:,0] + heat_flux * self.dz / self.k_matrix[:,0]
+        ghost_nodes_temperature = self.temp_matrix[:,0] + self.heat_flux * self.dz / self.k_matrix[:,0]
         
         return ghost_nodes_temperature
     
@@ -954,13 +992,13 @@ class Simulation():
             array: incoming solar radiation for each grid point in the computational domain
         """
         
-        factors = np.zeros(self.angles.shape)
+        self.factors = np.zeros(self.angles.shape)
         
         for i in range(len(self.angles)):
             
-            factors[i] = self.solar_flux_map[int(self.angles[i])][int(self.timestamps[timestep_id].day_of_year - 1)]  # index starts at 0, while day_of_year starts at 1, hence -1
+            self.factors[i] = self.solar_flux_map[int(self.angles[i])][int(self.timestamps[timestep_id].day_of_year - 1)]  # index starts at 0, while day_of_year starts at 1, hence -1
         
-        solar_flux = I0 * factors
+        solar_flux = I0 * self.factors
         
         return solar_flux
         
@@ -1137,19 +1175,56 @@ class Simulation():
         # create directory
         if not os.path.exists(result_dir_timestep):
             os.makedirs(result_dir_timestep)
+            
+        # bathymetric variables
+        self._check_and_write('xgr', self.xgr, dirname=result_dir_timestep)  # 1D series of x-values
+        self._check_and_write('zgr', self.zgr, dirname=result_dir_timestep)  # 1D series of z-values
+        self._check_and_write('angles', self.angles, dirname=result_dir_timestep)  # 1D series of angles (in radians)
         
-        if "bathymetry" in self.config.output.output_vars:
-            # save xgrid and zgrid of bathymetry
-            np.savetxt(os.path.join(result_dir_timestep, "xgr.txt"), self.xgr)
-            np.savetxt(os.path.join(result_dir_timestep, "zgr.txt"), self.zgr)
+        # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
+        ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
+        self._check_and_write('wave_height', ds.H.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
+        self._check_and_write('run_up', ds.run_up.values.flatten(), dirname=result_dir_timestep)  # single value
+        self._check_and_write('storm_surge', self.current_storm_surge, dirname=result_dir_timestep)  # single value
+        self._check_and_write('wave_energy', ds.E.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
+        self._check_and_write('radiation_stress_xx', ds.Sxx.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        self._check_and_write('radiation_stress_xy', ds.Sxy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        self._check_and_write('radiation_stress_yy', ds.Syy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        self._check_and_write('mean_wave_angle', ds.thetamean.values.flatten(), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
+        self._check_and_write('velocity_magnitude', ds.vmag.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+        self._check_and_write('orbital_velocity', ds.urms.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+        ds.close()
         
-        if "ground_temperature_distribution" in self.config.output.output_vars:
-            np.savetxt(os.path.join(result_dir_timestep, "xgrid_ground_temperature_distribution.txt"), self.abs_xgr.flatten())
-            np.savetxt(os.path.join(result_dir_timestep, "zgrid_ground_temperature_distribution.txt"), self.abs_zgr.flatten())
-            np.savetxt(os.path.join(result_dir_timestep, "ground_temperature_distribution.txt"), self.temp_matrix.flatten())
+        # temperature variables
+        self._check_and_write('thaw_depth', self.thaw_depth, dirname=result_dir_timestep)  # 1D series of thaw depths
+        self._check_and_write('abs_xgr', self.abs_xgr.flatten(), dirname=result_dir_timestep)  # 1D series of x-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        self._check_and_write('abs_zgr', self.abs_zgr.flatten(), dirname=result_dir_timestep)  # 1D series of z-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        self._check_and_write('grount_temperature_distribution', self.temp_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
+        self._check_and_write('ground_enthalpy_distribution', self.enthalpy_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
+        self._check_and_write("2m_temperature", np.array(self.current_air_temp), dirname=result_dir_timestep)  # single value
+        self._check_and_write("sea_surface_temperature", np.array(self.current_sea_temp), dirname=result_dir_timestep)  # single value
         
-        if "thaw_depth" in self.config.output.output_vars:
-            np.savetxt(os.path.join(result_dir_timestep, "thaw_depth.txt"), self.thaw_depth)
+        # heat flux variables
+        self._check_and_write('solar_radiation_factor', self.factors, dirname=result_dir_timestep)  # 1D series of factors
+        self._check_and_write('solar_radiation_flux', self.sw_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        self._check_and_write('long_wave_radiation_flux', self.lw_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        self._check_and_write('latent_heat_flux', self.latent_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        self._check_and_write('convective_heat_flux', self.convective_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        self._check_and_write('total_heat_flux', self.heat_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        
+        # sea ice variables
+        self._check_and_write('sea_ice_cover', np.array(self.current_sea_ice), dirname=result_dir_timestep)  # single value
+        
+        # wind variables
+        self._check_and_write('wind_speed', self.wind_velocity, dirname=result_dir_timestep)  # single value
+        self._check_and_write('wind_direction', self.wind_direction, dirname=result_dir_timestep) # single value (degrees, clockwise from the north)
+        
+        return None
+    
+    def _check_and_write(self, varname, save_var, dirname):
+        
+        if varname in self.config.output.output_vars:
+            np.savetxt(os.path.join(dirname, f"{varname}" + ".txt"), save_var)
         
         return None
         

@@ -95,6 +95,7 @@ def main(sim, print_report=False):
 
     # loop through (xbeach) timesteps
     print(textbox("STARTING SIMULATION"))
+    
     for timestep_id in range(len(sim.T)):
         
         print(f"timestep {timestep_id+1}/{len(sim.T)}")

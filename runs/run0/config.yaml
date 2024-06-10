@@ -104,7 +104,7 @@ thermal:
   rho_soil_frozen   : 1500   # [kg/m3] density frozen soil, placeholder (placeholder)
   rho_soil_unfrozen : 1500   # [kg/m3] density unfrozen soil, placeholder (placeholder)
   nb              : 0.65  # [-] ground ice content (Ravens et al, 2023: 0.65 - 0.45)
-  c_soil_frozen   : 4600000  # [J/K/m3] volumetric heat capacity for frozen soil (Ravens et al, 2023)
+  c_soil_frozen   : 4600000  # [J/K/m3] volumetric heat capacity for frozen soil (Ravens et al, 2023)  ( = specific heat capacity)
   c_soil_unfrozen : 7000000  # [J/K/m3] volumetric heat capacity for unfrozen soil (Ravens et al, 2023)
   k_soil_frozen_min   : 0.7  # [W/m/K] minimum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
   k_soil_frozen_max   : 2.7  # [W/m/K] maximum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
@@ -117,4 +117,45 @@ thermal:
 # output
 output:
   output_res  : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
-  output_vars  : ["bathymetry", "ground_temperature_distribution", "thaw_depth"]  # list of output variables
+  output_vars  : [  # list of output variables
+    "timestamps",
+    "timestep_ids",
+    "timestep_output_ids",
+    "timesteps_xbeach_ids",
+
+    "xgr",
+    "zgr",
+    "angles",
+
+    "wave_height",
+    "run_up",
+    "storm_surge",
+    "wave_energy",
+    "radiation_stress_xx",
+    "radiation_stress_xy",
+    "radiation_stress_yy",
+    "mean_wave_angle",
+    "velocity_magnitude"
+    "orbital_velocity",
+
+    "thaw_depth",
+    "abs_xgr",
+    "abs_zgr",
+    "ground_temperature_distribution", 
+    "ground_enthalpy_distribution",
+    "2m_temperature",
+    "sea_surface_temperature",
+
+    "solar_radiation_factor",
+    "solar_radiation_flux",
+    "long_wave_radiation_flux",
+    "latent_heat_flux",
+    "convective_heat_flux",
+    "total_heat_flux",
+
+    "sea_ice_cover",
+    
+    "wind_speed",
+    "wind_direction",
+    ]
+  
