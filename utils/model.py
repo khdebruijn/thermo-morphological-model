@@ -202,6 +202,27 @@ class Simulation():
     ##            # XBEACH FUNCTIONS              ##
     ##                                            ##
     ################################################
+    
+    def initialize_xbeach_module(self):
+        """This method initializes the xbeach module. Currently only used to set values for the first output at t=0.
+
+        Returns:
+            None
+        """       
+        # first get the correct forcing timestep
+        row = self.forcing_data.iloc[0]
+        
+        # with associated forcing values
+        self.current_air_temp = row["2m_temperature"]  # also used in output
+        self.current_sea_temp = row['sea_surface_temperature']  # also used in output
+        self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
+        
+        self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=0)
+        
+        self.current_storm_surge = 0
+        
+        return None
+    
     def xbeach_setup(self, timestep_id):
         """This function initializes an xbeach run, i.e., it writes all inputs to files
         """
@@ -588,6 +609,14 @@ class Simulation():
         
         # initialize angles
         self._update_angles()
+        
+        # initialize output
+        self.factors = np.zeros(self.xgr.shape)
+        self.sw_flux = np.zeros(self.xgr.shape)
+        self.lw_flux = np.zeros(self.xgr.shape)
+        self.latent_flux = np.zeros(self.xgr.shape)
+        self.convective_flux = np.zeros(self.xgr.shape)
+        self.heat_flux = np.zeros(self.xgr.shape)
 
         return None
     
@@ -803,14 +832,14 @@ class Simulation():
         self.lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0  # also used in output
         
         if self.config.thermal.with_solar:  # also used in output
-            I0 = row["mean_surface_net_short_wave_radiation_flux"]
+            I0 = row["mean_surface_net_short_wave_radiation_flux"]  # float value
             
             if self.config.thermal.with_solar_flux_calculator:
                 self.sw_flux = self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
             else:
-                self.sw_flux = I0
+                self.sw_flux = np.ones(self.xgr.shape) * I0
         else:
-            self.sw_flux = 0
+            self.sw_flux = np.zeros(self.xgr.shape)
         
         # add all heat fluxes  together (also used in output)
         self.heat_flux = self.convective_flux + \
@@ -990,13 +1019,21 @@ class Simulation():
 
         Returns:
             array: incoming solar radiation for each grid point in the computational domain
-        """
+        """        
+        # get current timestamp
+        timestamp = self.timestamps.iloc[timestep_id]
         
-        self.factors = np.zeros(self.angles.shape)
+        # get id of current timestamp w.r.t. solar_flux_map (-1 because: 'minimum id is 0' and 'minimum day of year is 1')
+        id_t = timestamp.dayofyear - 1  # factors are associated with day of year only (as it is based on maximum angle per day)
         
-        for i in range(len(self.angles)):
-            
-            self.factors[i] = self.solar_flux_map[int(self.angles[i])][int(self.timestamps[timestep_id].day_of_year - 1)]  # index starts at 0, while day_of_year starts at 1, hence -1
+        # get correct row in solar flux map (so row corresponding to current day of the year)
+        row = self.solar_flux_map[id_t, :]
+        
+        # transform angles to ids (first convert to degrees)
+        ids_angle = np.int32((self.angles / (2*np.pi) * 360 - self.config.thermal.angle_min) / self.config.thermal.delta_angle)
+        
+        # use ids to get correct factors in correct order from the row of solar fluxes
+        self.factors = row[ids_angle]
         
         solar_flux = I0 * self.factors
         
@@ -1017,18 +1054,19 @@ class Simulation():
 
         Returns:
             dictionary: the mapping variable used to quickly obtain solar flux enhancement factor values.
-        """
-        self.solar_flux_map = {}
+        """        
+        self.solar_flux_angles = np.arange(angle_min, angle_max+1, delta_angle)
         
-        for angle in np.arange(angle_min, angle_max+1, delta_angle):
-            
-            t_start_datetime = pd.to_datetime(t_start)
-            t_end_datetime = pd.to_datetime(t_end)
-            
-            t = pd.date_range(t_start_datetime, t_end_datetime, freq='1h', inclusive='left')
-            
+        t_start_datetime = pd.to_datetime(t_start)
+        t_end_datetime = pd.to_datetime(t_end)
+        self.solar_flux_times = pd.date_range(t_start_datetime, t_end_datetime, freq='1h', inclusive='left')
+                
+        self.solar_flux_map = np.zeros(len(self.solar_flux_times) / 24, len(self.solar_flux_angles))
+        
+        for angle in self.solar_flux_angles:
+            angle_id = np.nonzero(angle==self.solar_flux_angles)
             # for each integer angle in the angle range, an array of enhancement factors is saved, indexable by N (i.e., the N-th day of the year)
-            self.solar_flux_map[angle] = self._calculate_solar_flux_factors(t, angle, timezone_diff)
+            self.solar_flux_map[:, angle_id] = self._calculate_solar_flux_factors(self.solar_flux_times, angle, timezone_diff)
         
         return self.solar_flux_map
     
@@ -1100,12 +1138,12 @@ class Simulation():
         
         # 9) in order to avoid very peaky scales, let us take the daily maximum and use that for scaling.
         sin_theta_2d = sin_theta.reshape((-1, 24))
-        sin_theta_daily_max_2d = np.max(sin_theta_2d, axis=1)
-        sin_theta_daily_max = np.repeat(sin_theta_daily_max_2d.flatten(), 24)
+        sin_theta_daily_max = np.max(sin_theta_2d, axis=1).flatten()
+        # sin_theta_daily_max_repeated = np.repeat(sin_theta_daily_max, 24)
 
         sin_0_2d = sin_0.reshape((-1, 24))
-        sin_0_daily_max_2d = np.max(sin_0_2d, axis=1)
-        sin_0_daily_max = np.repeat(sin_0_daily_max_2d.flatten(), 24)
+        sin_0_daily_max = np.max(sin_0_2d, axis=1).flatten()
+        # sin_0_daily_max_repeated = np.repeat(sin_0_daily_max, 24)
 
         # 10) calculate enhancement factor
         factor = sin_theta_daily_max / sin_0_daily_max
@@ -1182,18 +1220,31 @@ class Simulation():
         self._check_and_write('angles', self.angles, dirname=result_dir_timestep)  # 1D series of angles (in radians)
         
         # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
-        ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
-        self._check_and_write('wave_height', ds.H.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
-        self._check_and_write('run_up', ds.run_up.values.flatten(), dirname=result_dir_timestep)  # single value
-        self._check_and_write('storm_surge', self.current_storm_surge, dirname=result_dir_timestep)  # single value
-        self._check_and_write('wave_energy', ds.E.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
-        self._check_and_write('radiation_stress_xx', ds.Sxx.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
-        self._check_and_write('radiation_stress_xy', ds.Sxy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
-        self._check_and_write('radiation_stress_yy', ds.Syy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
-        self._check_and_write('mean_wave_angle', ds.thetamean.values.flatten(), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
-        self._check_and_write('velocity_magnitude', ds.vmag.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
-        self._check_and_write('orbital_velocity', ds.urms.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
-        ds.close()
+        xb_output_path = os.path.join(self.cwd, "xboutput.nc")
+        if os.path.isfile(xb_output_path):  # check if an xbeach output file exists (it shouldn't at the first timestep)
+            ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
+            self._check_and_write('wave_height', ds.H.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
+            self._check_and_write('run_up', np.ones(1) * (ds.runup.values.flatten()), dirname=result_dir_timestep)  # single value
+            self._check_and_write('storm_surge', np.ones(1) * (self.current_storm_surge), dirname=result_dir_timestep)  # single value
+            self._check_and_write('wave_energy', ds.E.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
+            self._check_and_write('radiation_stress_xx', ds.Sxx.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+            self._check_and_write('radiation_stress_xy', ds.Sxy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+            self._check_and_write('radiation_stress_yy', ds.Syy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+            self._check_and_write('mean_wave_angle', ds.thetamean.values.flatten(), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
+            self._check_and_write('velocity_magnitude', ds.vmag.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+            self._check_and_write('orbital_velocity', ds.urms.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+            ds.close()
+        else:        
+            self._check_and_write('wave_height', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
+            self._check_and_write('run_up', np.ones(1) * (0), dirname=result_dir_timestep)  # single value
+            self._check_and_write('storm_surge', np.ones(1) * (0), dirname=result_dir_timestep)  # single value
+            self._check_and_write('wave_energy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
+            self._check_and_write('radiation_stress_xx', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+            self._check_and_write('radiation_stress_xy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+            self._check_and_write('radiation_stress_yy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+            self._check_and_write('mean_wave_angle', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
+            self._check_and_write('velocity_magnitude', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+            self._check_and_write('orbital_velocity', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
         
         # temperature variables
         self._check_and_write('thaw_depth', self.thaw_depth, dirname=result_dir_timestep)  # 1D series of thaw depths
@@ -1201,8 +1252,8 @@ class Simulation():
         self._check_and_write('abs_zgr', self.abs_zgr.flatten(), dirname=result_dir_timestep)  # 1D series of z-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
         self._check_and_write('grount_temperature_distribution', self.temp_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
         self._check_and_write('ground_enthalpy_distribution', self.enthalpy_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
-        self._check_and_write("2m_temperature", np.array(self.current_air_temp), dirname=result_dir_timestep)  # single value
-        self._check_and_write("sea_surface_temperature", np.array(self.current_sea_temp), dirname=result_dir_timestep)  # single value
+        self._check_and_write("2m_temperature", np.ones(1) * (self.current_air_temp), dirname=result_dir_timestep)  # single value
+        self._check_and_write("sea_surface_temperature",  np.ones(1) * (self.current_sea_temp), dirname=result_dir_timestep)  # single value
         
         # heat flux variables
         self._check_and_write('solar_radiation_factor', self.factors, dirname=result_dir_timestep)  # 1D series of factors
@@ -1213,11 +1264,11 @@ class Simulation():
         self._check_and_write('total_heat_flux', self.heat_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
         
         # sea ice variables
-        self._check_and_write('sea_ice_cover', np.array(self.current_sea_ice), dirname=result_dir_timestep)  # single value
+        self._check_and_write('sea_ice_cover', np.ones(1) * (self.current_sea_ice), dirname=result_dir_timestep)  # single value
         
         # wind variables
-        self._check_and_write('wind_speed', self.wind_velocity, dirname=result_dir_timestep)  # single value
-        self._check_and_write('wind_direction', self.wind_direction, dirname=result_dir_timestep) # single value (degrees, clockwise from the north)
+        self._check_and_write('wind_velocity', np.ones(1) * (self.wind_velocity), dirname=result_dir_timestep)  # single value
+        self._check_and_write('wind_direction', np.ones(1) * (self.wind_direction), dirname=result_dir_timestep) # single value (degrees, clockwise from the north)
         
         return None
     

@@ -78,8 +78,15 @@ thermal:
   with_solar                  : True  # include short wave solar radiation in thermal computation step
   with_longwave               : True  # include longwave radiation (incoming & outgoining) in thermal computation step
   with_latent                 : True  # include latent heat in thermal computation step\
-  with_solar_flux_calculator  : True  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
   
+  # solar flux calculator
+  with_solar_flux_calculator  : False  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
+  angle_min   : -89
+  angle_max   : 89
+  delta_angle : 1
+  t_start     : '2000-01-01'
+  t_end       : '2001-01-01'
+
   # guess for convective heat transfer from water
   with_convective_transport_water_guess : True  # include a guess of convective heat transfer from water in thermal computation step. If False, a more sophisticated computation is performed
   hc_guess : 500  # [W/m2/K], guess for the convective heat transfer coefficient from water (from Kobayashi et al, 1999)
@@ -135,7 +142,7 @@ output:
     "radiation_stress_xy",
     "radiation_stress_yy",
     "mean_wave_angle",
-    "velocity_magnitude"
+    "velocity_magnitude",
     "orbital_velocity",
 
     "thaw_depth",
@@ -155,7 +162,7 @@ output:
 
     "sea_ice_cover",
     
-    "wind_speed",
+    "wind_velocity",
     "wind_direction",
     ]
   

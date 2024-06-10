@@ -30,7 +30,7 @@ def main(sim, print_report=False):
         config.model.timestep
         )
     print("succesfully set temporal parameters")
-    
+        
     # load in forcing data
     sim.load_forcing(fname_in_ts_datasets="era5.csv")
     print("succesfully loaded forcing")
@@ -41,7 +41,7 @@ def main(sim, print_report=False):
         )
     print("succesfully generated xbeach times")
     
-    
+    # generate schematized bathymetry
     if sim.config.bathymetry.with_schematized_bathymetry:
         xgr, zgr = generate_schematized_bathymetry(
             bluff_flat_length=sim.config.bathymetry.bluff_flat_length,
@@ -80,14 +80,18 @@ def main(sim, print_report=False):
         )
     print("succesfully generated grid")
     
+    # initialize xbeach module
+    sim.initialize_xbeach_module()
+    print("succesfully initialized xbeach module")
+    
     # initialize thermal model
     sim.initialize_thermal_module()
-    print("succesfully initialized thermal module\n")
+    print("succesfully initialized thermal module")
     
     # initialize solar flux calculator
     if sim.config.thermal.with_solar_flux_calculator:
         sim.initialize_solar_flux_calculator(sim.config.model.time_zone_diff)
-    print("succesfully initialized solar flux calculator")
+    print("succesfully initialized solar flux calculator\n")
     
     # show CFL values (they have already been checked to be below 0.5)
     print(textbox("CFL VALUES (for 1D thermal models)"))

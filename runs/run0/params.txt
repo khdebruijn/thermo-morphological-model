@@ -1,5 +1,5 @@
 %% XBeach model: Run C:\Users\bruij_kn\OneDrive - Stichting Deltares\Documents\GitHub\thermo-morphological-model\runs\run0: timestep 0 
-%% Params created on 2024-06-07 11H:06m 
+%% Params created on 2024-06-10 17H:06m 
 %% Params created by bruij_kn 
 
 %% General 
@@ -11,7 +11,7 @@ wbctype             = parametric
 
 vardx               = 1
 posdwn              = -1
-nx                  = 186
+nx                  = 228
 ny                  = 0
 xori                = 0
 yori                = 0
@@ -96,10 +96,17 @@ bcfile              = jonswap.txt
 
 %% Output variables 
 
-nglobalvar          = 5
+nglobalvar          = 12
 zb
 zs
 H
 runup
 sedero
+E
+Sxx
+Sxy
+Syy
+thetamean
+vmag
+urms
 
