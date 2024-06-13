@@ -20,7 +20,7 @@ def main(sim, print_report=False):
     print(textbox("INITIALIZING SIMULATION"))
     print(f"{repr(sim)}")
     
-    config = sim.read_config(config_file="config.yaml")
+    config = sim.config
     print("succesfully read configuration")
 
     # read temporal parameters

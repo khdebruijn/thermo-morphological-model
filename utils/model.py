@@ -39,9 +39,9 @@ class Simulation():
         config_file: string
             string that contains the name of the configuration file, default config.yaml, in the runid folder"""
         self.runid = runid
-        self._set_directory()
         self.read_config(config_file)
-    
+        self._set_directory()
+        
     def __repr__(self) -> str:
         """Provides a string representation of the current simulation."""
         
@@ -62,13 +62,18 @@ class Simulation():
         self.cwd = os.path.join(os.getcwd(), 'runs', self.runid)
         self.ts_dir = os.path.join(self.proj_dir, "database/ts_datasets/")
         
+        # change working directory to folder containing the config.yaml file
         os.chdir(self.cwd)    
 
         # setup output location
-        if not os.path.exists(os.path.join(self.cwd, "results/")):
-            os.mkdir(os.path.join(self.cwd, "results/"))
+        if self.config.output.use_default_output_path:  # check if results should be stored in the working directory
+            self.result_dir = os.path.join(self.cwd, "results/")
+        else:  # or somewhere else
+            self.result_dir = os.path.join(Path(self.config.output.output_path), self.runid)
             
-        self.result_dir = os.path.join(self.cwd, "results/")
+        # create output directory
+        if not os.path.exists(self.result_dir):
+            os.mkdir(self.result_dir)
     
     def read_config(self, config_file):
         '''
@@ -87,7 +92,9 @@ class Simulation():
                 super(AttrDict, self).__init__(*args, **kwargs)
                 self.__dict__ = self
                     
-        with open(os.path.join(self.cwd, config_file)) as f:
+        cwd = os.path.join(os.getcwd(), 'runs', self.runid)
+                    
+        with open(os.path.join(cwd, config_file)) as f:
             cfg = yaml.safe_load(f)
             
         self.config = AttrDict(cfg)
@@ -676,7 +683,7 @@ class Simulation():
             subgrid_timestep_id (int): id of the current subgrid timestep
         """
         # get the new boundary condition
-        self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id)
+        self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id, subgrid_timestep_id)
         self.bottom_boundary_temperature = self._get_bottom_boundary_temperature()
         
         # aggregate temperature matrix
@@ -741,11 +748,12 @@ class Simulation():
         
         return None
      
-    def _get_ghost_node_boundary_condition(self, timestep_id):
+    def _get_ghost_node_boundary_condition(self, timestep_id, subgrid_timestep_id):
         """This function uses the forcing at a specific timestep to return an array containing the ghost node temperature.
 
         Args:
             timestep_id (int): index of the current timestep.
+            subgrid_timestep_id (int): id of the current subgrid timestep
 
         Returns:
             array: temperature values for the ghost nodes.
@@ -827,25 +835,27 @@ class Simulation():
         # compute total convective transport
         self.convective_flux = dry_mask * convective_transport_air + wet_mask * convective_transport_water  # also used in output
         
-        # determine radiation, assuming radiation only influences the dry domain
-        self.latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0  # also used in output
-        self.lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0  # also used in output
+        if subgrid_timestep_id == 0:  # determine radiation fluxes only during first timestep, as they are constant for each subgrid timestep
         
-        if self.config.thermal.with_solar:  # also used in output
-            I0 = row["mean_surface_net_short_wave_radiation_flux"]  # float value
+            # determine radiation, assuming radiation only influences the dry domain
+            self.latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0  # also used in output
+            self.lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0  # also used in output
             
-            if self.config.thermal.with_solar_flux_calculator:
-                self.sw_flux = self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
+            if self.config.thermal.with_solar:  # also used in output
+                I0 = row["mean_surface_net_short_wave_radiation_flux"]  # float value
+                
+                if self.config.thermal.with_solar_flux_calculator:
+                    self.sw_flux = self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
+                else:
+                    self.sw_flux = np.ones(self.xgr.shape) * I0
             else:
-                self.sw_flux = np.ones(self.xgr.shape) * I0
-        else:
-            self.sw_flux = np.zeros(self.xgr.shape)
+                self.sw_flux = np.zeros(self.xgr.shape)
+            
+            # save this constant flux
+            self.constant_flux = self.latent_flux + self.lw_flux + self.sw_flux
         
         # add all heat fluxes  together (also used in output)
-        self.heat_flux = self.convective_flux + \
-                         self.latent_flux + \
-                         self.lw_flux + \
-                         self.sw_flux
+        self.heat_flux = self.convective_flux + self.constant_flux
         
         # determine temperature of the ghost nodes
         ghost_nodes_temperature = self.temp_matrix[:,0] + self.heat_flux * self.dz / self.k_matrix[:,0]

@@ -123,8 +123,10 @@ thermal:
 
 # output
 output:
-  output_res  : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
-  output_vars  : [  # list of output variables
+  output_res              : 24  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
+  use_default_output_path : False  # If True, the model creates a subfolder in the same folder as the configuration file, and stores all results there. If False, the output_path variable is used and a subfolder with the run_id is created at this location
+  output_path             : "P:/11210070-usgscoop-202324-arcticxb/runs/"  # "P:/11210070-usgscoop-202324-arcticxb/runs/" (absolute path to p-drive)
+  output_vars             : [  # list of output variables
     "timestamps",
     "timestep_ids",
     "timestep_output_ids",
