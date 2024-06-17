@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import sys
+import time
 
 from IPython import get_ipython
 import numpy as np
@@ -144,10 +145,10 @@ def main(sim, print_report=False):
                 print(f"xbeach ran succesfully for final timestep timestep ({sim.timestamps[timestep_id]})")
             
             print()
-            
+                        
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
-            sim.update_grid("xboutput.nc")
-            
+            sim.update_grid("xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
+                                    
         # loop through thermal subgrid timestep
         for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
             
@@ -173,3 +174,4 @@ if __name__ == '__main__':
     sim = Simulation(runid)
 
     main(sim)
+    

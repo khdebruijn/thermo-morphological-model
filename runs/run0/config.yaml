@@ -2,7 +2,6 @@
 dataset_parameters:
   database_folder: 'database/datasets'  # datasets location
 
-
 # model settings
 model:
   # nx: 100  # number of points in x-direction
@@ -10,9 +9,9 @@ model:
   latitude          : 70.13  # latitude of the study site
   time_start        : '08-01-2020'  # MM-DD-YY starting time (if -1 take entire dataset)
   time_end          : '08-10-2020' # MM-DD-YY stopping time (if -1 take entire dataset)
-  timestep          : 1              # size of timesteps (in hours)
+  timestep          : 1  # size of timesteps (in hours)
   call_xbeach_inter :  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
-  time_zone_diff     : -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
+  time_zone_diff    : -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
 
 
 # wrapper parameters:
@@ -92,7 +91,7 @@ thermal:
   hc_guess : 500  # [W/m2/K], guess for the convective heat transfer coefficient from water (from Kobayashi et al, 1999)
 
   # model properties
-  dt: 2  # [s] timestep used in the thermal model on the temporal subgrid
+  dt              : 2  # [s] timestep used in the thermal model on the temporal subgrid
   grid_resolution : 30  # number of points for each 1D thermal model
   max_depth       : 3  # [m], the maximum depth of the 1D thermal model
   # dz_max          : 10 # [m/s/m] Maximum bed level change due to avalanching
@@ -100,7 +99,7 @@ thermal:
 
   # water properties
   wl_switch       : 0  # [m], water level relative to outputted local water level at which is switched from wet to dry (positive means higher than output water level)
-  L_water_ice     : 334000000 # [J/m3] latent heat of fusion water-ice
+  L_water_ice     : 334000 # [J/kg] latent heat of fusion water-ice
   rho_water       : 1000  # [kg/m3] water density
   rho_ice         : 971  # [kg/m3] density ice
   # c_sea_water     : ...  # [J/K] heat capacity for seawater
@@ -108,9 +107,11 @@ thermal:
 
   # soil properties
   with_density      : False  # whether or not to used density in the temperature distribution calculations. formulations with density have not been implemented yet.
-  rho_soil_frozen   : 1500   # [kg/m3] density frozen soil, placeholder (placeholder)
-  rho_soil_unfrozen : 1500   # [kg/m3] density unfrozen soil, placeholder (placeholder)
-  nb              : 0.65  # [-] ground ice content (Ravens et al, 2023: 0.65 - 0.45)
+  rho_soil        : "None"   # [kg/m3] density soil, constant for frozen/unfrozen. If "None", density is calculated as "nb * rho_water + (1-nb) * rho_particle".
+  rho_particle    : 2650     # [kg/m3] particle density of soil, only used if "rho_soil = None"
+  nb_min          : 0.45     # [-] minimum ground ice content (Ravens et al, 2023: 0.65 - 0.45)
+  nb_max          : 0.65     # [-] maximum ground ice content (Ravens et al, 2023: 0.65 - 0.45)
+  nb_switch_depth : 1        # [m] switch from max to min porosity (from Ravens, thermal model)
   c_soil_frozen   : 4600000  # [J/K/m3] volumetric heat capacity for frozen soil (Ravens et al, 2023)  ( = specific heat capacity)
   c_soil_unfrozen : 7000000  # [J/K/m3] volumetric heat capacity for unfrozen soil (Ravens et al, 2023)
   k_soil_frozen_min   : 0.7  # [W/m/K] minimum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
