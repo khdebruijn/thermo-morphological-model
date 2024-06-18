@@ -629,8 +629,11 @@ class Simulation():
         # initialize output
         self.factors = np.zeros(self.xgr.shape)
         self.sw_flux = np.zeros(self.xgr.shape)
-        self.lw_flux = np.zeros(self.xgr.shape)
-        self.latent_flux = np.zeros(self.xgr.shape)
+        
+        row = self.forcing_data.iloc[0]
+        self.latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0  # also used in output
+        self.lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0  # also used in output
+        
         self.convective_flux = np.zeros(self.xgr.shape)
         self.heat_flux = np.zeros(self.xgr.shape)
 
@@ -1261,7 +1264,7 @@ class Simulation():
         self._check_and_write('thaw_depth', self.thaw_depth, dirname=result_dir_timestep)  # 1D series of thaw depths
         self._check_and_write('abs_xgr', self.abs_xgr.flatten(), dirname=result_dir_timestep)  # 1D series of x-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
         self._check_and_write('abs_zgr', self.abs_zgr.flatten(), dirname=result_dir_timestep)  # 1D series of z-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
-        self._check_and_write('grount_temperature_distribution', self.temp_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
+        self._check_and_write('ground_temperature_distribution', self.temp_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
         self._check_and_write('ground_enthalpy_distribution', self.enthalpy_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
         self._check_and_write("2m_temperature", np.ones(1) * (self.current_air_temp), dirname=result_dir_timestep)  # single value
         self._check_and_write("sea_surface_temperature",  np.ones(1) * (self.current_sea_temp), dirname=result_dir_timestep)  # single value

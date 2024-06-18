@@ -1,0 +1,8 @@
+result_params:
+  output_file_name: "output0.nc"  # name of the output file generated.
+  output_file_path: "None"  # path to the output file generated. If None, the result is saved in the result directory
+  result_dir: "p:/11210070-usgscoop-202324-arcticxb/runs"  # path to result directory
+  run_ids: [  # list of runs to include in .nc file
+    "run0",
+  ]
+  

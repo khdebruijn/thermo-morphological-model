@@ -1,5 +1,5 @@
-%% XBeach model: Run C:\Users\bruij_kn\OneDrive - Stichting Deltares\Documents\GitHub\thermo-morphological-model\runs\run0: timestep 0 
-%% Params created on 2024-06-14 14H:06m 
+%% XBeach model: Run C:\Users\bruij_kn\OneDrive - Stichting Deltares\Documents\GitHub\thermo-morphological-model\runs\run0: timestep 107 
+%% Params created on 2024-06-18 16H:06m 
 %% Params created by bruij_kn 
 
 %% General 
@@ -79,7 +79,7 @@ tideloc             = 0
 
 %% Initial conditions 
 
-zs0                 = 0
+zs0                 = 0.96
 
 %% Wave breaking parameters 
 

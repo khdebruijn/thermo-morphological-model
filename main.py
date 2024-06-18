@@ -18,6 +18,8 @@ def main(sim, print_report=False):
     Args:
         sim (Simulation): instance of the Simulation class
     """
+    t_output = time.time()
+    
     print(textbox("INITIALIZING SIMULATION"))
     print(f"{repr(sim)}")
     
@@ -114,7 +116,17 @@ def main(sim, print_report=False):
         
         # write output variables to output file every output interval
         if timestep_id in sim.temp_output_ids:
+            
             sim.write_output(timestep_id)
+        
+            # write computational time between current output and previous output
+            if sim.config.output.write_computation_time:
+                
+                comp_time = time.time() - t_output  # computational time in seconds
+                
+                result_dir_timestep = os.path.join(sim.result_dir, str(timestep_id) + "/")
+                
+                np.savetxt(os.path.join(result_dir_timestep, "computational_time.txt"), np.ones(1) * comp_time)
             
         # check if xbeach is enabled for current timestep
         if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
@@ -161,6 +173,10 @@ def main(sim, print_report=False):
 
 
 if __name__ == '__main__':
+    
+    ##| To run script from Terminal:
+    ##| cd C:\Users\bruij_kn\OneDrive - Stichting Deltares\Documents\GitHub\thermo-morphological-model
+    ##| python main.py run_id
     
     # reduce ipython cache size to free up memory
     ipython = get_ipython()
