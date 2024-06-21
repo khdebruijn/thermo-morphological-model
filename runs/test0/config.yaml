@@ -77,7 +77,7 @@ thermal:
   with_latent   : True  # include latent heat in thermal computation step\
   
   # solar flux calculator
-  with_solar_flux_calculator : False  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
+  with_solar_flux_calculator : True  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
   angle_min   : -89  # [degrees] minimum angle used in the solar flux calculator map
   angle_max   : 89  # [degrees] maximum angle used in the solar flux calculator map
   delta_angle : 1  # [degrees] step size of angle used in the solar flux calculator map
