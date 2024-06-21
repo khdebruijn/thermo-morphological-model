@@ -33,6 +33,7 @@ test/*.nc
 
 # run output (in the runs folder)
 runs/*/results/*/*.txt
+runs/*/results/*.txt
 runs/*/*.dep
 runs/*/*.png
 runs/*/*.bcf

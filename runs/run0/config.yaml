@@ -94,7 +94,6 @@ thermal:
   dt              : 2  # [s] timestep used in the thermal model on the temporal subgrid
   grid_resolution : 30  # number of points for each 1D thermal model
   max_depth       : 3  # [m], the maximum depth of the 1D thermal model
-  # dz_max          : 10 # [m/s/m] Maximum bed level change due to avalanching
   T_melt          : 273.15  # [K] Melting temperature at the interface of water/air and bluff
 
   # water properties
@@ -102,11 +101,8 @@ thermal:
   L_water_ice     : 334000 # [J/kg] latent heat of fusion water-ice
   rho_water       : 1000  # [kg/m3] water density
   rho_ice         : 971  # [kg/m3] density ice
-  # c_sea_water     : ...  # [J/K] heat capacity for seawater
-  # k_sea_water     : ... #  [W/m/K] thermal conductivity for sea water
 
   # soil properties
-  with_density      : False  # whether or not to used density in the temperature distribution calculations. formulations with density have not been implemented yet.
   rho_soil        : "None"   # [kg/m3] density soil, constant for frozen/unfrozen. If "None", density is calculated as "nb * rho_water + (1-nb) * rho_particle".
   rho_particle    : 2650     # [kg/m3] particle density of soil, only used if "rho_soil = None"
   nb_min          : 0.45     # [-] minimum ground ice content (Ravens et al, 2023: 0.65 - 0.45)

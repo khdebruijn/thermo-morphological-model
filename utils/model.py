@@ -710,6 +710,27 @@ class Simulation():
             timestep_id (int): id of the current timestep
             subgrid_timestep_id (int): id of the current subgrid timestep
         """
+        # update nb matrix, soil density matrix, k-matrix, and Cs, Cl (and determine which part of the domain is frozen and unfrozen)
+        frozen_mask_old = (self.temp_matrix < self.config.thermal.T_melt)
+        unfrozen_mask_old = np.ones(frozen_mask_old.shape) - frozen_mask_old
+        
+            # determine nb-matrix
+        self.nb_matrix = np.tile(self.nb_distr, (len(self.xgr), 1))
+                
+            # determine k-matrix
+        self.k_matrix = frozen_mask_old * np.tile(self.k_frozen_distr, (len(self.xgr), 1)) + \
+                        unfrozen_mask_old * np.tile(self.k_unfrozen_distr, (len(self.xgr), 1))
+                        
+            # determine soil density matrix
+        if self.config.thermal.rho_soil == "None":
+            self.soil_density_matrix = self.nb_matrix * self.config.thermal.rho_water + (1 - self.nb_matrix) * self.config.thermal.rho_particle
+        else:
+            self.soil_density_matrix = np.ones(self.nb_matrix.shape) * self.config.thermal.rho_soil
+        
+            # update Cs, Cl
+        self.Cs = self.config.thermal.c_soil_frozen / self.soil_density_matrix
+        self.Cl = self.config.thermal.c_soil_unfrozen / self.soil_density_matrix
+        
         # get the new boundary condition
         self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id, subgrid_timestep_id)
         self.bottom_boundary_temperature = self._get_bottom_boundary_temperature()
@@ -720,14 +741,6 @@ class Simulation():
             self.temp_matrix,
             self.bottom_boundary_temperature.reshape(len(self.xgr), 1)
             ), axis=1) 
-        
-        # determine which part of the domain is frozen and unfrozen
-        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
-        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
-        
-        # determine k-matrix
-        self.k_matrix = frozen_mask * np.tile(self.k_frozen_distr, (len(self.xgr), 1)) + \
-                        unfrozen_mask * np.tile(self.k_unfrozen_distr, (len(self.xgr), 1))
                 
         # determine the courant-friedlichs-lewy number matrix
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
@@ -872,7 +885,7 @@ class Simulation():
             self.constant_flux = self.latent_flux + self.lw_flux + self.sw_flux
         
         # add all heat fluxes  together (also used in output)
-        self.heat_flux = self.convective_flux + self.constant_flux
+        self.heat_flux = self.convective_flux + self.constant_flux            
         
         # determine temperature of the ghost nodes
         ghost_nodes_temperature = self.temp_matrix[:,0] + self.heat_flux * self.dz / self.k_matrix[:,0]
@@ -988,7 +1001,7 @@ class Simulation():
         cum_sedero = self._update_bed_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
         
         # only update the grid of there actually was a change in bed level
-        if not all(cum_sedero) == 0:
+        if not all(cum_sedero == 0):
         
             # generate a new xgrid and zgrid
             self.xgr_new, self.zgr_new = xgrid(self.xgr, self.bathy_current, dxmin=2)
@@ -1004,9 +1017,15 @@ class Simulation():
             # set the grid to be equal to this new grid
             self.xgr = self.xgr_new
             self.zgr = self.zgr_new
+            self.bathy_current = self.zgr_new
+            
+            self.abs_xgr = self.abs_xgr_new
+            self.abs_zgr = self.abs_zgr_new
             
             # update the angles
             self._update_angles()
+        
+        return None
         
     def _update_angles(self):
         """This function geneartes an array of local angles (in radians) for the grid, based on the central differences method.

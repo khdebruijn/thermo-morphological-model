@@ -161,7 +161,7 @@ def main(sim, print_report=False):
             print()
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
-            sim.update_grid("xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
+            sim.update_grid(fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
                                     
         # loop through thermal subgrid timestep
         for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
