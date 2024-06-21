@@ -7,8 +7,8 @@ model:
   # nx: 100  # number of points in x-direction
   longitude         : -143.7  # longitude of the study site
   latitude          : 70.13  # latitude of the study site
-  time_start        : '07-01-2020'  # MM-DD-YY starting time (if -1 take entire dataset)
-  time_end          : '08-30-2020' # MM-DD-YY stopping time (if -1 take entire dataset)
+  time_start        : '01-01-2019'  # MM-DD-YY starting time (if -1 take entire dataset)
+  time_end          : '31-12-2020' # MM-DD-YY stopping time (if -1 take entire dataset)
   timestep          : 1  # size of timesteps (in hours)
   call_xbeach_inter :  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
   time_zone_diff    : -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
@@ -24,7 +24,7 @@ wrapper:
 bathymetry:
   xfile           : 'x.grd'   # file used for the grid (x-direction)
   depfile         : 'bed.dep'  # file used for the bed
-  grid_orientation: 88.14  # [degrees], grid orientation with respect to east. The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook
+  grid_orientation: 88.14  # [degrees], orientation of bluff face with respect to east (ccw). The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook
 
   # schematized bathymetry parameters
   with_schematized_bathymetry :  True  # whether or not to generate a schematized bathymetry upon initialization
@@ -51,7 +51,6 @@ xbeach:
   version     : '1.24'  # version of xbeach used
 
   # grid settings
-  tstop     : '3600'    # length of xbeach simulation (in seconds), should be the same as model.timestep
   thetamin  : '-90'  # minimum angle
   thetamax  : '90'   # maximum angle
   dtheta    : '15'     # bin width
@@ -63,9 +62,8 @@ xbeach:
   visc_kin      : 0.000006  # [m2/s] kinematic viscosity sea water (placeholder)
 
   # sediment properties
-  reposeangle : 35  # [degrees] angle of repose used in xbeach (placeholder)
-  dryslp      : 35  # [degrees] Critical avalanching slope above water (dz/dx and dz/dy) (placeholder)
-  wetslp      : 35  # [degrees] Critical avalanching slope below water (dz/dx and dz/dy) (placeholder)
+  dryslp      : 1  # [dz/dx] Critical avalanching slope above water (dz/dx and dz/dy) (placeholder)
+  wetslp      : 0.5  # [dz/dx] Critical avalanching slope below water (dz/dx and dz/dy) (placeholder)
   D50         : 0.00190  # [m] mean grain size, value from erikson data (at waterline, a few km westward of the transect) 
   rho_solid   : 2650  # [kg/m3] density of sediment particles
   bedfriccoef : 0.01  # [-] bed friction coefficient (placeholder)
@@ -79,7 +77,7 @@ thermal:
   with_latent   : True  # include latent heat in thermal computation step\
   
   # solar flux calculator
-  with_solar_flux_calculator  : False  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
+  with_solar_flux_calculator : False  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
   angle_min   : -89  # [degrees] minimum angle used in the solar flux calculator map
   angle_max   : 89  # [degrees] maximum angle used in the solar flux calculator map
   delta_angle : 1  # [degrees] step size of angle used in the solar flux calculator map
@@ -94,7 +92,6 @@ thermal:
   dt              : 2  # [s] timestep used in the thermal model on the temporal subgrid
   grid_resolution : 30  # number of points for each 1D thermal model
   max_depth       : 3  # [m], the maximum depth of the 1D thermal model
-  # dz_max          : 10 # [m/s/m] Maximum bed level change due to avalanching
   T_melt          : 273.15  # [K] Melting temperature at the interface of water/air and bluff
 
   # water properties
@@ -102,11 +99,8 @@ thermal:
   L_water_ice     : 334000 # [J/kg] latent heat of fusion water-ice
   rho_water       : 1000  # [kg/m3] water density
   rho_ice         : 971  # [kg/m3] density ice
-  # c_sea_water     : ...  # [J/K] heat capacity for seawater
-  # k_sea_water     : ... #  [W/m/K] thermal conductivity for sea water
 
   # soil properties
-  with_density      : False  # whether or not to used density in the temperature distribution calculations. formulations with density have not been implemented yet.
   rho_soil        : "None"   # [kg/m3] density soil, constant for frozen/unfrozen. If "None", density is calculated as "nb * rho_water + (1-nb) * rho_particle".
   rho_particle    : 2650     # [kg/m3] particle density of soil, only used if "rho_soil = None"
   nb_min          : 0.45     # [-] minimum ground ice content (Ravens et al, 2023: 0.65 - 0.45)

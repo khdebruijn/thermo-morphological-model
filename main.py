@@ -153,7 +153,7 @@ def main(sim, print_report=False):
                 sim.cwd
             )
             try:
-                if run_succesful:  
+                if run_succesful:
                     print(f"succesfully ran xbeach timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
                 else:
                     print(f"failed to run xbeach for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")

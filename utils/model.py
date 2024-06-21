@@ -795,7 +795,7 @@ class Simulation():
         self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
         
         # check wether or not this will be a storm timestep.
-        if self.xbeach_times[timestep_id]:  # If it is, use (storm surge water level + runup)
+        if self.xbeach_times[timestep_id] and self.config.xbeach.with_xbeach:  # If it is, use (storm surge water level + runup)
             
             # get storm surge
             surge = self.conditions[timestep_id]["SS(m)"]
@@ -830,7 +830,7 @@ class Simulation():
             hc = self.config.thermal.hc_guess
         else:
             # determine hydraulic parameters for convective heat transfer computation
-            if self.xb_times[timestep_id]:
+            if self.xb_times[timestep_id] and self.config.xbeach.with_xbeach:
                 
                 data_path = os.path.join(self.cwd, "xboutput.nc")
                 
