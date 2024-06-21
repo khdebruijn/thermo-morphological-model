@@ -110,6 +110,12 @@ def main(sim, print_report=False):
     # loop through (xbeach) timesteps
     print(textbox("STARTING SIMULATION"))
     
+    ################################################
+    ##                                            ##
+    ##            # MAIN LOOP                     ##
+    ##                                            ##
+    ################################################
+    
     for timestep_id in range(len(sim.T)):
         
         print(f"timestep {timestep_id+1}/{len(sim.T)}")
@@ -132,9 +138,6 @@ def main(sim, print_report=False):
             
         # check if xbeach is enabled for current timestep
         if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
-            
-            # calculate the current thaw depth
-            sim.find_thaw_depth()
             
             # export current thaw depth to a file
             sim.write_ne_layer()
@@ -162,7 +165,10 @@ def main(sim, print_report=False):
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid(fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
-                                    
+        
+        # calculate the current thaw depth
+        sim.find_thaw_depth()
+        
         # loop through thermal subgrid timestep
         for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
             

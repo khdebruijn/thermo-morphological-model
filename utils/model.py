@@ -282,7 +282,7 @@ class Simulation():
             
             # grid parameters
             # most already specified with xb_setup.set_grid(...)
-            "alfa": self.config.bathymetry.grid_orientation,  # counter-clockwise from the east
+            "alfa": self.config.bathymetry.grid_orientation - 180,  # counter-clockwise from the east
             "thetamin": -90,
             "thetamax": 90,
             "dtheta": 15,
@@ -767,13 +767,13 @@ class Simulation():
             frozen_mask * \
                 (self.enthalpy_matrix / self.Cs) + \
             inbetween_mask * \
-                (self.config.thermal.T_melt) * \
+                (self.config.thermal.T_melt) + \
             unfrozen_mask * \
                 (self.enthalpy_matrix - \
                 (self.Cl - self.Cs) * self.config.thermal.T_melt - \
                 self.config.thermal.L_water_ice * self.nb_matrix) / \
                     (self.Cl)
-        
+                            
         return None
      
     def _get_ghost_node_boundary_condition(self, timestep_id, subgrid_timestep_id):
@@ -1258,6 +1258,11 @@ class Simulation():
         
         return self.thaw_depth
         
+    ################################################
+    ##                                            ##
+    ##            # OUTPUT FUNCTIONS              ##
+    ##                                            ##
+    ################################################
         
     def write_output(self, timestep_id):
         """This function writes output in the results folder, and creates subfolders for each timestep for which results are output.

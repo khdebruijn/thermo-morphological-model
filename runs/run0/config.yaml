@@ -24,7 +24,7 @@ wrapper:
 bathymetry:
   xfile           : 'x.grd'   # file used for the grid (x-direction)
   depfile         : 'bed.dep'  # file used for the bed
-  grid_orientation: 88.14  # [degrees], grid orientation with respect to east. The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook
+  grid_orientation: 88.14  # [degrees], orientation of bluff face with respect to east (ccw). The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook
 
   # schematized bathymetry parameters
   with_schematized_bathymetry :  True  # whether or not to generate a schematized bathymetry upon initialization
@@ -47,7 +47,7 @@ bathymetry:
 # xbeach parameters
 xbeach:
   # general settings
-  with_xbeach : True  # include the xbeach module in the model, default true
+  with_xbeach : False  # include the xbeach module in the model, default true
   version     : '1.24'  # version of xbeach used
 
   # grid settings
