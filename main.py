@@ -18,7 +18,7 @@ def main(sim, print_report=False):
     Args:
         sim (Simulation): instance of the Simulation class
     """
-    t_output = time.time()
+    t_start = time.time()
     
     print(textbox("INITIALIZING SIMULATION"))
     print(f"{repr(sim)}")
@@ -122,11 +122,13 @@ def main(sim, print_report=False):
             # write computational time between current output and previous output
             if sim.config.output.write_computation_time:
                 
-                comp_time = time.time() - t_output  # computational time in seconds
+                comp_time = time.time() - t_start  # computational time in seconds
                 
                 result_dir_timestep = os.path.join(sim.result_dir, str(timestep_id) + "/")
                 
-                np.savetxt(os.path.join(result_dir_timestep, "computational_time.txt"), np.ones(1) * comp_time)
+                np.savetxt(os.path.join(result_dir_timestep, "cumulative_computational_time.txt"), np.ones(1) * comp_time)
+            
+            print("sucessfully generated output")
             
         # check if xbeach is enabled for current timestep
         if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
@@ -149,9 +151,9 @@ def main(sim, print_report=False):
             )
             try:
                 if run_succesful:  
-                    print(f"xbeach ran succesfully for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
+                    print(f"succesfully ran xbeach timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
                 else:
-                    print(f"xbeach failed to run for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
+                    print(f"failed to run xbeach for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
             except IndexError:
                 # index error occurs when xbeach is called during the final time step, this catches it
                 print(f"xbeach ran succesfully for final timestep timestep ({sim.timestamps[timestep_id]})")

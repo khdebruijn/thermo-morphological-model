@@ -136,6 +136,10 @@ def generate_schematized_bathymetry(
         
         total_x = np.append(total_x, np.linspace(x1, x2, N))
         total_z = np.append(total_z, np.linspace(z1, z2, N))
+        
+    # x=0 should be the furthest offshore point, and increase with distance to shore
+    total_x = total_x[::-1] * -1 + np.max(total_x)
+    total_z = total_z[::-1]
 
     return total_x, total_z
 

@@ -8,7 +8,7 @@
   **********************************************************
  
   Simulation started: YYYYMMDD    hh:mm:ss     time zone (UTC)
-                      20240618  16:53:33     +0200
+                      20240621  14:02:32     +0200
  
   General Input Module
   Reading input parameters:
@@ -38,7 +38,7 @@
                       xori =.0000
                       yori =.0000
                       alfa =.0000
-                        nx =228
+                        nx =221
                         ny =0
                     posdwn =-1.0000
                    depfile =bed.dep
@@ -57,7 +57,7 @@
   Model time parameters:
                        CFL =.9500 (no record found, default value used)
                      dtset =.0000 (no record found, default value used)
-                     tstop =1.0000
+                     tstop =3600.0000
                   maxdtfac =50.0000 (no record found, default value used)
   --------------------------------
   Physical constants:
@@ -81,16 +81,16 @@
                    trepfac =.0100 (no record found, default value used)
                    sprdthr =.0800 (no record found, default value used)
                 Tm01switch =0 (no record found, default value used)
-                        rt =1.0000 (no record found, default value used)
+                        rt =3600.0000 (no record found, default value used)
                       dtbc =1.0000 (no record found, default value used)
               nspectrumloc =1 (no record found, default value used)
              wbcEvarreduce =.3000 (no record found, default value used)
   --------------------------------
   Flow boundary condition parameters:
-                     front =abs_1d (no record found, default value used)
+                     front =abs_2d
                       left =neumann
                      right =neumann
-                      back =abs_1d (no record found, default value used)
+                      back =wall
                        ARC =1 (no record found, default value used)
                      order =2.0000 (no record found, default value used)
                   highcomp =0 (no record found, default value used)
@@ -191,7 +191,7 @@
                         nd =3 (no record found, default value used)
                        por =.4000 (no record found, default value used)
                        D50 =.0019 Warning: value > recommended value of.0008
-   D90 =.0003 (no record found, default value used)
+                       D90 =.0019 Warning: value > recommended value of.0015
                       rhos =2650.0000
                        dzg =.1000 (no record found, default value used)
                       dzg1 =.1000 (no record found, default value used)
@@ -204,14 +204,13 @@
                     morfac =1.0000
                  morfacopt =1 (no record found, default value used)
                   morstart =.0000
-                   morstop =1.0000 (no record found, default value used)
-                    wetslp =35.0000 Warning: value > recommended value of1.0000
-                    dryslp =35.0000 Warning: value > recommended value of2.0000
+                   morstop =3600.0000 (no record found, default value used)
+                    wetslp =.5000
+                    dryslp =1.0000
                    hswitch =.0000 (no record found, default value used)
                      dzmax =.0500 (no record found, default value used)
-                    struct =0 (no record found, default value used)
- Warning: swrunup can only be used in combination with struct=1. swrunup will be
-  turned off.
+                    struct =1
+                  ne_layer =ne_layer.txt
   --------------------------------
   Output variables:
                    timings =1 (no record found, default value used)
@@ -219,11 +218,11 @@
                     tstart =.0000
                       tint =900.0000 (no record found, default value used)
                   tsglobal = None specified
-                     tintg =900.0000 (no record found, default value used)
+                     tintg =3600.0000
                   tspoints = None specified
                      tintp =1.0000 (no record found, default value used)
                     tsmean = None specified
-                     tintm =1.0000 (no record found, default value used)
+                     tintm =3600.0000 (no record found, default value used)
                 nglobalvar =12
    nglobalvar: Will generate global output for variable:zb
    nglobalvar: Will generate global output for variable:zs
@@ -277,9 +276,13 @@
   --------------------------------
   Finished reading input parameters
   --------------------------------
+  Warning: 2D absorbing boundary condition [front=abs_2d] reduces to a
+           1D absorbing boundary condition [front=abs_1d] in
+           1D mode [ny=0]
    Unknown, unused or multiple statements of parameterDTHETA_S inparams.txt
+   Unknown, unused or multiple statements of parameterXORI inparams.txt
+   Unknown, unused or multiple statements of parameterYORI inparams.txt
    Unknown, unused or multiple statements of parameterWETSLP inparams.txt
-   Unknown, unused or multiple statements of parameterNE_LAYER inparams.txt
    Unknown, unused or multiple statements of parameterTHETAMIN inparams.txt
    Unknown, unused or multiple statements of parameterTHETAMAX inparams.txt
    Unknown, unused or multiple statements of parameterDTHETA inparams.txt
@@ -327,102 +330,6 @@
   Trep      =7.26 s
   Mean dir  =305.21 degN
   Overall Trep from all spectra calculated:7.26 s
-   No dispersion convergence found for wave train           1  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           2  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           3  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           4  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           5  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           6  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           7  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           8  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           9  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          10  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          11  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          12  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          13  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          14  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          15  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          16  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          17  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          18  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          19  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          20  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          21  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          22  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          23  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          24  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          25  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          26  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          27  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          28  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          29  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          30  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          31  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          32  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          33  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          34  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          35  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          36  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          37  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          38  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          39  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          40  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          41  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          42  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          43  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          44  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          45  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          46  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          47  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          48  in boundary condi
- tion generation
   Calculating Fourier components
   5.0% done
   10.0% done
@@ -444,7 +351,7 @@
   90.0% done
   95.0% done
   100.0% done
-  Wave energy outside computational domain at offshore boundary:.1%
+  Wave energy outside computational domain at offshore boundary:.6%
   Calculating short wave time series for theta bin1 of18
   Calculating short wave time series for theta bin2 of18
   Calculating short wave time series for theta bin3 of18
@@ -465,19 +372,19 @@
   Calculating short wave time series for theta bin18 of18
  Calculating wave energy envelope at boundary.
   100.0% done
-  Wave bin1 contains.00% of total energy
-  Wave bin2 contains5.64% of total energy
-  Wave bin3 contains10.27% of total energy
-  Wave bin4 contains8.97% of total energy
-  Wave bin5 contains13.45% of total energy
-  Wave bin6 contains18.81% of total energy
-  Wave bin7 contains11.89% of total energy
-  Wave bin8 contains13.80% of total energy
-  Wave bin9 contains8.03% of total energy
-  Wave bin10 contains4.37% of total energy
-  Wave bin11 contains3.37% of total energy
-  Wave bin12 contains.74% of total energy
-  Wave bin13 contains.66% of total energy
+  Wave bin1 contains2.12% of total energy
+  Wave bin2 contains7.18% of total energy
+  Wave bin3 contains9.04% of total energy
+  Wave bin4 contains11.10% of total energy
+  Wave bin5 contains11.08% of total energy
+  Wave bin6 contains17.71% of total energy
+  Wave bin7 contains18.04% of total energy
+  Wave bin8 contains9.43% of total energy
+  Wave bin9 contains6.32% of total energy
+  Wave bin10 contains4.66% of total energy
+  Wave bin11 contains1.85% of total energy
+  Wave bin12 contains.98% of total energy
+  Wave bin13 contains.49% of total energy
   Wave bin14 contains.00% of total energy
   Wave bin15 contains.00% of total energy
   Wave bin16 contains.00% of total energy
@@ -487,25 +394,26 @@
   file done
   Calculating primary wave interaction
   5.0% done
-  10.1% done
-  15.1% done
-  20.1% done
-  25.1% done
-  30.2% done
-  35.2% done
-  40.2% done
-  45.2% done
-  50.3% done
-  55.3% done
-  60.3% done
-  65.3% done
-  70.4% done
-  75.4% done
-  80.4% done
-  85.4% done
-  90.5% done
-  95.5% done
+  10.0% done
+  15.0% done
+  20.0% done
+  25.0% done
+  30.1% done
+  35.1% done
+  40.1% done
+  45.1% done
+  50.1% done
+  55.1% done
+  60.1% done
+  65.1% done
+  70.1% done
+  75.1% done
+  80.1% done
+  85.2% done
+  90.2% done
+  95.2% done
   100.0% done
+  Warning: shallow water so long wave variance is reduced using par%nmax
   Calculating flux at boundary
   100.0% done
    Writing long wave mass flux toq_reuse.bcf ...
@@ -514,8 +422,11 @@
   Spectral wave boundary conditions complete
   --------------------------------
   Boundary conditions complete, starting computation
-   Duration   :  0.281250000000000       seconds
-   Timesteps  :          11
-   Average dt :  9.090909090909091E-002  seconds
-   Unit speed :  1.116514489876935E-004  seconds/1
-  End of program xbeach
+  Simulation  6.1 percent complete. Average dt  0.213 seconds
+  Time remaining  1 minutes and 17 seconds
+  Simulation 23.8 percent complete. Average dt  0.208 seconds
+  Time remaining 27 seconds
+  Simulation 44.6 percent complete. Average dt  0.209 seconds
+  Time remaining 16 seconds
+  Simulation 66.2 percent complete. Average dt  0.208 seconds
+  Time remaining  9 seconds

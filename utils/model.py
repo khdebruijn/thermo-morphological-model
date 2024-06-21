@@ -244,7 +244,7 @@ class Simulation():
             "mainang":self.conditions[timestep_id]["Dp(deg)"],  # relative to true north
             "gammajsp": 1.3,  # placeholder
             "s": 10,     # placeholder
-            "duration": self.dt,
+            "duration": self.dt * 3600,
             "dtbc": 60, # placeholder
             "fnyq":1, # placeholder
         })
@@ -256,14 +256,21 @@ class Simulation():
         # water level, wind input, sediment input, avalanching, vegetation, 
         # drifters ipnut, output selection)
         self.xb_setup.set_params({
+            # grid parameters
+            "xori": 0,
+            "yori": 0,
+            
             # sediment parameters
             "D50": self.config.xbeach.D50,
+            "D90": self.config.xbeach.D50,  # placeholder
             "rhos": self.config.xbeach.rho_solid,
-            "reposeangle": self.config.xbeach.reposeangle,
+            # "reposeangle": self.config.xbeach.reposeangle,  # currently unused, since dryslp and wetslp are already defined
             "dryslp": self.config.xbeach.dryslp,
             "wetslp": self.config.xbeach.wetslp,
             
             # flow boundary condition parameters
+            "front": "abs_2d",
+            "back": "wall",
             "left": "neumann",
             "right": "neumann",
             
@@ -282,7 +289,7 @@ class Simulation():
             "thetanaut": 0,
             
             # model time
-            "tstop":self.dt,
+            "tstop":self.dt * 3600,  # convert from [h] to [s]
             
             # morphology parameters
             "morfac": 1,
@@ -300,9 +307,11 @@ class Simulation():
             "morphology": 1,  # Turn on morphology
             "sedtrans": 1,  # Turn on sediment transport
             "swave": 1,  # Turn on short waves
-            "swrunup": 1,  # Turn on short wave runup
+            "swrunup": 1,  # Turn on short wave runup (can only be used with structures)
+            "struct": 1,
             "viscosity": 1,  # Include viscosity in flow solver
             "wind": 1,  # Include wind in flow solver
+            "struct": 1,  # required for working with ne_layer
 
             # tide boundary conditions
             "tideloc": 0,
@@ -310,6 +319,7 @@ class Simulation():
             "zs0":self.conditions[timestep_id]["SS(m)"],
 
             # wave boundary conditions
+            "instat": "jons",
             "bcfile": "jonswap.txt",
             "wavemodel":"surfbeat",
             "break":"roelvink1",
@@ -320,7 +330,7 @@ class Simulation():
             
             # output variables
             "outputformat":"netcdf",
-            "tint":3600,
+            "tintg":self.dt * 3600,  # maybe dont have to specify this?
             "tstart":0,
             "nglobalvar":[
                 "zb",  # bed level (1D array)
@@ -490,8 +500,10 @@ class Simulation():
         
         # for these intervals, if not conditions are supplied from the storm projections, set conditions to '0'
         zero_conditions = {
-                    "Hso(m)": 0.001,
-                    "Hs(m)": 0.001,
+                    # "Hso(m)": 0.001,
+                    # "Hs(m)": 0.001,
+                    "Hso(m)": 0.2,  # placeholder
+                    "Hs(m)": 0.2,  # placeholder
                     # "Hso(m)": 0,
                     # "Hs(m)": 0,
                     "Dp(deg)": 270,                    
@@ -534,10 +546,13 @@ class Simulation():
         """
         
         # read initial conditions
-        ground_temp_distr_dry, ground_temp_distr_wet = self._generate_initial_ground_temperature_distribution(self.forcing_data, 
-                                                                                                             self.t_start, 
-                                                                                                             self.config.thermal.grid_resolution,
-                                                                                                             self.config.thermal.max_depth)
+        ground_temp_distr_dry, ground_temp_distr_wet = self._generate_initial_ground_temperature_distribution(
+            self.forcing_data, 
+            self.t_start, 
+            self.config.thermal.grid_resolution,
+            self.config.thermal.max_depth
+            )
+        
         # save the grid resolution
         self.dz = self.config.thermal.max_depth / (self.config.thermal.grid_resolution - 1) 
                
@@ -672,7 +687,7 @@ class Simulation():
             [(2.29+max_depth)/2, df.soil_temperature_level_4.values[0]],
         ])
         
-        ground_temp_distr_dry = interpolate_points(dry_points[0,:], dry_points[1,:], n)
+        ground_temp_distr_dry = interpolate_points(dry_points[:,0], dry_points[:,1], n)
         
         wet_points = np.array([
             [0, df.soil_temperature_level_1_offs.values[0]],
@@ -683,7 +698,7 @@ class Simulation():
             [(2.29+max_depth)/2, df.soil_temperature_level_4_offs.values[0]],
         ])
         
-        ground_temp_distr_wet = interpolate_points(wet_points[0,:], wet_points[1,:], n)
+        ground_temp_distr_wet = interpolate_points(wet_points[:,0], wet_points[:,1], n)
         
         return ground_temp_distr_dry, ground_temp_distr_wet
         
@@ -776,7 +791,7 @@ class Simulation():
             if subgrid_timestep_id == 0:
                 
                 ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))
-                self.runup = ds.runup.values.flatten()
+                self.runup = ds.runup.values.flatten()[-1]
                 ds.close()
             
             # get water level to check whether to use convective heat transfer from air or sea
@@ -1007,10 +1022,14 @@ class Simulation():
             filepath to the xbeach sedero (sedimentation-erosion) output relative to the current working directory."""
             
         # Read output file
-        ds = xr.open_dataset(fp_xbeach_output).squeeze()
+        ds = xr.load_dataset(fp_xbeach_output)
+        ds = ds.sel(globaltime = ds.globaltime != 0).squeeze()
+        
         cum_sedero = ds.sedero.values
         xgr = ds.globalx.values
         
+        ds.close()
+
         # Create an interpolation function
         interpolation_function = interp1d(xgr, cum_sedero, kind='linear', fill_value='extrapolate')
         
@@ -1173,6 +1192,8 @@ class Simulation():
         """
         np.savetxt(os.path.join(self.cwd, "ne_layer.txt"), self.thaw_depth)
         
+        # np.savetxt(os.path.join(self.cwd, "ne_layer.txt"), np.zeros(self.xgr.shape))  # (used for testing purpose)
+        
         return None
         
     def find_thaw_depth(self):
@@ -1190,8 +1211,8 @@ class Simulation():
         indices = count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt))
         
         # find associated coordinates of these points
-        x_thaw = x_matrix[indices]
-        z_thaw = z_matrix[indices]
+        x_thaw = x_matrix[np.arange(x_matrix.shape[0]), indices]
+        z_thaw = z_matrix[np.arange(x_matrix.shape[0]), indices]
         
         # sort 
         sort_indices = np.argsort(x_thaw)

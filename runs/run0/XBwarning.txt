@@ -1,108 +1,14 @@
                        D50 =.0019 Warning: value > recommended value of.0008
-                    wetslp =35.0000 Warning: value > recommended value of1.0000
-                    dryslp =35.0000 Warning: value > recommended value of2.0000
- Warning: swrunup can only be used in combination with struct=1. swrunup will be
-  turned off.
+                       D90 =.0019 Warning: value > recommended value of.0015
+  Warning: 2D absorbing boundary condition [front=abs_2d] reduces to a
+           1D absorbing boundary condition [front=abs_1d] in
+           1D mode [ny=0]
    Unknown, unused or multiple statements of parameterDTHETA_S inparams.txt
+   Unknown, unused or multiple statements of parameterXORI inparams.txt
+   Unknown, unused or multiple statements of parameterYORI inparams.txt
    Unknown, unused or multiple statements of parameterWETSLP inparams.txt
-   Unknown, unused or multiple statements of parameterNE_LAYER inparams.txt
    Unknown, unused or multiple statements of parameterTHETAMIN inparams.txt
    Unknown, unused or multiple statements of parameterTHETAMAX inparams.txt
    Unknown, unused or multiple statements of parameterDTHETA inparams.txt
    Unknown, unused or multiple statements of parameterTHETANAUT inparams.txt
-   No dispersion convergence found for wave train           1  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           2  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           3  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           4  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           5  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           6  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           7  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           8  in boundary condi
- tion generation
-   No dispersion convergence found for wave train           9  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          10  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          11  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          12  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          13  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          14  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          15  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          16  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          17  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          18  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          19  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          20  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          21  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          22  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          23  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          24  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          25  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          26  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          27  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          28  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          29  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          30  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          31  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          32  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          33  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          34  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          35  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          36  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          37  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          38  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          39  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          40  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          41  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          42  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          43  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          44  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          45  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          46  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          47  in boundary condi
- tion generation
-   No dispersion convergence found for wave train          48  in boundary condi
- tion generation
+  Warning: shallow water so long wave variance is reduced using par%nmax

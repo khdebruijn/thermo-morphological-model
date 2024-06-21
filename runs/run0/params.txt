@@ -1,5 +1,5 @@
-%% XBeach model: Run C:\Users\bruij_kn\OneDrive - Stichting Deltares\Documents\GitHub\thermo-morphological-model\runs\run0: timestep 107 
-%% Params created on 2024-06-18 16H:06m 
+%% XBeach model: Run C:\Users\bruij_kn\OneDrive - Stichting Deltares\Documents\GitHub\thermo-morphological-model\runs\run0: timestep 99 
+%% Params created on 2024-06-21 14H:06m 
 %% Params created by bruij_kn 
 
 %% General 
@@ -11,7 +11,7 @@ wbctype             = parametric
 
 vardx               = 1
 posdwn              = -1
-nx                  = 228
+nx                  = 221
 ny                  = 0
 xori                = 0
 yori                = 0
@@ -26,10 +26,13 @@ dtheta_s            = 10
 
 %% par 
 
+xori                = 0
+yori                = 0
 
 %% Bed composition parameters 
 
 D50                 = 0.0019
+D90                 = 0.0019
 
 %% Sediment input 
 
@@ -37,18 +40,21 @@ rhos                = 2650
 
 %% Avalanching 
 
-dryslp              = 35
-wetslp              = 35
+dryslp              = 1
+wetslp              = 0.5
 
 %% Morphology parameters 
 
-wetslp              = 35
+wetslp              = 0.5
 morfac              = 1
 morstart            = 0
 ne_layer            = ne_layer.txt
+struct              = 1
 
 %% Flow boundary condition parameters 
 
+front               = abs_2d
+back                = wall
 left                = neumann
 right               = neumann
 
@@ -61,7 +67,7 @@ thetanaut           = 0
 
 %% Model time 
 
-tstop               = 1
+tstop               = 3600
 
 %% Physical processes 
 
@@ -88,6 +94,7 @@ break               = roelvink1
 %% Output 
 
 outputformat        = netcdf
+tintg               = 3600
 tstart              = 0
 
 %% Wave boundary condition parameters 
