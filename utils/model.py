@@ -1071,7 +1071,7 @@ class Simulation():
             array: incoming solar radiation for each grid point in the computational domain
         """        
         # get current timestamp
-        timestamp = self.timestamps.iloc[timestep_id]
+        timestamp = self.timestamps[timestep_id]
         
         # get id of current timestamp w.r.t. solar_flux_map (-1 because: 'minimum id is 0' and 'minimum day of year is 1')
         id_t = timestamp.dayofyear - 1  # factors are associated with day of year only (as it is based on maximum angle per day)
@@ -1111,14 +1111,14 @@ class Simulation():
         t_end_datetime = pd.to_datetime(t_end)
         self.solar_flux_times = pd.date_range(t_start_datetime, t_end_datetime, freq='1h', inclusive='left')
                 
-        self.solar_flux_map = np.zeros(len(self.solar_flux_times) / 24, len(self.solar_flux_angles))
+        self.solar_flux_map = np.zeros((np.int32(len(self.solar_flux_times)/24), len(self.solar_flux_angles)))
         
         for angle in self.solar_flux_angles:
             
             angle_id = np.nonzero(angle==self.solar_flux_angles)
             
             # for each integer angle in the angle range, an array of enhancement factors is saved, indexable by N (i.e., the N-th day of the year)
-            self.solar_flux_map[:, angle_id] = self._calculate_solar_flux_factors(self.solar_flux_times, angle, timezone_diff)
+            self.solar_flux_map[:, angle_id] = self._calculate_solar_flux_factors(self.solar_flux_times, angle, timezone_diff).reshape((-1, 1, 1))
         
         return self.solar_flux_map
     
@@ -1197,12 +1197,18 @@ class Simulation():
         sin_0_daily_max = np.max(sin_0_2d, axis=1).flatten()
         # sin_0_daily_max_repeated = np.repeat(sin_0_daily_max, 24)
 
-        # 10) calculate enhancement factor
+        # 10) calculate enhancement factor, and repeat it 24 time so it is constant for each day
         factor = sin_theta_daily_max / sin_0_daily_max
         
         # 11) filter out values where it the angle theta is negative (as that means radiation hits the surface from below)
-        shadow_mask = np.nonzero(theta < 0)
-        factor[shadow_mask] = 0
+        shadow_mask = np.zeros(factor.shape)
+        # shadow_mask = np.nonzero(theta < 0)
+        
+        for i, row in enumerate(theta.reshape((-1, 24))):
+            if all(row < 0):
+                shadow_mask[i] = 1
+            
+        factor[np.nonzero(shadow_mask)] = 0
         
         return factor
         
