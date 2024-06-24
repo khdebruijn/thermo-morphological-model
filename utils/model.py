@@ -352,7 +352,7 @@ class Simulation():
         block_print()
         
         # write model setup
-        self.xb_setup.write_model(self.cwd)
+        self.xb_setup.write_model(self.cwd, figure=False)
         
         # close figures generated during writing
         plt.close()
