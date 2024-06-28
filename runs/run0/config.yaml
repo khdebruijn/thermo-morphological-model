@@ -1,6 +1,7 @@
-# dataset parameters
-dataset_parameters:
-  database_folder: 'database/datasets'  # datasets location
+# data parameters
+data:
+  storm_data_path: 'database/ts_datasets/storms_erikson.csv'  # path to storm dataset
+  forcing_data_path: 'database/ts_datasets/era5.csv'  # path to forcing data
 
 # model settings
 model:
@@ -10,7 +11,7 @@ model:
   time_start        : '08-05-2020'  # MM-DD-YY starting time (if -1 take entire dataset)
   time_end          : '08-14-2020' # MM-DD-YY stopping time (if -1 take entire dataset)
   timestep          : 1  # size of timesteps (in hours)
-  call_xbeach_inter :  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
+  call_xbeach_inter : 168  # xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
   time_zone_diff    : -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
 
 
@@ -34,7 +35,7 @@ bathymetry:
   beach_width                 :  12.5  # [m] width of the beach
   beach_slope                 :  0.1  # [-] slope of the beach, i.e., height/width
   nearshore_max_depth         :  3  # [m] maximum depth of the nearshore
-  nearshore_slope             :  0.03  # [-] slope of the nearshore section, i.e., height/width
+  nearshore_slope             :  0.08  # [-] slope of the nearshore section, i.e., height/width
   offshore_max_depth          :  5  # [m] maximum offshore depth
   offshore_slope              :  0.007  # [-] slope of the offshore section, i.e., height/width
   continental_flat_width      :  400  # [m] width of the continental flat section

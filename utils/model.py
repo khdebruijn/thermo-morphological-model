@@ -16,7 +16,7 @@ from scipy.interpolate import interp1d
 import xarray as xr
 
 import xbTools
-from xbTools.grid.creation import xgrid, ygrid
+from xbTools.grid.creation import xgrid
 from xbTools.xbeachtools import XBeachModelSetup
 from xbTools.general.executing_runs import xb_run_script_win
 from xbTools.general.wave_functions import dispersion
@@ -176,6 +176,9 @@ class Simulation():
         # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
         self.thaw_depth = np.zeros(self.xgr.shape)
         
+        # set origin of x-grid
+        self.x_ori = np.min(self.xgr)
+        
         return self.xgr, self.zgr, self.thaw_depth
 
     
@@ -198,11 +201,10 @@ class Simulation():
             self.bathy_grid = np.loadtxt(f)
             
             
-    def load_forcing(self, fname_in_ts_datasets="era5.csv"):
+    def load_forcing(self, fpath):
         """This function loads in the forcing data and makes it an attribute of the simulation instance"""
         # read in forcing concditions
-        fpath = os.path.join(self.proj_dir, "database/ts_datasets/")
-        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, os.path.join(fpath, fname_in_ts_datasets))
+        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, fpath)
         return None
     
     ################################################
@@ -1007,6 +1009,11 @@ class Simulation():
             self.xgr_new, self.zgr_new = xgrid(self.xgr, self.bathy_current, dxmin=2)
             self.zgr_new = np.interp(self.xgr_new, self.xgr, self.bathy_current)
             
+            # ensure that the grid doesn't extend further offshore than the original grid (this is a bug in the xbeach python toolbox)
+            while self.xgr_new[0] < self.x_ori:
+                self.xgr_new = self.xgr_new[1:]
+                self.zgr_new = self.zgr_new[1:]
+
             # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
             self.abs_xgr_new, self.abs_zgr_new = generate_perpendicular_grids(self.xgr_new, self.zgr_new)
             

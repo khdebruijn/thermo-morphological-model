@@ -32,11 +32,11 @@ class SimulationResults():
         var_list_path = os.path.join(timestep_output_ids_path, str(self.timestep_output_ids[0]) + "/")
         self.var_list = np.array([item[:-4] for item in os.listdir(var_list_path)])
         
-        self.get_bluff_toes_and_shorelines()
+        self._get_bluff_toes_and_shorelines()
         
         return None
                 
-    def get_bluff_toes_and_shorelines(self):
+    def _get_bluff_toes_and_shorelines(self):
         
         self.bluff_toes = {}
         self.shore_lines = {}
@@ -100,8 +100,21 @@ class SimulationResults():
             var_dict[runid] = var_array
             
         return var_dict
-   
     
+    def get_timestamps(self, timestep_ids):
+        
+        return self.timestamps[[timestep_ids]]
     
-    
-    
+    def get_timestep_ids(self, timestamps):
+        
+        timestep_ids = []
+        
+        for timestamp in timestamps:
+            
+            timestep_ids.append(np.argwhere(timestamp==self.timestamps))
+        
+        return np.array(timestep_ids)
+        
+    def save_animation(self, varname, timestep_id_start, timestep_id_end):
+        
+        pass

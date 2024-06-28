@@ -35,12 +35,14 @@ def main(sim, print_report=False):
     print("succesfully set temporal parameters")
         
     # load in forcing data
-    sim.load_forcing(fname_in_ts_datasets="era5.csv")
+    sim.load_forcing(
+        os.path.join(sim.proj_dir, sim.config.data.forcing_data_path)
+    )
     print("succesfully loaded forcing")
     
     # this variable is used to determine if xbeach should be ran for each timestep
     xb_times = sim.timesteps_with_xbeach_active(
-        os.path.join(sim.proj_dir, "database/ts_datasets/storms_erikson.csv"),
+        os.path.join(sim.proj_dir, sim.config.data.storm_data_path),
         )
     print("succesfully generated xbeach times")
     

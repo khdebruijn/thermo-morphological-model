@@ -9,6 +9,7 @@ __pycache__
 
 # raw datasets
 database/raw_datasets/era5/*/*.nc
+database/raw_datasets/era5/*.nc
 database/raw_datasets/gibbs/*/*
 database/raw_datasets/erikson/*/*
 database/raw_datasets/cmip5/*/*

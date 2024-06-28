@@ -1,6 +1,7 @@
-# dataset parameters
-dataset_parameters:
-  database_folder: 'database/datasets'  # datasets location
+# data parameters
+data:
+  storm_data_path: 'database/ts_datasets/storms_erikson.csv'  # path to storm dataset
+  forcing_data_path: 'database/ts_datasets/era5.csv'  # path to forcing data
 
 # model settings
 model:

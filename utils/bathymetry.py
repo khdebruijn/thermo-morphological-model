@@ -48,9 +48,6 @@ def calculate_bluff_edge_toe_position(xgr, zgr):
             
         distances[i] = np.cross(p2-p1, p3-p1) / np.linalg.norm(p2-p1)
         
-        if not zgr[i] < xgr[i] * (zgr[-1] - zgr[0]) / (xgr[-1] - xgr[0]) + zgr[0]:
-            distances[i] *= -1
-        
     bluff_edge_id = np.argmax(distances)
     bluff_toe_id = np.argmin(distances)
     
