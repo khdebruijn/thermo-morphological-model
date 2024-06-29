@@ -110,8 +110,8 @@ class Simulation():
         
         # set start and end time, and time step
         self.dt = dt
-        self.t_start = pd.to_datetime(t_start)
-        self.t_end = pd.to_datetime(t_end)
+        self.t_start = pd.to_datetime(t_start, dayfirst=True)
+        self.t_end = pd.to_datetime(t_end, dayfirst=True)
         
         # this variable will be used to keep track of time
         self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left')
