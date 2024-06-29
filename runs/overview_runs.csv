@@ -1,10 +1,10 @@
 run_id;t_start;t_end;description
 run_template;8-1-2020;8-10-2020;(MM-DD-YY) used as a read-to-run template, that is easily adjustable to generate other runs
 ;;;
-test0;;;used in development
-test1;;;
-test2;;;
-test3;;;
+test0;1-1-2020;31-12-2021;used in development (too high slope, some wrong parameters, weird offshore extension of grid, too much onshore transport)\
+test1;1-1-2020;31-12-2021;fixed offshore grid extension and adjusted slope down, but still some weird parameters and likelyh too much onshore transport
+test2;1-1-2020;31-12-2021;will adjust: grid resolution (should increase by factor ~2), resolutie verfijnen in grid generator, paar vlakke cellen toevoegen offshore zodat er geen bodem gradient is (stuk of 3 cellen), en meer (zie notes 28-6-2024, onder 'oplossing', en dan alles behalve asymmetry aanpassen)
+test3;1-1-2020;31-12-2021;zelfde als test 2, maar nu ook asymmetry waarden allemaal aanpassen naar 0.10 (ipv 0.15 - 0.20)
 ;;;
 val0;8-2-1950;7-10-2020;runs for the entire period for which there is coastal retreat data
 val1;;;runs for the first characteristic period
