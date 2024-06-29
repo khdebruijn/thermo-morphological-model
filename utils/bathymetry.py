@@ -73,6 +73,7 @@ def generate_schematized_bathymetry(
         with_artificial=False,
         artificial_max_depth=500,
         artificial_slope=1/50,
+        artificial_flat=60, # meters
         
         N=100
     ):
@@ -90,6 +91,7 @@ def generate_schematized_bathymetry(
     x_offs_cont = x_near_offs + (offshore_max_depth - nearshore_max_depth) / offshore_slope
     x_cont_arti = x_offs_cont + contintental_flat_width
     x_end = x_cont_arti + artificial_max_depth / artificial_slope
+    x_flat_extension = x_end + artificial_flat
     
     z_wl = 0
     z_toe = z_wl + beach_width * beach_slope
@@ -99,6 +101,7 @@ def generate_schematized_bathymetry(
     z_offs_cont = z_wl - offshore_max_depth
     z_cont_arti = z_wl - offshore_max_depth
     z_end = z_wl - artificial_max_depth
+    z_flat_extension = z_end
     
     xs = [
         x_start,
@@ -123,6 +126,11 @@ def generate_schematized_bathymetry(
     if with_artificial:
         xs.append(x_end)
         zs.append(z_end)
+        
+        xs.append(x_flat_extension)
+        zs.append(z_flat_extension)
+        
+        
     
     total_x = np.array([])
     total_z = np.array([])

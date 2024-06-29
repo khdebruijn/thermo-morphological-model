@@ -69,7 +69,8 @@ def main(sim, print_report=False):
             artificial_max_depth=sim.config.bathymetry.artificial_max_depth,
             artificial_slope=sim.config.bathymetry.artificial_slope,
             
-            N=sim.config.bathymetry.N
+            N=sim.config.bathymetry.N,
+            artificial_flat=sim.config.bathymetry.artificial_flat
         )
         
         np.savetxt("x.grd", xgr)
@@ -166,7 +167,7 @@ def main(sim, print_report=False):
             print()
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
-            sim.update_grid(fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
+            sim.update_grid(timestep_id, fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
         
         # calculate the current thaw depth
         sim.find_thaw_depth()

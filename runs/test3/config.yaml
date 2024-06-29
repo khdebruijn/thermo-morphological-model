@@ -46,7 +46,6 @@ bathymetry:
   N                           :  100 # number of points of each section
   artificial_flat             : 60  # [m] length of flat section at the end of artificial slope
 
-
 # xbeach parameters
 xbeach:
   # general settings
@@ -54,12 +53,12 @@ xbeach:
   version     : '1.24'  # version of xbeach used
 
   # physical processes:
-  with_wind: True  # include wind in the xbeach model
+  with_wind: False  # include wind in the xbeach model
 
   # grid settings
   thetamin  : '-90'  # minimum angle
-  thetamax  : '90'   # maximum angle
-  dtheta    : '15'     # bin width
+  thetamax  :  '90'  # maximum angle
+  dtheta    : '180'  # bin width
 
   # hydrodynamics settings
   wbctype : 'jons'   # type of wave boundary condition
@@ -74,6 +73,10 @@ xbeach:
   rho_solid   : 2650  # [kg/m3] density of sediment particles
   bedfriccoef : 0.01  # [-] bed friction coefficient (placeholder)
 
+  # wave asymmetry factors
+  facSk: 0.10  # [-] Calibration factor time averaged flows due to wave skewness. Default is 0.15.
+  facAs: 0.10  # [-] Calibration factor time averaged flows due to wave asymmetry. Default is 0.20.
+  facua: 0.10  # [-] Calibration factor time averaged flows due to wave skewness and asymmetry. Default is 0.175.
 
 # thermal moodel parameters
 thermal:

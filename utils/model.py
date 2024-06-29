@@ -165,7 +165,7 @@ class Simulation():
             self.xgr = np.linspace(min(self.bathy_grid), max(self.bathy_grid), self.config.model.nx)
         else:
             # transform into a more suitable grid for xbeach
-            self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2)
+            self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2, ppwl=self.config.bathymetry.ppwl)
         
         # interpolate bathymetry to grid
         self.zgr = np.interp(self.xgr, self.bathy_grid, self.bathy_initial)
@@ -264,20 +264,22 @@ class Simulation():
             
             # sediment parameters
             "D50": self.config.xbeach.D50,
-            "D90": self.config.xbeach.D50,  # placeholder
+            "D90": self.config.xbeach.D50 * 1.5,  # placeholder
             "rhos": self.config.xbeach.rho_solid,
             # "reposeangle": self.config.xbeach.reposeangle,  # currently unused, since dryslp and wetslp are already defined
             "dryslp": self.config.xbeach.dryslp,
             "wetslp": self.config.xbeach.wetslp,
             
             # flow boundary condition parameters
-            "front": "abs_2d",
+            "front": "abs_1d",
             "back": "wall",
             "left": "neumann",
             "right": "neumann",
             
-            #flow parameters
-            # -----
+            # flow parameters
+            "facSk": 0.15 if not "facSk" in self.config.xbeach.keys() else self.config.xbeach.facSk,
+            "facAs": 0.20 if not "facAs" in self.config.xbeach.keys() else self.config.xbeach.facAs,
+            "facua": 0.175 if not "facua" in self.config.xbeach.keys() else self.config.xbeach.facua,
 
             # general
             "befriccoef":self.config.xbeach.bedfriccoef,  # placeholder
@@ -305,14 +307,9 @@ class Simulation():
             # physical processes
             "avalanching": 1,  # Turn on avalanching
             "flow": 1,  # Turn on flow calculation
-            "lwave": 1,  # Turn on short wave forcing on nlsw equations and boundary conditions
             "morphology": 1,  # Turn on morphology
             "sedtrans": 1,  # Turn on sediment transport
-            "swave": 1,  # Turn on short waves
-            "swrunup": 1,  # Turn on short wave runup (can only be used with structures)
-            "struct": 1,
-            "viscosity": 1,  # Include viscosity in flow solver
-            "wind": 1,  # Include wind in flow solver
+            "wind": 1 if self.config.xbeach.with_wind else 0,  # Include wind in flow solver
             "struct": 1,  # required for working with ne_layer
 
             # tide boundary conditions
@@ -324,11 +321,14 @@ class Simulation():
             "instat": "jons",
             "bcfile": "jonswap.txt",
             "wavemodel":"surfbeat",
-            "break":"roelvink1",
             
             # wind boundary condition
-            "windth": wind_direction,  # degrees clockwise from the north
-            "windv": wind_velocity,
+            "windth": wind_direction if self.config.xbeach.with_wind else 0,  # degrees clockwise from the north
+            "windv": wind_velocity if self.config.xbeach.with_wind else 0,
+            
+            # hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)
+            "writehotstart": 1 if self.xbeach_times[timestep_id] else 0,
+            "hotstart": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,
             
             # output variables
             "outputformat":"netcdf",
@@ -443,7 +443,7 @@ class Simulation():
         self.xbeach_times = self.storm_timing * self.xbeach_sea_ice + self.xbeach_inter
         
         # output these xbeach timestep ids
-        self._check_and_write('timestep_xbeach_ids', self.xbeach_times, self.result_dir)
+        self._check_and_write('xbeach_times', self.xbeach_times, self.result_dir)
 
         return self.xbeach_times
     
@@ -992,7 +992,7 @@ class Simulation():
         return 0.05
 
     
-    def update_grid(self, fp_xbeach_output="sedero.txt"):
+    def update_grid(self, timestep_id, fp_xbeach_output="sedero.txt"):
         """This function updates the current grid, calculates the angles of the new grid with the horizontal, generates a new thermal grid 
         (perpendicular to the existing grid), and fits the previous temperature and enthalpy distributions to the new grid."""
         
@@ -1005,9 +1005,13 @@ class Simulation():
         # only update the grid of there actually was a change in bed level
         if not all(cum_sedero == 0):
         
-            # generate a new xgrid and zgrid
-            self.xgr_new, self.zgr_new = xgrid(self.xgr, self.bathy_current, dxmin=2)
-            self.zgr_new = np.interp(self.xgr_new, self.xgr, self.bathy_current)
+            # generate a new xgrid and zgrid (but only if the next timestep does not require a hotstart, which requires the same xgrid)
+            if self.xbeach_times[timestep_id] and self.xbeach_times[timestep_id + 1]:
+                self.xgr_new, self.zgr_new = xgrid(self.xgr, self.bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
+                self.zgr_new = np.interp(self.xgr_new, self.xgr, self.bathy_current)
+            else:
+                self.xgr_new = self.xgr
+                self.zgr_new = self.bathy_current
             
             # ensure that the grid doesn't extend further offshore than the original grid (this is a bug in the xbeach python toolbox)
             while self.xgr_new[0] < self.x_ori:

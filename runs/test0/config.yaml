@@ -26,6 +26,7 @@ bathymetry:
   xfile           : 'x.grd'   # file used for the grid (x-direction)
   depfile         : 'bed.dep'  # file used for the bed
   grid_orientation: 88.14  # [degrees], orientation of bluff face with respect to east (ccw). The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook
+  ppwl            : 40  # number of points in the grid per wavelength. Default 20.
 
   # schematized bathymetry parameters
   with_schematized_bathymetry :  True  # whether or not to generate a schematized bathymetry upon initialization
@@ -43,6 +44,7 @@ bathymetry:
   artificial_max_depth        :  10  # [m] maximum depth of the artificial section (wave heights in dataset are defined at a depth of 10m, so that value is recommended)
   artificial_slope            :  0.02  # [-] slope of the artificial section, i.e., height/width
   N                           :  100 # number of points of each section
+  artificial_flat             : 60  # [m] length of flat section at the end of artificial slope
 
 
 # xbeach parameters
@@ -50,6 +52,9 @@ xbeach:
   # general settings
   with_xbeach : True  # include the xbeach module in the model, default true
   version     : '1.24'  # version of xbeach used
+
+  # physical processes:
+  with_wind: True  # include wind in the xbeach model
 
   # grid settings
   thetamin  : '-90'  # minimum angle
