@@ -136,6 +136,7 @@ output:
     "timestep_ids",
     "timestep_output_ids",
     "timesteps_xbeach_ids",
+    "xbeach_times",
 
     "xgr",
     "zgr",
