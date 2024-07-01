@@ -327,7 +327,7 @@ class Simulation():
             "windv": wind_velocity if self.config.xbeach.with_wind else 0,
             
             # hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)
-            "writehotstart": 1 if self.xbeach_times[timestep_id] else 0,
+            "writehotstart": 1 if self.xbeach_times[timestep_id + 1] else 0,
             "hotstart": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,
             
             # output variables
