@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from pathlib import Path
 import yaml
@@ -174,7 +174,7 @@ class SimulationResults():
             
             # set title
             timestamp = datetime.fromtimestamp(self.timestamps[np.where(output_id==self.timestep_ids)][0] * 10**-9)
-            ax.set_title(f'timestep = {output_id} ({timestamp})')
+            ax.set_title(f'timestep = {output_id} ({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
             
             # load grid
             xgr = self.get_var_timestep("xgr", output_id)[RUNID]
@@ -291,7 +291,7 @@ class SimulationResults():
             timestamp = datetime.fromtimestamp(self.timestamps[np.where(output_id==self.timestep_ids)][0] * 10**-9)
                             
             # set current timestep id as figure title
-            fig.suptitle(f'timestep = {output_id} ({timestamp})')
+            fig.suptitle(f'timestep = {output_id} ({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
             
             # get necessary variables
             xgr = self.get_var_timestep("xgr", output_id)[RUNID]
@@ -439,7 +439,7 @@ class SimulationResults():
             print(output_id)
             
             # set current timestep id as figure title
-            fig.suptitle(f'timestep = {output_id} ({timestamp})')
+            fig.suptitle(f'timestep = {output_id} ({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
             
             # get necessary variables
             xgr = self.get_var_timestep("xgr", output_id)[RUNID]
