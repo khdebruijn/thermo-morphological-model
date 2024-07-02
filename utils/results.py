@@ -319,9 +319,9 @@ class SimulationResults():
             
             # plot surface heat fluxes (in plot 2)
             total_heat_flux_line.set_data(xgr, total_heat_flux)
-            long_wave_radiation_flux_line.set_data(xgr, long_wave_radiation_flux)
+            long_wave_radiation_flux_line.set_data(xgr, long_wave_radiation_flux*np.ones(xgr.shape))
             solar_radiation_flux_line.set_data(xgr, solar_radiation_flux)
-            latent_heat_flux_line.set_data(xgr, latent_heat_flux)
+            latent_heat_flux_line.set_data(xgr, latent_heat_flux*np.ones(xgr.shape))
             convective_heat_flux_line.set_data(xgr, convective_heat_flux)
             
             # print progress
