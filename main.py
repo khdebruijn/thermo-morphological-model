@@ -12,7 +12,7 @@ from utils.bathymetry import generate_schematized_bathymetry
 from utils.miscellaneous import textbox
 
 
-def main(sim, print_report=False):
+def main(sim):
     """run this function to perform a simulation
 
     Args:
