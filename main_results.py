@@ -14,9 +14,12 @@ def main(runid):
     results = SimulationResults(runids=[runid])
     
     print(f"creating animations for {runid}")
-    results.bed_level_animation(runid)
-    results.heat_forcing_animation(runid)
-    results.temperature_animation(runid)
+    frame_num = len(results.timestep_output_ids)
+    fps = frame_num / 120  # for a 120 second animation
+
+    results.bed_level_animation(runid, fps=fps)
+    results.heat_forcing_animation(runid, fps=fps)
+    results.temperature_animation(runid, fps=fps)
     
     print(f"completed {runid}")
     
