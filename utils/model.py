@@ -870,16 +870,16 @@ class Simulation():
         if subgrid_timestep_id == 0:  # determine radiation fluxes only during first timestep, as they are constant for each subgrid timestep
         
             # determine radiation, assuming radiation only influences the dry domain
-            self.latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0  # also used in output
-            self.lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0  # also used in output
+            self.latent_flux = dry_mask * (row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0)  # also used in output
+            self.lw_flux = dry_mask * (row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0)  # also used in output
             
             if self.config.thermal.with_solar:  # also used in output
                 I0 = row["mean_surface_net_short_wave_radiation_flux"]  # float value
                 
                 if self.config.thermal.with_solar_flux_calculator:
-                    self.sw_flux = self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
+                    self.sw_flux = dry_mask * self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
                 else:
-                    self.sw_flux = np.ones(self.xgr.shape) * I0
+                    self.sw_flux = dry_mask * I0
             else:
                 self.sw_flux = np.zeros(self.xgr.shape)
             
