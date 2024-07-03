@@ -158,6 +158,50 @@ def linear_interp_with_nearest(xgr, zgr, values, new_xgr, new_zgr):
     new_temperature_values = new_temperature_values.reshape(new_xgr.shape)
 
     return new_temperature_values
+
+def linear_interp_z(abs_xgr, abs_zgr, temp_matrix, abs_xgr_new, abs_zgr_new, fill_value_top, fill_bottom='nearest'):
+    """This function takes an old x-grid and z-grid, and associated values (e.g., temperature), and casts them to a new grid of x and z values. 
+    For each new 1D perpendicular model, the closest surface coordinate from the old grid is taken, and new temperature values are based on the 
+    old perpendicular model related to this surface node. New values are computed through interpolation based on depth only. Grid points above the
+    surface get a new set temperature (given as argument), and grid cells below the old grid get set to the nearest value.
+
+    Args:
+        xgr (np.Array): x-grid (m x n), with every 1D model being assigned to a row
+        zgr (np.Array): z-grid (m x n), with every 1D model being assigned to a row
+        values (np.Array): matrix of same shape as xgr and zgr with associated valeus
+        new_xgr (np.Array): new x-grid (p x q)
+        new_zgr (np.Array): new z-grid (q x q)
+        fill_value_top (float): value given to grid cells above the old grid
+        fill_bottom (string): strategy to use for setting bottom values below the old grid. Defaults to 'nearest'.
+
+    Returns:
+        np.Array: new matrix of associated values for the new grid (shape p x q)
+    """
+    # initialize new temperature matrix
+    new_temperature_values = np.zeros(abs_xgr_new.shape)
+    
+    for i in range(len(new_temperature_values)):
+        
+        grid_id = np.argmin(np.abs(abs_xgr_new[i, 0] - abs_xgr[:, 0]))
+        
+        z_array = abs_zgr[grid_id,:]
+        temp_array = temp_matrix[grid_id,:]
+        
+        sort_id = np.argsort(z_array)
+        
+        new_z_array = abs_zgr_new[i,:]
+        
+        new_temp_array = np.interp(
+            x=new_z_array, 
+            xp=z_array[sort_id], 
+            fp=temp_array[sort_id], 
+            left=(temp_array[sort_id][0] if fill_bottom=='nearest' else 0),
+            right=fill_value_top
+            )
+        
+        new_temperature_values[i,:] = new_temp_array
+    
+    return new_temperature_values
     
     
 # def get_time_vector(datasets):

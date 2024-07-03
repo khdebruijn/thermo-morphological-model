@@ -22,7 +22,7 @@ from xbTools.general.executing_runs import xb_run_script_win
 from xbTools.general.wave_functions import dispersion
 
 from utils.visualization import block_print, enable_print
-from utils.miscellaneous import interpolate_points, get_A_matrix, count_nonzero_until_zero, generate_perpendicular_grids, linear_interp_with_nearest
+import utils.miscellaneous as um
 
 class Simulation():
     
@@ -565,7 +565,7 @@ class Simulation():
         self.temp_matrix = np.zeros((len(self.xgr), self.config.thermal.grid_resolution))
         
         # initialize the associated grid
-        self.abs_xgr, self.abs_zgr = generate_perpendicular_grids(self.xgr, self.zgr)
+        self.abs_xgr, self.abs_zgr = um.generate_perpendicular_grids(self.xgr, self.zgr)
         
         # set the above determined initial conditions for the xgr
         for i in range(len(self.temp_matrix)):
@@ -638,7 +638,7 @@ class Simulation():
         
         # get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points
         # at the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative
-        self.A_matrix = get_A_matrix(self.config.thermal.grid_resolution)
+        self.A_matrix = um.get_A_matrix(self.config.thermal.grid_resolution)
         
         # initialize angles
         self._update_angles()
@@ -647,9 +647,8 @@ class Simulation():
         self.factors = np.zeros(self.xgr.shape)
         self.sw_flux = np.zeros(self.xgr.shape)
         
-        row = self.forcing_data.iloc[0]
-        self.latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0  # also used in output
-        self.lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0  # also used in output
+        self.latent_flux = np.zeros(self.xgr.shape)  # also used in output
+        self.lw_flux = np.zeros(self.xgr.shape)  # also used in output  # also used in output
         
         self.convective_flux = np.zeros(self.xgr.shape)
         self.heat_flux = np.zeros(self.xgr.shape)
@@ -689,7 +688,7 @@ class Simulation():
             [(2.29+max_depth)/2, df.soil_temperature_level_4.values[0]],
         ])
         
-        ground_temp_distr_dry = interpolate_points(dry_points[:,0], dry_points[:,1], n)
+        ground_temp_distr_dry = um.interpolate_points(dry_points[:,0], dry_points[:,1], n)
         
         wet_points = np.array([
             [0, df.soil_temperature_level_1_offs.values[0]],
@@ -700,7 +699,7 @@ class Simulation():
             [(2.29+max_depth)/2, df.soil_temperature_level_4_offs.values[0]],
         ])
         
-        ground_temp_distr_wet = interpolate_points(wet_points[:,0], wet_points[:,1], n)
+        ground_temp_distr_wet = um.interpolate_points(wet_points[:,0], wet_points[:,1], n)
         
         return ground_temp_distr_dry, ground_temp_distr_wet
         
@@ -997,7 +996,7 @@ class Simulation():
         (perpendicular to the existing grid), and fits the previous temperature and enthalpy distributions to the new grid."""
         
         # generate perpendicular grids for previous timestep (to cast temperature and enthalpy)
-        self.abs_xgr, self.abs_zgr = generate_perpendicular_grids(self.xgr, self.zgr)
+        self.abs_xgr, self.abs_zgr = um.generate_perpendicular_grids(self.xgr, self.zgr)
         
         # update the current bathymetry
         cum_sedero = self._update_bed_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
@@ -1019,12 +1018,35 @@ class Simulation():
                 self.zgr_new = self.zgr_new[1:]
 
             # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
-            self.abs_xgr_new, self.abs_zgr_new = generate_perpendicular_grids(self.xgr_new, self.zgr_new)
+            self.abs_xgr_new, self.abs_zgr_new = um.generate_perpendicular_grids(self.xgr_new, self.zgr_new)
             
             # cast temperature matrix
-            self.temp_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new)
-            self.enthalpy_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.enthalpy_matrix, self.abs_xgr_new, self.abs_zgr_new)
-
+            if self.config.thermal.grid_interpolation == "linear_interp_with_nearest":
+                self.temp_matrix = um.linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new)
+                self.enthalpy_matrix = um.linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.enthalpy_matrix, self.abs_xgr_new, self.abs_zgr_new)
+            
+            elif self.config.thermal.grid_interpolation == "linear_interp_z":
+                
+                self.temp_matrix = um.linear_interp_z(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new, fill_value_top=self.current_sea_temp)
+                
+                # since only temperature matrix is interpolated to new grid, the enthalpy has to be recalculated
+                # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
+                
+                # and enthalpy is recalculated
+                frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+                unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+                self.enthalpy_matrix = \
+                    frozen_mask * \
+                        self.Cs * self.temp_matrix + \
+                    unfrozen_mask * \
+                        (self.Cl * self.temp_matrix + \
+                        (self.Cl - self.Cs) * self.config.thermal.T_melt + \
+                        self.config.thermal.L_water_ice * self.nb_matrix)
+                        
+            else:
+                raise ValueError("Invalid value for grid_interpolation")
+                        
+                
             # set the grid to be equal to this new grid
             self.xgr = self.xgr_new
             self.zgr = self.zgr_new
@@ -1202,18 +1224,15 @@ class Simulation():
         # 9) in order to avoid very peaky scales, let us take the daily maximum and use that for scaling.
         sin_theta_2d = sin_theta.reshape((-1, 24))
         sin_theta_daily_max = np.max(sin_theta_2d, axis=1).flatten()
-        # sin_theta_daily_max_repeated = np.repeat(sin_theta_daily_max, 24)
 
         sin_0_2d = sin_0.reshape((-1, 24))
         sin_0_daily_max = np.max(sin_0_2d, axis=1).flatten()
-        # sin_0_daily_max_repeated = np.repeat(sin_0_daily_max, 24)
 
-        # 10) calculate enhancement factor, and repeat it 24 time so it is constant for each day
+        # 10) calculate enhancement factor for each day
         factor = sin_theta_daily_max / sin_0_daily_max
         
         # 11) filter out values where it the angle theta is negative (as that means radiation hits the surface from below)
         shadow_mask = np.zeros(factor.shape)
-        # shadow_mask = np.nonzero(theta < 0)
         
         for i, row in enumerate(theta.reshape((-1, 24))):
             if all(row < 0):
@@ -1227,9 +1246,7 @@ class Simulation():
         """This function writes the thaw depth obtained from the thermal update to a file to be used by xbeach.
         """
         np.savetxt(os.path.join(self.cwd, "ne_layer.txt"), self.thaw_depth)
-        
-        # np.savetxt(os.path.join(self.cwd, "ne_layer.txt"), np.zeros(self.xgr.shape))  # (used for testing purpose)
-        
+                
         return None
         
     def find_thaw_depth(self):
@@ -1238,13 +1255,13 @@ class Simulation():
         self.thaw_depth = np.zeros(self.xgr.shape)
 
         # get the points from the temperature models
-        x_matrix, z_matrix = generate_perpendicular_grids(
+        x_matrix, z_matrix = um.generate_perpendicular_grids(
             self.xgr, self.zgr, 
             resolution=self.config.thermal.grid_resolution, 
             max_depth=self.config.thermal.max_depth)
         
         # determine indices of thaw depth in perpendicular model
-        indices = count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt))
+        indices = um.count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt))
         
         # find associated coordinates of these points
         x_thaw = x_matrix[np.arange(x_matrix.shape[0]), indices]
@@ -1273,6 +1290,9 @@ class Simulation():
             except:
                 self.thaw_depth[i] = 0
         
+        # ensure thaw depth is larger than zero everywhere
+        self.thaw_depth = np.max(np.column_stack((self.thaw_depth, np.zeros(self.thaw_depth.shape))), axis=1)
+        
         return self.thaw_depth
         
     ################################################
@@ -1281,70 +1301,74 @@ class Simulation():
     ##                                            ##
     ################################################
         
-    def write_output(self, timestep_id):
+    def write_output(self, timestep_id, t_start):
         """This function writes output in the results folder, and creates subfolders for each timestep for which results are output.
-        """
-        result_dir_timestep = os.path.join(self.result_dir, str(timestep_id) + "/")
+        """        
+        # create dataset
+        result_ds = xr.Dataset(
+            coords={
+                "xgr":self.xgr,  # 1D series of x-values
+                "depth_id":np.arange(self.config.thermal.grid_resolution),  # 1D series of id's representing the node number (zero meaning surface, one the first node below surface, etc.)
+                }
+            )
         
-        # create directory
-        if not os.path.exists(result_dir_timestep):
-            os.makedirs(result_dir_timestep)
-            
+        # time variables
+        result_ds['timestep_id'] = timestep_id
+        result_ds['timestamp'] = self.timestamps[timestep_id]
+        result_ds['cumulative_computational_time'] = time.time() - t_start
+        
         # bathymetric variables
-        self._check_and_write('xgr', self.xgr, dirname=result_dir_timestep)  # 1D series of x-values
-        self._check_and_write('zgr', self.zgr, dirname=result_dir_timestep)  # 1D series of z-values
-        self._check_and_write('angles', self.angles, dirname=result_dir_timestep)  # 1D series of angles (in radians)
+        result_ds["zgr"] = (["xgr"], self.zgr)  # 1D series of z-values
+        result_ds["angles"] = (["xgr"], self.angles)  # 1D series of angles (in radians)
         
         # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
-        xb_output_path = os.path.join(self.cwd, "xboutput.nc")
-        if os.path.isfile(xb_output_path):  # check if an xbeach output file exists (it shouldn't at the first timestep)
+        if timestep_id==0:  # check if an xbeach output file exists (it shouldn't at the first timestep)
             ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
-            self._check_and_write('wave_height', ds.H.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
-            self._check_and_write('run_up', np.ones(1) * (ds.runup.values.flatten()), dirname=result_dir_timestep)  # single value
-            self._check_and_write('storm_surge', np.ones(1) * (self.current_storm_surge), dirname=result_dir_timestep)  # single value
-            self._check_and_write('wave_energy', ds.E.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
-            self._check_and_write('radiation_stress_xx', ds.Sxx.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
-            self._check_and_write('radiation_stress_xy', ds.Sxy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
-            self._check_and_write('radiation_stress_yy', ds.Syy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
-            self._check_and_write('mean_wave_angle', ds.thetamean.values.flatten(), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
-            self._check_and_write('velocity_magnitude', ds.vmag.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
-            self._check_and_write('orbital_velocity', ds.urms.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+            ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep
+            result_ds['wave_height'] = (["xgr"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
+            result_ds['run_up'] = ds.runup.values.flatten()  # single value
+            result_ds['storm_surge'] = self.current_storm_surge  # single value
+            result_ds['wave_energy'] = (["xgr"], ds.E.values.flatten())  # 1D series of wave energies (associated with xgr.txt)
+            result_ds['radiation_stress_xx'] = (["xgr"], ds.Sxx.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
+            result_ds['radiation_stress_xy'] = (["xgr"], ds.Sxy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
+            result_ds['radiation_stress_yy'] = (["xgr"], ds.Syy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
+            # result_ds['mean_wave_angle'] = (["xgr"], ds.thetamean.values.flatten())  # 1D series of mean wave angles in radians (associated with xgr.txt)
+            result_ds['velocity_magnitude'] = (["xgr"], ds.vmag.values.flatten())  # 1D series of velocities (associated with xgr.txt)
+            result_ds['orbital_velocity'] = (["xgr"], ds.urms.values.flatten())  # 1D series of velocities (associated with xgr.txt)
             ds.close()
-        else:        
-            self._check_and_write('wave_height', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
-            self._check_and_write('run_up', np.ones(1) * (0), dirname=result_dir_timestep)  # single value
-            self._check_and_write('storm_surge', np.ones(1) * (0), dirname=result_dir_timestep)  # single value
-            self._check_and_write('wave_energy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
-            self._check_and_write('radiation_stress_xx', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
-            self._check_and_write('radiation_stress_xy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
-            self._check_and_write('radiation_stress_yy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
-            self._check_and_write('mean_wave_angle', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
-            self._check_and_write('velocity_magnitude', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
-            self._check_and_write('orbital_velocity', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+        else:
+            for varname in ['wave_height', 'run_up', 'storm_surge', 'wave_energy', 
+                            'radiation_stress_xx', 'radiation_stress_xy', 'radiation_stress_yy', 
+                            'mean_wave_angle', 'velocity_magnitude', 'orbital_velocity']:
+                result_ds[varname] = (["xgr"], np.zeros(self.xgr.shape)) 
         
         # temperature variables
-        self._check_and_write('thaw_depth', self.thaw_depth, dirname=result_dir_timestep)  # 1D series of thaw depths
-        self._check_and_write('abs_xgr', self.abs_xgr.flatten(), dirname=result_dir_timestep)  # 1D series of x-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
-        self._check_and_write('abs_zgr', self.abs_zgr.flatten(), dirname=result_dir_timestep)  # 1D series of z-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
-        self._check_and_write('ground_temperature_distribution', self.temp_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
-        self._check_and_write('ground_enthalpy_distribution', self.enthalpy_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
-        self._check_and_write("2m_temperature", np.ones(1) * (self.current_air_temp), dirname=result_dir_timestep)  # single value
-        self._check_and_write("sea_surface_temperature",  np.ones(1) * (self.current_sea_temp), dirname=result_dir_timestep)  # single value
+        result_ds['thaw_depth'] = (["xgr"], self.thaw_depth)  # 1D series of thaw depths
+        result_ds['abs_xgr'] = (["xgr", "depth_id"], self.abs_xgr)  # 1D series of x-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        result_ds['abs_zgr'] = (["xgr", "depth_id"], self.abs_zgr)  # 1D series of z-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        result_ds['ground_temperature_distribution'] = (["xgr", "depth_id"], self.temp_matrix)  # 1D series of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
+        result_ds['ground_enthalpy_distribution'] = (["xgr", "depth_id"], self.enthalpy_matrix)  # 1D series of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
+        result_ds['2m_temperature'] = self.current_air_temp  # single value
+        result_ds['sea_surface_temperature'] = self.current_sea_temp  # single value
         
         # heat flux variables
-        self._check_and_write('solar_radiation_factor', self.factors, dirname=result_dir_timestep)  # 1D series of factors
-        self._check_and_write('solar_radiation_flux', self.sw_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
-        self._check_and_write('long_wave_radiation_flux', np.ones(1) * (self.lw_flux), dirname=result_dir_timestep)  # single value of heat flux
-        self._check_and_write('latent_heat_flux',np.ones(1) * (self.latent_flux), dirname=result_dir_timestep)  # single value of heat flux
-        self._check_and_write('convective_heat_flux', self.convective_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
-        self._check_and_write('total_heat_flux', self.heat_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        result_ds['solar_radiation_factor'] = (["xgr"], self.factors)  # 1D series of factors
+        result_ds['solar_radiation_flux'] = (["xgr"], self.sw_flux)  # 1D series of heat fluxes
+        result_ds['long_wave_radiation_flux'] = (["xgr"], self.lw_flux)  # 1D series of heat fluxes
+        result_ds['latent_heat_flux'] = (["xgr"], self.latent_flux)  # 1D series of heat fluxes
+        result_ds['convective_heat_flux'] = (["xgr"], self.convective_flux)  # 1D series of heat fluxes
+        result_ds['total_heat_flux'] = (["xgr"], self.heat_flux)  # 1D series of heat fluxes
         
         # sea ice variables
-        self._check_and_write('sea_ice_cover', np.ones(1) * (self.current_sea_ice), dirname=result_dir_timestep)  # single value
+        result_ds['sea_ice_cover'] = self.current_sea_ice  # single value
         
         # wind variables
-        self._check_and_write('wind_velocity', np.ones(1) * (self.wind_velocity), dirname=result_dir_timestep)  # single value
-        self._check_and_write('wind_direction', np.ones(1) * (self.wind_direction), dirname=result_dir_timestep) # single value (degrees, clockwise from the north)
+        result_ds['wind_velocity'] = self.wind_velocity  # single value
+        result_ds['wind_direction'] = self.wind_direction  # single value (degrees, clockwise from the north)
+        
+        result_ds.to_netcdf(os.path.join(self.result_dir, str(timestep_id) + ".nc"))
+        
+        result_ds.close()
         
         return None
     
@@ -1425,6 +1449,77 @@ class Simulation():
     ##            # LEGACY CODE                   ##
     ##                                            ##
     ################################################
+    
+    # Old code for writing output:
+            # create directory
+        #     if not os.path.exists(result_dir_timestep):
+        #         os.makedirs(result_dir_timestep)
+                
+        #     # bathymetric variables
+        #     self._check_and_write('xgr', self.xgr, dirname=result_dir_timestep)  # 1D series of x-values
+        #     self._check_and_write('zgr', self.zgr, dirname=result_dir_timestep)  # 1D series of z-values
+        #     self._check_and_write('angles', self.angles, dirname=result_dir_timestep)  # 1D series of angles (in radians)
+            
+        #     # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
+        #     xb_output_path = os.path.join(self.cwd, "xboutput.nc")
+            
+        #     if os.path.isfile(xb_output_path):  # check if an xbeach output file exists (it shouldn't at the first timestep)
+                
+        #         ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
+                
+        #         self._check_and_write('wave_height', ds.H.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
+        #         self._check_and_write('run_up', np.ones(1) * (ds.runup.values.flatten()), dirname=result_dir_timestep)  # single value
+        #         self._check_and_write('storm_surge', np.ones(1) * (self.current_storm_surge), dirname=result_dir_timestep)  # single value
+        #         self._check_and_write('wave_energy', ds.E.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_xx', ds.Sxx.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_xy', ds.Sxy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_yy', ds.Syy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('mean_wave_angle', ds.thetamean.values.flatten(), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
+        #         self._check_and_write('velocity_magnitude', ds.vmag.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+        #         self._check_and_write('orbital_velocity', ds.urms.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+                
+        #         ds.close()
+            
+        #     else:        
+        #         self._check_and_write('wave_height', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
+        #         self._check_and_write('run_up', np.ones(1) * (0), dirname=result_dir_timestep)  # single value
+        #         self._check_and_write('storm_surge', np.ones(1) * (0), dirname=result_dir_timestep)  # single value
+        #         self._check_and_write('wave_energy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_xx', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_xy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_yy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('mean_wave_angle', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
+        #         self._check_and_write('velocity_magnitude', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+        #         self._check_and_write('orbital_velocity', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+            
+        #     # temperature variables
+        #     self._check_and_write('thaw_depth', self.thaw_depth, dirname=result_dir_timestep)  # 1D series of thaw depths
+        #     self._check_and_write('abs_xgr', self.abs_xgr.flatten(), dirname=result_dir_timestep)  # 1D series of x-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        #     self._check_and_write('abs_zgr', self.abs_zgr.flatten(), dirname=result_dir_timestep)  # 1D series of z-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        #     self._check_and_write('ground_temperature_distribution', self.temp_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
+        #     self._check_and_write('ground_enthalpy_distribution', self.enthalpy_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
+        #     self._check_and_write("2m_temperature", np.ones(1) * (self.current_air_temp), dirname=result_dir_timestep)  # single value
+        #     self._check_and_write("sea_surface_temperature",  np.ones(1) * (self.current_sea_temp), dirname=result_dir_timestep)  # single value
+            
+        #     # heat flux variables
+        #     self._check_and_write('solar_radiation_factor', self.factors, dirname=result_dir_timestep)  # 1D series of factors
+        #     self._check_and_write('solar_radiation_flux', self.sw_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        #     self._check_and_write('long_wave_radiation_flux', np.ones(1) * (self.lw_flux), dirname=result_dir_timestep)  # single value of heat flux
+        #     self._check_and_write('latent_heat_flux',np.ones(1) * (self.latent_flux), dirname=result_dir_timestep)  # single value of heat flux
+        #     self._check_and_write('convective_heat_flux', self.convective_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        #     self._check_and_write('total_heat_flux', self.heat_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+            
+        #     # sea ice variables
+        #     self._check_and_write('sea_ice_cover', np.ones(1) * (self.current_sea_ice), dirname=result_dir_timestep)  # single value
+            
+        #     # wind variables
+        #     self._check_and_write('wind_velocity', np.ones(1) * (self.wind_velocity), dirname=result_dir_timestep)  # single value
+        #     self._check_and_write('wind_direction', np.ones(1) * (self.wind_direction), dirname=result_dir_timestep) # single value (degrees, clockwise from the north)
+            
+        #     return None
+        
+    
+        
     
     # Old code from determining aggregated matrices (but that turned out to be the wrong order)
             

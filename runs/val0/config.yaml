@@ -83,7 +83,7 @@ thermal:
   # general
   with_solar    : True  # include short wave solar radiation in thermal computation step
   with_longwave : True  # include longwave radiation (incoming & outgoining) in thermal computation step
-  with_latent   : True  # include latent heat in thermal computation step\
+  with_latent   : True  # include latent heat in thermal computation step
   
   # solar flux calculator
   with_solar_flux_calculator : True  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
@@ -102,6 +102,7 @@ thermal:
   grid_resolution : 30  # number of points for each 1D thermal model
   max_depth       : 3  # [m], the maximum depth of the 1D thermal model
   T_melt          : 273.15  # [K] Melting temperature at the interface of water/air and bluff
+  grid_interpolation : "linear_interp_z"  # method for interpolating to new grid. Can be "linear_interp_with_nearest" or "linear_interp_z".
 
   # water properties
   wl_switch       : 0  # [m], water level relative to outputted local water level at which is switched from wet to dry (positive means higher than output water level)

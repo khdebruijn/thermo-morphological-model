@@ -126,16 +126,7 @@ def main(sim):
         # write output variables to output file every output interval
         if timestep_id in sim.temp_output_ids:
             
-            sim.write_output(timestep_id)
-        
-            # write computational time between current output and previous output
-            if sim.config.output.write_computation_time:
-                
-                comp_time = time.time() - t_start  # computational time in seconds
-                
-                result_dir_timestep = os.path.join(sim.result_dir, str(timestep_id) + "/")
-                
-                np.savetxt(os.path.join(result_dir_timestep, "cumulative_computational_time.txt"), np.ones(1) * comp_time)
+            sim.write_output(timestep_id, t_start)
             
             print("sucessfully generated output")
             
@@ -178,6 +169,7 @@ def main(sim):
             sim.thermal_update(timestep_id, subgrid_timestep_id)
             
 
+    print(f"Total simulation time: {(time.time() - t_start) / 3600:-1f} hours")
     print(textbox("SIMULATION FINISHED"))
     
     return sim.xgr, sim.zgr
