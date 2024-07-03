@@ -11,15 +11,15 @@ from utils.results import SimulationResults
 def main(runid):
     
     print(f"initializing {runid}")
-    results = SimulationResults(runids=[runid])
+    results = SimulationResults(runid=runid)
     
     print(f"creating animations for {runid}")
     frame_num = len(results.timestep_output_ids)
     fps = frame_num / 120  # for a 120 second animation
 
-    # results.bed_level_animation(runid, fps=fps)
-    results.heat_forcing_animation(runid, fps=fps)
-    results.temperature_animation(runid, fps=fps)
+    results.bed_level_animation(fps=fps, make_animation=False)
+    # results.heat_forcing_animation(fps=fps)
+    # results.temperature_animation(fps=fps)
     
     print(f"completed {runid}")
     

@@ -23,90 +23,72 @@ class SimulationResults():
     ##                                            ##
     ################################################
     
-    def __init__(self, runids=[], result_dir=Path("p:/11210070-usgscoop-202324-arcticxb/runs/")):
+    def __init__(self, runid, result_dir=Path("p:/11210070-usgscoop-202324-arcticxb/runs/")):
         
-        self.runids = runids
+        self.runid = runid
         
-        self.result_dirs_dict = {self.runids[i]:os.path.join(result_dir, self.runids[i]) for i in range(len(self.runids))}
+        self.result_dir = os.path.join(result_dir, str(runid) + "/")
         
-        timestep_output_ids_path = os.path.join(result_dir, self.runids[0] + "/")
-        dir_list = [item for item in os.listdir(timestep_output_ids_path) if os.path.isdir(os.path.join(timestep_output_ids_path, item))]
-        self.timestep_output_ids = np.sort(np.int32(np.array(dir_list)))
+        self.timestep_output_ids = np.loadtxt(os.path.join(result_dir, str(self.runid) + "/", "timestep_output_ids.txt"))
+        self.xbeach_times = np.loadtxt(os.path.join(result_dir, str(self.runid) + "/", "xbeach_times.txt"))
+        self.timestamps = np.loadtxt(os.path.join(result_dir, str(self.runid) + "/", "timestamps.txt"))
+        self.timestep_ids = np.loadtxt(os.path.join(result_dir, str(self.runid) + "/", "timestep_ids.txt"))
         
-        self.timestamps = np.loadtxt(os.path.join(result_dir, self.runids[0] + "/", "timestamps.txt"))
-        self.timestep_ids = np.loadtxt(os.path.join(result_dir, self.runids[0] + "/", "timestep_ids.txt"))
-
-        var_list_path = os.path.join(timestep_output_ids_path, str(self.timestep_output_ids[0]) + "/")
-        self.var_list = np.array([item[:-4] for item in os.listdir(var_list_path)])
-        
-        self._get_bluff_toes_and_shorelines()
-        
+        ds = xr.open_dataset(os.path.join(self.result_dir, "0.nc"))
+        self.var_list = list(ds.coords) + list(ds.keys())
+        ds.close()
+                
         return None
                 
-    def _get_bluff_toes_and_shorelines(self):
+    def get_bluff_toes_and_shorelines(self):
+
+        self.bluff_toes = []
+        self.shore_lines = []
         
-        self.bluff_toes = {}
-        self.shore_lines = {}
-        
-        for runid in self.runids:
-            bluff_toe = []
-            shore_line = []
+        for timestep_output_id in self.timestep_output_ids:
             
-            for timestep_output_id in self.timestep_output_ids:
-                
-                path_xgr = os.path.join(self.result_dirs_dict[runid], str(timestep_output_id), "xgr.txt")
-                path_zgr = os.path.join(self.result_dirs_dict[runid], str(timestep_output_id), "zgr.txt")
-                
-                with open(path_xgr) as fx:
-                    xgr = np.loadtxt(fx)
-                    
-                with open(path_zgr) as fz:
-                    zgr = np.loadtxt(fz)
-                    
-                bluff_toe.append(calculate_bluff_edge_toe_position(xgr, zgr)[0])
-                shore_line.append(calculate_shoreline_position(xgr, zgr))
-        
-            self.bluff_toes[runid] = bluff_toe
-            self.shore_lines[runid] = shore_line
+            ds = xr.open_dataset(os.path.join(self.result_dir, str(timestep_output_id) + ".nc"))
             
+            xgr = ds['xgr'].values
+            zgr = ds['zgr'].values
+            
+            ds.close()
+                
+            self.bluff_toes.append(calculate_bluff_edge_toe_position(xgr, zgr)[0])
+            self.shore_lines.append(calculate_shoreline_position(xgr, zgr))
+            
+        self.bluff_toes = np.array(self.bluff_toes)
+        self.shore_lines = np.array(self.shore_lines)
+
         return self.bluff_toes, self.shore_lines
-        
+    
     def get_var_timeseries(self, varname):
         
-        var_dict = {}
+        var_list = []
         
-        for runid in self.runids:
-            var_list = []
+        for timestep_output_id in self.timestep_output_ids:
             
-            for timestep_output_id in self.timestep_output_ids:
+            path = os.path.join(self.result_dir, str(timestep_output_id) + ".nc")
+
+            ds = xr.open_dataset(path)
                 
-                path = os.path.join(self.result_dirs_dict[runid], str(timestep_output_id), varname + ".txt")
-        
-                with open(path) as f:
-                    
-                    var = np.loadtxt(f)
-                    
-                    var_list.append(var)
-                    
-            var_dict[runid] = var_list
+            var_list.append(ds[varname])  
             
-        return var_dict
+            ds.close()
+            
+        return np.array(var_list)
     
     def get_var_timestep(self, varname, timestep_id):
+                  
+        path = os.path.join(self.result_dir, str(timestep_id) + ".nc")
         
-        var_dict = {}
+        ds = xr.open_dataset(path)
         
-        for runid in self.runids:
+        var_array = ds[varname]
+        
+        ds.close()        
             
-            path = os.path.join(self.result_dirs_dict[runid], str(timestep_id), varname + ".txt")
-            
-            with open(path) as f:
-            
-                var_array = np.loadtxt(f)
-                
-            var_dict[runid] = var_array
-            
-        return var_dict
+        return var_array
     
     def get_timestamps(self, timestep_ids):
         
@@ -124,13 +106,13 @@ class SimulationResults():
     
     def bed_level_animation(
         self, 
-        RUNID,
         animation_timesteps=None,
         xmin=0, 
         xmax=1500, 
         aspect_equal=False, 
         cmap='plasma', 
-        save=True, 
+        save=True,
+        make_animation=True,
         save_folder=Path("results/"),
         save_name='bedlevel',
         fps=5
@@ -170,18 +152,26 @@ class SimulationResults():
                 l.set(alpha=0.2, linewidth=1)
             
             # get current timestep
-            output_id = animation_timesteps[i]
+            output_id = int(animation_timesteps[i])
             
             # set title
-            timestamp = datetime.fromtimestamp(self.timestamps[np.where(output_id==self.timestep_ids)][0] * 10**-9)
+            timestamp = datetime.fromtimestamp(self.timestamps[np.nonzero(output_id==self.timestep_ids)][0] * 10**-9)
             ax.set_title(f'timestep = {output_id} ({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
             
             # load grid
-            xgr = self.get_var_timestep("xgr", output_id)[RUNID]
-            zgr = self.get_var_timestep("zgr", output_id)[RUNID]
+            xgr = self.get_var_timestep("xgr", output_id)
+            zgr = self.get_var_timestep("zgr", output_id)
             
             # load water level
-            wl = self.get_var_timestep("storm_surge", output_id)[RUNID]
+            wl = self.get_var_timestep("storm_surge", output_id)
+            
+            print(xgr.shape)
+            print(zgr.shape)
+            print(wl.shape)
+            
+            print(xgr)
+            print(zgr)
+            print(wl)
             
             # draw new bathymetry
             line, = ax.plot(xgr, zgr, color=colors[i], linewidth=3)
@@ -194,28 +184,51 @@ class SimulationResults():
             print(f'{output_id} / {len(animation_timesteps)}')
             
             return None
+                
+        if make_animation:
+
+            # define animation
+            animation = FuncAnimation(fig, animation_function, frames=range(len(animation_timesteps)))
             
-        # define animation
-        animation = FuncAnimation(fig, animation_function, frames=range(len(animation_timesteps)))
+            # save animation
+            if save:
+                
+                fpath = os.path.join(save_folder, str(self.runid) + save_name + ".mp4")
+                
+                animation.save(fpath, writer='ffmpeg', fps=fps)
+            
+            # close 
+            plt.close()
         
-        # save animation
-        if save:
-            animation.save(os.path.join(save_folder, str(RUNID) + save_name + ".mp4"), writer='ffmpeg', fps=fps)
-        
-        # close 
-        plt.close()
+        else:
+            
+            # create folder for images
+            fig_dir = os.path.join(save_folder, str(self.runid) + save_name + '/')
+            
+            if not os.path.exists(fig_dir):
+                
+                os.makedirs(fig_dir)
+            
+            # loop through all frames and save figure after each one
+            for frame in range(len(animation_timesteps)):
+                
+                animation_function(frame)
+                
+                fig.savefig(os.path.join(fig_dir, str(frame) + ".png"))
+            
+            plt.close()
             
         return animation
         
     def heat_forcing_animation(
         self,
-        RUNID,
         animation_timesteps=None,
         xmin=0, 
         xmax=1500, 
         aspect_equal=False, 
         cmap='plasma', 
         save=True, 
+        make_animation=False,
         save_folder=Path("results/"),
         save_name='bedlevel_thawdepth_heatflux',
         fps=5
@@ -294,18 +307,18 @@ class SimulationResults():
             fig.suptitle(f'timestep = {output_id} ({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
             
             # get necessary variables
-            xgr = self.get_var_timestep("xgr", output_id)[RUNID]
-            zgr = self.get_var_timestep("zgr", output_id)[RUNID]
+            xgr = self.get_var_timestep("xgr", output_id)
+            zgr = self.get_var_timestep("zgr", output_id)
             
-            wl = self.get_var_timestep("storm_surge", output_id)[RUNID]
+            wl = self.get_var_timestep("storm_surge", output_id)
             
-            thaw_depth = self.get_var_timestep("thaw_depth", output_id)[RUNID]
+            thaw_depth = self.get_var_timestep("thaw_depth", output_id)
             
-            total_heat_flux = self.get_var_timestep("total_heat_flux", output_id)[RUNID]
-            long_wave_radiation_flux = self.get_var_timestep("long_wave_radiation_flux", output_id)[RUNID]
-            solar_radiation_flux = self.get_var_timestep("solar_radiation_flux", output_id)[RUNID]
-            latent_heat_flux = self.get_var_timestep("latent_heat_flux", output_id)[RUNID]
-            convective_heat_flux = self.get_var_timestep("convective_heat_flux", output_id)[RUNID]
+            total_heat_flux = self.get_var_timestep("total_heat_flux", output_id)
+            long_wave_radiation_flux = self.get_var_timestep("long_wave_radiation_flux", output_id)
+            solar_radiation_flux = self.get_var_timestep("solar_radiation_flux", output_id)
+            latent_heat_flux = self.get_var_timestep("latent_heat_flux", output_id)
+            convective_heat_flux = self.get_var_timestep("convective_heat_flux", output_id)
                 
             # plot bathymetry (in plot 0)
             line, = axs[0].plot(xgr, zgr, color=colors[i])
@@ -329,21 +342,43 @@ class SimulationResults():
             
             return None
 
-        # define animation
-        animation = FuncAnimation(fig, animation_function, frames=range(len(animation_timesteps)))
+        if make_animation:
+
+            # define animation
+            animation = FuncAnimation(fig, animation_function, frames=range(len(animation_timesteps)))
+            
+            # save animation
+            if save:
+                
+                fpath = os.path.join(save_folder, str(self.runid) + save_name + ".mp4")
+                
+                animation.save(fpath, writer='ffmpeg', fps=fps)
+            
+            # close 
+            plt.close()
         
-        # save animation
-        if save:
-            animation.save(os.path.join(save_folder, str(RUNID) + save_name + ".mp4"), writer='ffmpeg', fps=fps)
-        
-        # close 
-        plt.close()
+        else:
+            
+            # create folder for images
+            fig_dir = os.path.join(save_folder, str(self.runid) + save_name + '/')
+            
+            if not os.path.exists(fig_dir):
+                
+                os.makedirs(fig_dir)
+            
+            # loop through all frames and save figure after each one
+            for frame in range(len(animation_timesteps)):
+                
+                animation_function(frame)
+                
+                fig.savefig(os.path.join(fig_dir, str(frame) + ".png"))
+                
+            plt.close()
             
         return animation
     
     def temperature_animation(
         self,
-        RUNID,
         animation_timesteps=None,
         xmin=0, 
         xmax=1500,
@@ -351,6 +386,7 @@ class SimulationResults():
         vmax=10,   # degrees Celcius
         aspect_equal=False, 
         save=True, 
+        make_animation=True,
         save_folder=Path("results/"),
         save_name='temperature_thawdepth_heatflux',
         fps=5
@@ -366,7 +402,7 @@ class SimulationResults():
         sm = ScalarMappable(norm, cmap='seismic')
 
         # initialize temperature scatter plot
-        temp_scatter = axs[0].scatter([], [], c=[], cmap='seismic', norm=norm, s=50)
+        temp_scatter = axs[0].scatter([], [], c=[], cmap='coolwarm', norm=norm, s=50)
         
         # create colorbar
         plt.colorbar(
@@ -442,22 +478,22 @@ class SimulationResults():
             fig.suptitle(f'timestep = {output_id} ({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
             
             # get necessary variables
-            xgr = self.get_var_timestep("xgr", output_id)[RUNID]
-            zgr = self.get_var_timestep("zgr", output_id)[RUNID]
+            xgr = self.get_var_timestep("xgr", output_id)
+            zgr = self.get_var_timestep("zgr", output_id)
             
-            wl = self.get_var_timestep("storm_surge", output_id)[RUNID]
+            wl = self.get_var_timestep("storm_surge", output_id)
             
-            thaw_depth = self.get_var_timestep("thaw_depth", output_id)[RUNID]
+            thaw_depth = self.get_var_timestep("thaw_depth", output_id)
             
-            total_heat_flux = self.get_var_timestep("total_heat_flux", output_id)[RUNID]
-            long_wave_radiation_flux = self.get_var_timestep("long_wave_radiation_flux", output_id)[RUNID]
-            solar_radiation_flux = self.get_var_timestep("solar_radiation_flux", output_id)[RUNID]
-            latent_heat_flux = self.get_var_timestep("latent_heat_flux", output_id)[RUNID]
-            convective_heat_flux = self.get_var_timestep("convective_heat_flux", output_id)[RUNID]
+            total_heat_flux = self.get_var_timestep("total_heat_flux", output_id)
+            long_wave_radiation_flux = self.get_var_timestep("long_wave_radiation_flux", output_id)
+            solar_radiation_flux = self.get_var_timestep("solar_radiation_flux", output_id)
+            latent_heat_flux = self.get_var_timestep("latent_heat_flux", output_id)
+            convective_heat_flux = self.get_var_timestep("convective_heat_flux", output_id)
             
-            abs_xgr = self.get_var_timestep("abs_xgr", output_id)[RUNID]
-            abs_zgr = self.get_var_timestep("abs_zgr", output_id)[RUNID]
-            temp = self.get_var_timestep("ground_temperature_distribution", output_id)[RUNID] - 273.15
+            abs_xgr = self.get_var_timestep("abs_xgr", output_id)
+            abs_zgr = self.get_var_timestep("abs_zgr", output_id)
+            temp = self.get_var_timestep("ground_temperature_distribution", output_id) - 273.15
             temp_norm = sm.to_rgba(temp)  # get normalized temperature values (needed to plot)
 
             # plot bathymetry (in plot 0)
@@ -489,14 +525,37 @@ class SimulationResults():
             
             return None
 
-        # define animation
-        animation = FuncAnimation(fig, animation_function, frames=range(len(animation_timesteps)))
+        if make_animation:
+
+            # define animation
+            animation = FuncAnimation(fig, animation_function, frames=range(len(animation_timesteps)))
+            
+            # save animation
+            if save:
+                
+                fpath = os.path.join(save_folder, str(self.runid) + save_name + ".mp4")
+                
+                animation.save(fpath, writer='ffmpeg', fps=fps)
+            
+            # close 
+            plt.close()
         
-        # save animation
-        if save:
-            animation.save(os.path.join(save_folder, str(RUNID) + save_name + ".mp4"), writer='ffmpeg', fps=fps)
-        
-        # close 
-        plt.close()
+        else:
+            
+            # create folder for images
+            fig_dir = os.path.join(save_folder, str(self.runid) + save_name + '/')
+            
+            if not os.path.exists(fig_dir):
+                
+                os.makedirs(fig_dir)
+            
+            # loop through all frames and save figure after each one
+            for frame in range(len(animation_timesteps)):
+                
+                animation_function(frame)
+                
+                fig.savefig(os.path.join(fig_dir, str(frame) + ".png"))
+                
+            plt.close()
             
         return animation

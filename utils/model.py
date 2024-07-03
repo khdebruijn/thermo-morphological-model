@@ -294,6 +294,7 @@ class Simulation():
             
             # model time
             "tstop":self.dt * 3600,  # convert from [h] to [s]
+            "CFL": 0.9,
             
             # morphology parameters
             "morfac": 1,
@@ -1152,6 +1153,11 @@ class Simulation():
             
             # for each integer angle in the angle range, an array of enhancement factors is saved, indexable by N (i.e., the N-th day of the year)
             self.solar_flux_map[:, angle_id] = self._calculate_solar_flux_factors(self.solar_flux_times, angle, timezone_diff).reshape((-1, 1, 1))
+            
+        # can't have negative factors (which may occur in winter when the angle between light rays and a flat surface is negative but between light rays and inclined surface (facing southward) is positive)
+        self.solar_flux_map[np.nonzero(self.solar_flux_map < 0)] = 0
+            
+        np.savetxt(os.path.join(self.result_dir, 'solar_flux_map.txt'), self.solar_flux_map)
         
         return self.solar_flux_map
     
@@ -1322,7 +1328,7 @@ class Simulation():
         result_ds["angles"] = (["xgr"], self.angles)  # 1D series of angles (in radians)
         
         # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
-        if timestep_id==0:  # check if an xbeach output file exists (it shouldn't at the first timestep)
+        if (not timestep_id==0) and os.path.exists(os.path.join(self.cwd, "xboutput.nc")):  # check if an xbeach output file exists (it shouldn't at the first timestep)
             ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
             ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep
             result_ds['wave_height'] = (["xgr"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
@@ -1336,11 +1342,16 @@ class Simulation():
             result_ds['velocity_magnitude'] = (["xgr"], ds.vmag.values.flatten())  # 1D series of velocities (associated with xgr.txt)
             result_ds['orbital_velocity'] = (["xgr"], ds.urms.values.flatten())  # 1D series of velocities (associated with xgr.txt)
             ds.close()
+            
         else:
-            for varname in ['wave_height', 'run_up', 'storm_surge', 'wave_energy', 
+            
+            for varname in ['wave_height', 'wave_energy', 
                             'radiation_stress_xx', 'radiation_stress_xy', 'radiation_stress_yy', 
                             'mean_wave_angle', 'velocity_magnitude', 'orbital_velocity']:
-                result_ds[varname] = (["xgr"], np.zeros(self.xgr.shape)) 
+                result_ds[varname] = (["xgr"], np.zeros(self.xgr.shape))
+                
+            for varname in ['run_up', 'storm_surge']:
+                result_ds[varname] = 0
         
         # temperature variables
         result_ds['thaw_depth'] = (["xgr"], self.thaw_depth)  # 1D series of thaw depths
