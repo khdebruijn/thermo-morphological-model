@@ -113,7 +113,7 @@ class SimulationResults():
         cmap='plasma', 
         save=True,
         make_animation=True,
-        save_folder=Path("results/"),
+        save_folder=Path("P:/11210070-usgscoop-202324-arcticxb/results/"),
         save_name='bedlevel',
         fps=5
     ):
@@ -221,7 +221,7 @@ class SimulationResults():
         cmap='plasma', 
         save=True, 
         make_animation=False,
-        save_folder=Path("results/"),
+        save_folder=Path("P:/11210070-usgscoop-202324-arcticxb/results/"),
         save_name='bedlevel_thawdepth_heatflux',
         fps=5
         ):
@@ -379,7 +379,7 @@ class SimulationResults():
         aspect_equal=False, 
         save=True, 
         make_animation=True,
-        save_folder=Path("results/"),
+        save_folder=Path("P:/11210070-usgscoop-202324-arcticxb/results/"),
         save_name='temperature_thawdepth_heatflux',
         fps=5
         ):
