@@ -80,7 +80,7 @@ class SimulationResults():
     
     def get_var_timestep(self, varname, timestep_id):
                   
-        path = os.path.join(self.result_dir, str(timestep_id) + ".nc")
+        path = os.path.join(self.result_dir, str(int(timestep_id)) + ".nc")
         
         ds = xr.open_dataset(path)
         
@@ -165,14 +165,6 @@ class SimulationResults():
             # load water level
             wl = self.get_var_timestep("storm_surge", output_id)
             
-            print(xgr.shape)
-            print(zgr.shape)
-            print(wl.shape)
-            
-            print(xgr)
-            print(zgr)
-            print(wl)
-            
             # draw new bathymetry
             line, = ax.plot(xgr, zgr, color=colors[i], linewidth=3)
             lines.append(line)
@@ -203,7 +195,7 @@ class SimulationResults():
         else:
             
             # create folder for images
-            fig_dir = os.path.join(save_folder, str(self.runid) + save_name + '/')
+            fig_dir = os.path.join(save_folder, str(self.runid) + "_" + save_name + '/')
             
             if not os.path.exists(fig_dir):
                 
@@ -360,7 +352,7 @@ class SimulationResults():
         else:
             
             # create folder for images
-            fig_dir = os.path.join(save_folder, str(self.runid) + save_name + '/')
+            fig_dir = os.path.join(save_folder, str(self.runid) + "_" + save_name + '/')
             
             if not os.path.exists(fig_dir):
                 
@@ -491,9 +483,9 @@ class SimulationResults():
             latent_heat_flux = self.get_var_timestep("latent_heat_flux", output_id)
             convective_heat_flux = self.get_var_timestep("convective_heat_flux", output_id)
             
-            abs_xgr = self.get_var_timestep("abs_xgr", output_id)
-            abs_zgr = self.get_var_timestep("abs_zgr", output_id)
-            temp = self.get_var_timestep("ground_temperature_distribution", output_id) - 273.15
+            abs_xgr = self.get_var_timestep("abs_xgr", output_id).values.flatten()
+            abs_zgr = self.get_var_timestep("abs_zgr", output_id).values.flatten()
+            temp = self.get_var_timestep("ground_temperature_distribution", output_id).values.flatten() - 273.15
             temp_norm = sm.to_rgba(temp)  # get normalized temperature values (needed to plot)
 
             # plot bathymetry (in plot 0)
@@ -507,7 +499,7 @@ class SimulationResults():
             thaw_line.set_data(xgr, zgr - thaw_depth)
             
             # plot temperature (in plot 0)
-            temp_scatter.set_offsets(np.column_stack((abs_xgr, abs_zgr)))
+            temp_scatter.set_offsets(np.column_stack((abs_xgr.flatten(), abs_zgr.flatten())))
             temp_scatter.set_color(temp_norm)
             
             # plot thaw depth (in plot 1)
@@ -543,7 +535,7 @@ class SimulationResults():
         else:
             
             # create folder for images
-            fig_dir = os.path.join(save_folder, str(self.runid) + save_name + '/')
+            fig_dir = os.path.join(save_folder, str(self.runid) + "_" + save_name + '/')
             
             if not os.path.exists(fig_dir):
                 

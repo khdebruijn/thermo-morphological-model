@@ -18,8 +18,8 @@ def main(runid):
     fps = frame_num / 120  # for a 120 second animation
 
     results.bed_level_animation(fps=fps, make_animation=False)
-    # results.heat_forcing_animation(fps=fps)
-    # results.temperature_animation(fps=fps)
+    results.heat_forcing_animation(fps=fps, make_animation=False)
+    results.temperature_animation(fps=fps, make_animation=False)
     
     print(f"completed {runid}")
     
