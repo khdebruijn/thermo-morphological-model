@@ -210,7 +210,7 @@ class SimulationResults():
             
             plt.close()
             
-        return animation
+        return None
         
     def heat_forcing_animation(
         self,
@@ -367,7 +367,7 @@ class SimulationResults():
                 
             plt.close()
             
-        return animation
+        return None
     
     def temperature_animation(
         self,
@@ -550,4 +550,4 @@ class SimulationResults():
                 
             plt.close()
             
-        return animation
+        return None
