@@ -1333,19 +1333,19 @@ class Simulation():
             ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
             ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep
             
-            if ds.H.values.flatten().shape == self.xgr.shape:  # check that x grid hasn't changed since last xbeach output
-            
-                result_ds['wave_height'] = (["xgr"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
-                result_ds['run_up'] = ds.runup.values.flatten()  # single value
-                result_ds['storm_surge'] = self.current_storm_surge  # single value
-                result_ds['wave_energy'] = (["xgr"], ds.E.values.flatten())  # 1D series of wave energies (associated with xgr.txt)
-                result_ds['radiation_stress_xx'] = (["xgr"], ds.Sxx.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
-                result_ds['radiation_stress_xy'] = (["xgr"], ds.Sxy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
-                result_ds['radiation_stress_yy'] = (["xgr"], ds.Syy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
-                # result_ds['mean_wave_angle'] = (["xgr"], ds.thetamean.values.flatten())  # 1D series of mean wave angles in radians (associated with xgr.txt)
-                result_ds['velocity_magnitude'] = (["xgr"], ds.vmag.values.flatten())  # 1D series of velocities (associated with xgr.txt)
-                result_ds['orbital_velocity'] = (["xgr"], ds.urms.values.flatten())  # 1D series of velocities (associated with xgr.txt)
-            
+            result_ds = result_ds.assign_coords(xgr_xb=ds.globalx.values.flatten())
+                    
+            result_ds['wave_height'] = (["xgr_xb"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
+            result_ds['run_up'] = ds.runup.values.flatten()  # single value
+            result_ds['storm_surge'] = self.current_storm_surge  # single value
+            result_ds['wave_energy'] = (["xgr_xb"], ds.E.values.flatten())  # 1D series of wave energies (associated with xgr.txt)
+            result_ds['radiation_stress_xx'] = (["xgr_xb"], ds.Sxx.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
+            result_ds['radiation_stress_xy'] = (["xgr_xb"], ds.Sxy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
+            result_ds['radiation_stress_yy'] = (["xgr_xb"], ds.Syy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
+            # result_ds['mean_wave_angle'] = (["xgr_xb"], ds.thetamean.values.flatten())  # 1D series of mean wave angles in radians (associated with xgr.txt)
+            result_ds['velocity_magnitude'] = (["xgr_xb"], ds.vmag.values.flatten())  # 1D series of velocities (associated with xgr.txt)
+            result_ds['orbital_velocity'] = (["xgr_xb"], ds.urms.values.flatten())  # 1D series of velocities (associated with xgr.txt                
+        
             ds.close()
             
         else:
