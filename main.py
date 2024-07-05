@@ -133,6 +133,9 @@ def main(sim):
         # check if xbeach is enabled for current timestep
         if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
             
+            # calculate the current thaw depth
+            sim.find_thaw_depth()
+            
             # export current thaw depth to a file
             sim.write_ne_layer()
                         
@@ -171,6 +174,7 @@ def main(sim):
 
     print(f"Total simulation time: {(time.time() - t_start) / 3600:-1f} hours")
     print(textbox("SIMULATION FINISHED"))
+    
     
     return sim.xgr, sim.zgr
 
