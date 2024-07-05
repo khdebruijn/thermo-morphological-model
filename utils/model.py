@@ -585,40 +585,10 @@ class Simulation():
         # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
         frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
-                    
-        # initialize linear distribution of k, starting at min value and ending at max value (at a depth of 1m)
-        id_kmax = np.argmin(np.abs(self.thermal_zgr - self.config.thermal.depth_constant_k))  # id of the grid point at which the maximum k should be reached
-        self.k_unfrozen_distr = np.append(
-            np.linspace(
-                self.config.thermal.k_soil_unfrozen_min, 
-                self.config.thermal.k_soil_unfrozen_max,
-                len(self.thermal_zgr[:id_kmax])), 
-            np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_unfrozen_max)
-        self.k_frozen_distr = np.append(
-            np.linspace(
-                self.config.thermal.k_soil_frozen_min, 
-                self.config.thermal.k_soil_frozen_max,
-                len(self.thermal_zgr[:id_kmax])), 
-            np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_frozen_max)
         
-        # initialize distribution of ground ice content
-        self.nb_distr = np.ones(self.thermal_zgr.shape)
-        idz = self.config.thermal.grid_resolution * self.config.thermal.nb_switch_depth / self.config.thermal.max_depth
-        self.nb_distr[:int(idz)] = self.config.thermal.nb_max  # set nb close to surface (nb_max)
-        self.nb_distr[int(idz):] = self.config.thermal.nb_min  # set nb at greater depth (nb_min)
-        self.nb_matrix = np.tile(self.nb_distr, (len(self.xgr), 1))
-        
-        # calculate / read in density
-        if self.config.thermal.rho_soil == "None":
-            self.soil_density_matrix = self.nb_matrix * self.config.thermal.rho_water + (1 - self.nb_matrix) * self.config.thermal.rho_particle
-        else:
-            self.soil_density_matrix = np.ones(self.nb_matrix.shape) * self.config.thermal.rho_soil
-        
-        
-        # using the states, the initial enthalpy can be determined. The enthalpy matrix is used as the 'preserved' quantity, and is used to numerically solve the
-        # heat balance equation. Enthalpy formulation from Ravens et al. (2023).
-        self.Cs = self.config.thermal.c_soil_frozen / self.soil_density_matrix
-        self.Cl = self.config.thermal.c_soil_unfrozen / self.soil_density_matrix
+        # define soil properties (k, density, nb, Cs & Cl)
+        self.define_soil_property_matrices(self.xgr)
+            
         self.enthalpy_matrix = \
             frozen_mask * \
                 self.Cs * self.temp_matrix + \
@@ -626,10 +596,6 @@ class Simulation():
                 (self.Cl * self.temp_matrix + \
                 (self.Cl - self.Cs) * self.config.thermal.T_melt + \
                 self.config.thermal.L_water_ice * self.nb_matrix)  # unit of L_water_ice is already corrected to use water density
-        
-        # initialize k-matrix
-        self.k_matrix = frozen_mask * np.tile(self.k_frozen_distr, (len(self.xgr), 1)) + \
-                        unfrozen_mask * np.tile(self.k_unfrozen_distr, (len(self.xgr), 1))
         
         # calculate the courant-friedlichs-lewy number matrix
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
@@ -654,6 +620,52 @@ class Simulation():
         self.convective_flux = np.zeros(self.xgr.shape)
         self.heat_flux = np.zeros(self.xgr.shape)
 
+        return None
+    
+    def define_soil_property_matrices(self, xgr):
+        """This function is ran to easily define (and redefine) matrices with soil properties. 
+        It is only a function of the x-grid, since the perpendicular z-grid is does not change in size."""
+        # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
+        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+        
+        # initialize linear distribution of k, starting at min value and ending at max value (at a depth of 1m)
+        id_kmax = np.argmin(np.abs(self.thermal_zgr - self.config.thermal.depth_constant_k))  # id of the grid point at which the maximum k should be reached
+        self.k_unfrozen_distr = np.append(
+            np.linspace(
+                self.config.thermal.k_soil_unfrozen_min, 
+                self.config.thermal.k_soil_unfrozen_max,
+                len(self.thermal_zgr[:id_kmax])), 
+            np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_unfrozen_max)
+        self.k_frozen_distr = np.append(
+            np.linspace(
+                self.config.thermal.k_soil_frozen_min, 
+                self.config.thermal.k_soil_frozen_max,
+                len(self.thermal_zgr[:id_kmax])), 
+            np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_frozen_max)
+        
+        # initialize k-matrix
+        self.k_matrix = frozen_mask * np.tile(self.k_frozen_distr, (len(xgr), 1)) + \
+                        unfrozen_mask * np.tile(self.k_unfrozen_distr, (len(xgr), 1))
+        
+        # initialize distribution of ground ice content
+        self.nb_distr = np.ones(self.thermal_zgr.shape)
+        idz = self.config.thermal.grid_resolution * self.config.thermal.nb_switch_depth / self.config.thermal.max_depth
+        self.nb_distr[:int(idz)] = self.config.thermal.nb_max  # set nb close to surface (nb_max)
+        self.nb_distr[int(idz):] = self.config.thermal.nb_min  # set nb at greater depth (nb_min)
+        self.nb_matrix = np.tile(self.nb_distr, (len(xgr), 1))
+        
+        # calculate / read in density
+        if self.config.thermal.rho_soil == "None":
+            self.soil_density_matrix = self.nb_matrix * self.config.thermal.rho_water + (1 - self.nb_matrix) * self.config.thermal.rho_particle
+        else:
+            self.soil_density_matrix = np.ones(self.nb_matrix.shape) * self.config.thermal.rho_soil
+        
+        # using the states, the initial enthalpy can be determined. The enthalpy matrix is used as the 'preserved' quantity, and is used to numerically solve the
+        # heat balance equation. Enthalpy formulation from Ravens et al. (2023).
+        self.Cs = self.config.thermal.c_soil_frozen / self.soil_density_matrix
+        self.Cl = self.config.thermal.c_soil_unfrozen / self.soil_density_matrix
+        
         return None
     
     def print_and_return_A_matrix(self):
@@ -716,22 +728,8 @@ class Simulation():
         frozen_mask_old = (self.temp_matrix < self.config.thermal.T_melt)
         unfrozen_mask_old = np.ones(frozen_mask_old.shape) - frozen_mask_old
         
-            # determine nb-matrix
-        self.nb_matrix = np.tile(self.nb_distr, (len(self.xgr), 1))
-                
-            # determine k-matrix
-        self.k_matrix = frozen_mask_old * np.tile(self.k_frozen_distr, (len(self.xgr), 1)) + \
-                        unfrozen_mask_old * np.tile(self.k_unfrozen_distr, (len(self.xgr), 1))
-                        
-            # determine soil density matrix
-        if self.config.thermal.rho_soil == "None":
-            self.soil_density_matrix = self.nb_matrix * self.config.thermal.rho_water + (1 - self.nb_matrix) * self.config.thermal.rho_particle
-        else:
-            self.soil_density_matrix = np.ones(self.nb_matrix.shape) * self.config.thermal.rho_soil
-        
-            # update Cs, Cl
-        self.Cs = self.config.thermal.c_soil_frozen / self.soil_density_matrix
-        self.Cl = self.config.thermal.c_soil_unfrozen / self.soil_density_matrix
+        # redefine matrices with soil properties
+        self.define_soil_property_matrices(self.xgr)
         
         # get the new boundary condition
         self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id, subgrid_timestep_id)
@@ -1030,12 +1028,15 @@ class Simulation():
                 
                 self.temp_matrix = um.linear_interp_z(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new, fill_value_top=self.current_sea_temp)
                 
+                # redefine matrices with soil properties
+                self.define_soil_property_matrices(self.xgr_new)
+                
                 # since only temperature matrix is interpolated to new grid, the enthalpy has to be recalculated
                 # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
-                
-                # and enthalpy is recalculated
                 frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
                 unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+                
+                # and enthalpy is recalculated
                 self.enthalpy_matrix = \
                     frozen_mask * \
                         self.Cs * self.temp_matrix + \
