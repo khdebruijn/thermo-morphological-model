@@ -156,7 +156,7 @@ class SimulationResults():
             
             # set title
             timestamp = datetime.fromtimestamp(self.timestamps[np.nonzero(output_id==self.timestep_ids)][0] * 10**-9)
-            ax.set_title(f'timestep = {output_id} ({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
+            ax.set_title(f'timestep = {output_id} \n({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
             
             # load grid
             xgr = self.get_var_timestep("xgr", output_id)
@@ -227,7 +227,7 @@ class SimulationResults():
         ):
         print('creating bed level, thaw depth, heat forcing animation')
         # create figure
-        fig, axs = plt.subplots(3, 1, figsize=(15,15))
+        fig, axs = plt.subplots(3, 1, figsize=(15,20))
 
         # set some visual properties
         axs[0].grid()
@@ -296,7 +296,7 @@ class SimulationResults():
             timestamp = datetime.fromtimestamp(self.timestamps[np.where(output_id==self.timestep_ids)][0] * 10**-9)
                             
             # set current timestep id as figure title
-            fig.suptitle(f'timestep = {output_id} ({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
+            fig.suptitle(f'timestep = {output_id} \n({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
             
             # get necessary variables
             xgr = self.get_var_timestep("xgr", output_id)
@@ -385,20 +385,20 @@ class SimulationResults():
         ):
         print('creating temperature, thaw depth, heat flux animation')
         # create figure
-        fig, axs = plt.subplots(3, 1, figsize=(15,15), sharex=True)
+        fig, axs = plt.subplots(3, 1, figsize=(15,20), sharex=True)
 
         # create normalization
         norm = Normalize(vmin=vmin, vmax=vmax)
         
         # create scalarmappable
-        sm = ScalarMappable(norm, cmap='seismic')
+        sm = ScalarMappable(norm, cmap='coolwarm')
 
         # initialize temperature scatter plot
-        temp_scatter = axs[0].scatter([], [], c=[], cmap='coolwarm', norm=norm, s=50)
+        temp_scatter = axs[0].scatter([], [], c=[], cmap='coolwarm', norm=norm, s=1)
         
         # create colorbar
         plt.colorbar(
-            temp_scatter, 
+            sm, 
             ax=axs[0], 
             orientation='horizontal', 
             fraction=0.05, 
@@ -463,11 +463,9 @@ class SimulationResults():
             # get current timestep id
             output_id = animation_timesteps[i]
             timestamp = datetime.fromtimestamp(self.timestamps[np.where(output_id==self.timestep_ids)][0] * 10**-9)
-                
-            print(output_id)
-            
+                            
             # set current timestep id as figure title
-            fig.suptitle(f'timestep = {output_id} ({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
+            fig.suptitle(f'timestep = {output_id} \n({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
             
             # get necessary variables
             xgr = self.get_var_timestep("xgr", output_id)
