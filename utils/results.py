@@ -394,7 +394,7 @@ class SimulationResults():
         sm = ScalarMappable(norm, cmap='coolwarm')
 
         # initialize temperature scatter plot
-        temp_scatter = axs[0].scatter([], [], c=[], cmap='coolwarm', norm=norm, s=1)
+        temp_scatter = axs[0].scatter([], [], color=[], cmap='coolwarm', norm=norm, s=1)
         
         # create colorbar
         plt.colorbar(
