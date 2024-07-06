@@ -172,7 +172,7 @@ def main(sim):
             sim.thermal_update(timestep_id, subgrid_timestep_id)
             
 
-    print(f"Total simulation time: {(time.time() - t_start) / 3600:-1f} hours")
+    print(f"Total simulation time: {(time.time() - t_start) / 3600:1f} hours")
     print(textbox("SIMULATION FINISHED"))
     
     

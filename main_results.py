@@ -17,7 +17,7 @@ def main(runid):
     frame_num = len(results.timestep_output_ids)
     fps = frame_num / 120  # for a 120 second animation
 
-    results.bed_level_animation(fps=fps, make_animation=False)
+    # results.bed_level_animation(fps=fps, make_animation=False)
     results.heat_forcing_animation(fps=fps, make_animation=False)
     results.temperature_animation(fps=fps, make_animation=False)
     
