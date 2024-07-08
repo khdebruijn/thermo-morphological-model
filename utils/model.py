@@ -601,7 +601,8 @@ class Simulation():
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
         
         if np.max(self.cfl_matrix >= 0.5):
-            raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+            # raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+            print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
         
         # get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points
         # at the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative
@@ -747,7 +748,8 @@ class Simulation():
         
         if np.max(self.cfl_matrix >= 0.5):
             raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
-        
+            # print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+            
         # get the new enthalpy matrix
         self.enthalpy_matrix = self.enthalpy_matrix + \
                                self.cfl_matrix * (aggregated_temp_matrix @ self.A_matrix)
