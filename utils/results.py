@@ -23,16 +23,16 @@ class SimulationResults():
     ##                                            ##
     ################################################
     
-    def __init__(self, runid, result_dir=Path("p:/11210070-usgscoop-202324-arcticxb/runs/")):
+    def __init__(self, runid, runs_folder=Path("p:/11210070-usgscoop-202324-arcticxb/runs/")):
         
         self.runid = runid
         
-        self.result_dir = os.path.join(result_dir, str(runid) + "/")
+        self.result_dir = os.path.join(runs_folder, str(runid) + "/")
         
-        self.timestep_output_ids = np.loadtxt(os.path.join(result_dir, str(self.runid) + "/", "timestep_output_ids.txt"))
-        self.xbeach_times = np.loadtxt(os.path.join(result_dir, str(self.runid) + "/", "xbeach_times.txt"))
-        self.timestamps = np.loadtxt(os.path.join(result_dir, str(self.runid) + "/", "timestamps.txt"))
-        self.timestep_ids = np.loadtxt(os.path.join(result_dir, str(self.runid) + "/", "timestep_ids.txt"))
+        self.timestep_output_ids = np.int32(np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestep_output_ids.txt")))
+        self.xbeach_times = np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "xbeach_times.txt"))
+        self.timestamps = np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestamps.txt"))
+        self.timestep_ids = np.int32(np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestep_ids.txt")))
         
         ds = xr.open_dataset(os.path.join(self.result_dir, "0.nc"))
         self.var_list = list(ds.coords) + list(ds.keys())
@@ -40,8 +40,9 @@ class SimulationResults():
                 
         return None
                 
-    def get_bluff_toes_and_shorelines(self):
+    def get_bluff_toes_and_shorelines(self, save=True):
 
+        self.bluff_edges = []
         self.bluff_toes = []
         self.shore_lines = []
         
@@ -53,14 +54,24 @@ class SimulationResults():
             zgr = ds['zgr'].values
             
             ds.close()
-                
-            self.bluff_toes.append(calculate_bluff_edge_toe_position(xgr, zgr)[0])
-            self.shore_lines.append(calculate_shoreline_position(xgr, zgr))
             
+            be, bt, distance = calculate_bluff_edge_toe_position(xgr, zgr)
+            sl = calculate_shoreline_position(xgr, zgr)
+            
+            self.bluff_edges.append(be)
+            self.bluff_toes.append(bt)
+            self.shore_lines.append(sl)
+            
+        self.bluff_edges = np.array(self.bluff_edges)
         self.bluff_toes = np.array(self.bluff_toes)
         self.shore_lines = np.array(self.shore_lines)
+        
+        if save:
+            np.savetxt(os.path.join(self.result_dir, "bluff_edges.txt"), self.bluff_edges)
+            np.savetxt(os.path.join(self.result_dir, "bluff_toes.txt"), self.bluff_toes)
+            np.savetxt(os.path.join(self.result_dir, "shore_lines.txt"), self.shore_lines)
 
-        return self.bluff_toes, self.shore_lines
+        return self.bluff_edges, self.shore_lines
     
     def get_var_timeseries(self, varname):
         

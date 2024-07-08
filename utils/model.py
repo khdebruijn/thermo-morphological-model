@@ -753,15 +753,17 @@ class Simulation():
                                self.cfl_matrix * (aggregated_temp_matrix @ self.A_matrix)
                 
         # determine state masks (which part of the domain is frozen, in between, or unfrozen (needed to later calculate temperature from enthalpy))
-        frozen_mask = (self.enthalpy_matrix / self.Cs < self.config.thermal.T_melt)
-        inbetween_mask = ((self.enthalpy_matrix / self.Cs) >= self.config.thermal.T_melt) * \
-                         ((self.enthalpy_matrix - \
-                             (self.Cs - self.Cl) * self.config.thermal.T_melt - \
-                              self.config.thermal.L_water_ice * self.nb_matrix) / self.Cl < self.config.thermal.T_melt)
-                          
-        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask - inbetween_mask
+        frozen_mask = (self.enthalpy_matrix)  < (self.config.thermal.T_melt * self.Cs)
+        
+        unfrozen_mask = (self.enthalpy_matrix) > (
+            self.config.thermal.T_melt * self.Cl + \
+            (self.Cs - self.Cl) * self.config.thermal.T_melt + \
+            self.config.thermal.L_water_ice * self.nb_matrix
+            )
+        
+        inbetween_mask = np.ones(frozen_mask.shape) - frozen_mask - unfrozen_mask
                 
-        # from this new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
+        # from the new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
         # again, the state masks are used to make this calculation faster
         self.temp_matrix = \
             frozen_mask * \
@@ -773,7 +775,7 @@ class Simulation():
                 (self.Cl - self.Cs) * self.config.thermal.T_melt - \
                 self.config.thermal.L_water_ice * self.nb_matrix) / \
                     (self.Cl)
-                            
+        
         return None
      
     def _get_ghost_node_boundary_condition(self, timestep_id, subgrid_timestep_id):
@@ -808,7 +810,7 @@ class Simulation():
                 ds.close()
             
             # get water level to check whether to use convective heat transfer from air or sea
-            water_level = surge + self.runup
+            self.water_level = surge + self.runup
             
         else:  # otherwise, use a water level of z=0
             water_level = 0
@@ -1026,14 +1028,22 @@ class Simulation():
             
             elif self.config.thermal.grid_interpolation == "linear_interp_z":
                 
-                self.temp_matrix = um.linear_interp_z(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new, fill_value_top=self.current_sea_temp)
+                self.temp_matrix = um.linear_interp_z(
+                    self.abs_xgr, 
+                    self.abs_zgr, 
+                    self.temp_matrix, 
+                    self.abs_xgr_new, 
+                    self.abs_zgr_new,
+                    water_level=self.current_storm_surge,
+                    fill_value_top_water=self.current_sea_temp
+                    )
                 
                 # redefine matrices with soil properties
                 self.define_soil_property_matrices(self.xgr_new)
                 
                 # since only temperature matrix is interpolated to new grid, the enthalpy has to be recalculated
                 # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
-                frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+                frozen_mask = (self.temp_matrix <= self.config.thermal.T_melt)
                 unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
                 
                 # and enthalpy is recalculated

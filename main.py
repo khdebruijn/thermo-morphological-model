@@ -162,6 +162,9 @@ def main(sim):
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid(timestep_id, fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
+            
+        else:
+            sim.current_storm_surge = 0
         
         # calculate the current thaw depth
         sim.find_thaw_depth()

@@ -159,7 +159,7 @@ def linear_interp_with_nearest(xgr, zgr, values, new_xgr, new_zgr):
 
     return new_temperature_values
 
-def linear_interp_z(abs_xgr, abs_zgr, temp_matrix, abs_xgr_new, abs_zgr_new, fill_value_top, fill_bottom='nearest'):
+def linear_interp_z(abs_xgr, abs_zgr, temp_matrix, abs_xgr_new, abs_zgr_new, water_level, fill_value_top_water, fill_value_top_air='nearest', fill_bottom='nearest'):
     """This function takes an old x-grid and z-grid, and associated values (e.g., temperature), and casts them to a new grid of x and z values. 
     For each new 1D perpendicular model, the closest surface coordinate from the old grid is taken, and new temperature values are based on the 
     old perpendicular model related to this surface node. New values are computed through interpolation based on depth only. Grid points above the
@@ -171,7 +171,9 @@ def linear_interp_z(abs_xgr, abs_zgr, temp_matrix, abs_xgr_new, abs_zgr_new, fil
         values (np.Array): matrix of same shape as xgr and zgr with associated valeus
         new_xgr (np.Array): new x-grid (p x q)
         new_zgr (np.Array): new z-grid (q x q)
-        fill_value_top (float): value given to grid cells above the old grid
+        water_level (float): current water level
+        fill_value_top_water (float): value given to grid cells above the old grid (below the water level)
+        fill_value_top_air (float or string): if 'nearest', set temperature to nearest grid cell. If float, use that value.
         fill_bottom (string): strategy to use for setting bottom values below the old grid. Defaults to 'nearest'.
 
     Returns:
@@ -191,12 +193,22 @@ def linear_interp_z(abs_xgr, abs_zgr, temp_matrix, abs_xgr_new, abs_zgr_new, fil
         
         new_z_array = abs_zgr_new[i,:]
         
-        new_temp_array = np.interp(
-            x=new_z_array, 
-            xp=z_array[sort_id], 
-            fp=temp_array[sort_id], 
-            left=(temp_array[sort_id][0] if fill_bottom=='nearest' else 0),
-            right=fill_value_top
+        if new_z_array[0] < water_level:
+            new_temp_array = np.interp(
+                x=new_z_array, 
+                xp=z_array[sort_id], 
+                fp=temp_array[sort_id], 
+                left=(temp_array[sort_id][0] if fill_bottom=='nearest' else 0),
+                right=fill_value_top_water
+                )
+            
+        else:
+            new_temp_array = np.interp(
+                x=new_z_array, 
+                xp=z_array[sort_id], 
+                fp=temp_array[sort_id], 
+                left=(temp_array[sort_id][0] if fill_bottom=='nearest' else 0),
+                right=(temp_array[sort_id][-1] if fill_value_top_air=='nearest' else fill_value_top_air)
             )
         
         new_temperature_values[i,:] = new_temp_array
