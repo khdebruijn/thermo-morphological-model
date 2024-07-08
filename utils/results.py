@@ -83,7 +83,7 @@ class SimulationResults():
 
             ds = xr.open_dataset(path)
                 
-            var_list.append(ds[varname])  
+            var_list.append(ds[varname].values)  
             
             ds.close()
             
@@ -95,7 +95,7 @@ class SimulationResults():
         
         ds = xr.open_dataset(path)
         
-        var_array = ds[varname]
+        var_array = ds[varname].values
         
         ds.close()        
             
@@ -142,7 +142,7 @@ class SimulationResults():
             ax.set_aspect('equal')
         
         # initialize water level line
-        wl_line, = ax.plot((xmin, xmax), (0, 0), color='C0')
+        wl_line, = ax.plot((xmin, xmax), (0, 0), color='C0', label='water level')
         
         # initialize other lines to loop through and set alpha
         lines=[]
@@ -273,14 +273,14 @@ class SimulationResults():
         wl_line, = axs[0].plot((xmin, xmax), (0,0), color='C0', label='water level')
 
         # create initial plot for thaw depth
-        thaw_depth_line, = axs[1].plot([],[],label='thaw_depth', color='k')
+        thaw_depth_line, = axs[1].plot([],[],label='thaw depth', color='k')
 
         # create initial_plot for heat fluxes
-        total_heat_flux_line, = axs[2].plot([],[],label='total_heat_flux', color='k', linewidth=3)
-        long_wave_radiation_flux_line, = axs[2].plot([],[],label='long_wave_radiation_flux')
-        solar_radiation_flux_line, = axs[2].plot([],[],label='solar_radiation_flux')
-        latent_heat_flux_line, = axs[2].plot([],[],label='latent_heat_flux')
-        convective_heat_flux_line, = axs[2].plot([],[],label='convective_heat_flux')
+        total_heat_flux_line, = axs[2].plot([],[],label='total heat flux', color='k', linewidth=3)
+        long_wave_radiation_flux_line, = axs[2].plot([],[],label='long-wave radiation flux')
+        solar_radiation_flux_line, = axs[2].plot([],[],label='solar radiation flux')
+        latent_heat_flux_line, = axs[2].plot([],[],label='latent heat flux')
+        convective_heat_flux_line, = axs[2].plot([],[],label='convective heat flux')
 
         # add legends
         axs[0].legend(loc='upper left')
@@ -380,7 +380,7 @@ class SimulationResults():
             
         return None
     
-    def temperature_animation(
+    def temperature_heatforcing_animation(
         self,
         animation_timesteps=None,
         xmin=0, 
@@ -426,14 +426,19 @@ class SimulationResults():
         thaw_line, = axs[0].plot([],[], color='r', label='thaw interface', linewidth=2)
         
         # create initial plot for thaw depth
-        thaw_depth_line, = axs[1].plot([],[],label='thaw_depth', color='k')
+        thaw_depth_line, = axs[1].plot([],[],label='thaw depth', color='k')
 
         # create initial_plot for heat fluxes
-        total_heat_flux_line, = axs[2].plot([],[],label='total_heat_flux', color='k', linewidth=3)
-        long_wave_radiation_flux_line, = axs[2].plot([],[],label='long_wave_radiation_flux')
-        solar_radiation_flux_line, = axs[2].plot([],[],label='solar_radiation_flux')
-        latent_heat_flux_line, = axs[2].plot([],[],label='latent_heat_flux')
-        convective_heat_flux_line, = axs[2].plot([],[],label='convective_heat_flux')
+        total_heat_flux_line, = axs[2].plot([],[],label='total heat flux', color='k', linewidth=3)
+        long_wave_radiation_flux_line, = axs[2].plot([],[],label='long-wave radiation flux')
+        solar_radiation_flux_line, = axs[2].plot([],[],label='solar radiation flux')
+        latent_heat_flux_line, = axs[2].plot([],[],label='latent heat flux')
+        convective_heat_flux_line, = axs[2].plot([],[],label='convective heat flux')
+        
+        # create plots for sea temperature label and air temperature label
+        air_temp_label = axs[0].scatter([],[], label='2m air temperature: ')
+        sea_temp_label = axs[0].scatter([],[], label='sea surface temperature: ')
+
 
         # some visual stuff
         axs[0].grid()
@@ -496,6 +501,9 @@ class SimulationResults():
             abs_zgr = self.get_var_timestep("abs_zgr", output_id).values.flatten()
             temp = self.get_var_timestep("ground_temperature_distribution", output_id).values.flatten() - 273.15
             temp_norm = sm.to_rgba(temp)  # get normalized temperature values (needed to plot)
+            
+            air_temp = self.get_var_timestep("2m_temperature", output_id)
+            sea_temp = self.get_var_timestep("sea_surface_temperature", output_id)
 
             # plot bathymetry (in plot 0)
             bathy_line.set_data(xgr, zgr)
@@ -520,6 +528,114 @@ class SimulationResults():
             solar_radiation_flux_line.set_data(xgr, solar_radiation_flux)
             latent_heat_flux_line.set_data(xgr, latent_heat_flux)
             convective_heat_flux_line.set_data(xgr, convective_heat_flux)
+            
+            # update temperature labels
+            air_temp_label.set_label(f"2m temperature: {air_temp - 273.15:.1f} degrees C")
+            sea_temp_label.set_label(f"Sea surface temperature: {sea_temp - 273.15:.1f} degrees C")
+            
+            # print progress
+            print(f'{output_id} / {len(animation_timesteps)}')
+            
+            return None
+
+        if make_animation:
+
+            # define animation
+            animation = FuncAnimation(fig, animation_function, frames=range(len(animation_timesteps)))
+            
+            # save animation
+            if save:
+                
+                fpath = os.path.join(save_folder, str(self.runid) + save_name + ".mp4")
+                
+                animation.save(fpath, writer='ffmpeg', fps=fps)
+            
+            # close 
+            plt.close()
+        
+        else:
+            
+            # create folder for images
+            fig_dir = os.path.join(save_folder, str(self.runid) + "_" + save_name + '/')
+            
+            if not os.path.exists(fig_dir):
+                
+                os.makedirs(fig_dir)
+            
+            # loop through all frames and save figure after each one
+            for frame in range(len(animation_timesteps)):
+                
+                animation_function(frame)
+                
+                fig.savefig(os.path.join(fig_dir, str(frame) + ".png"))
+                
+            plt.close()
+            
+        return None
+
+    def temperature_animation(
+        self,
+        animation_timesteps=None,
+        vmin=-10,  # degrees Celcius
+        vmax=10,   # degrees Celcius
+        aspect_equal=False, 
+        save=True, 
+        make_animation=True,
+        save_folder=Path("P:/11210070-usgscoop-202324-arcticxb/results/"),
+        save_name='temperature',
+        fps=5
+    ):
+        print('creating temperature animation')
+        # create figure
+        fig, ax = plt.subplots(figsize=(15,5))
+
+        # create normalization
+        norm = Normalize(vmin=vmin, vmax=vmax)
+        
+        # create scalarmappable
+        sm = ScalarMappable(norm, cmap='coolwarm')
+        
+        if aspect_equal:
+            ax.set_aspect('equal')
+        
+        # determinae output steps that should be part of the animation
+        if not animation_timesteps:
+            animation_timesteps = self.timestep_output_ids
+
+        def animation_function(i):
+            ax.clear()
+            
+            # create colorbar
+            plt.colorbar(
+                sm, 
+                ax=ax[0], 
+                orientation='horizontal', 
+                fraction=0.05, 
+                pad=0.05, 
+                anchor=(0.9, 1), 
+                ticks=np.arange(vmin, vmax, 1), 
+                label='Temperature [degrees Celcius]', 
+                aspect=40
+                )
+
+            # some visual stuff
+            ax.set_title("Ground temperature grid")
+            ax.set_ylabel('z-id')
+            ax.set_xlabel('x-grid')
+            
+            # get current timestep id
+            output_id = animation_timesteps[i]
+            timestamp = datetime.fromtimestamp(self.timestamps[np.where(output_id==self.timestep_ids)][0] * 10**-9)
+                            
+            # set current timestep id as figure title
+            fig.suptitle(f'timestep = {output_id} \n({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
+            
+            # get necessary variables
+            temp = self.get_var_timestep("ground_temperature_distribution", output_id)[:,::-1].T - 273.15
+            temp_colors = sm.to_rgba(temp)
+            
+            psm = ax.pcolormesh(temp, rasterized=True,)
+            psm.set_color(temp_colors)
             
             # print progress
             print(f'{output_id} / {len(animation_timesteps)}')

@@ -8,19 +8,35 @@ import matplotlib.pyplot as plt
 
 from utils.results import SimulationResults
 
-def main(runid):
+def main(runid, args):
     
     print(f"initializing {runid}")
     results = SimulationResults(runid=runid)
-    
+
+    if "bluff_and_toe" in args:
+        print('Computing bluff toe & shoreline positions')    
+        results.get_bluff_toes_and_shorelines()
+
     print(f"creating animations for {runid}")
     frame_num = len(results.timestep_output_ids)
     fps = frame_num / 120  # for a 120 second animation
 
-    results.get_bluff_toes_and_shorelines()
-    # results.bed_level_animation(fps=fps, make_animation=False)
-    results.heat_forcing_animation(fps=fps, make_animation=False)
-    results.temperature_animation(fps=fps, make_animation=False)
+    if "bed" in args:
+        results.bed_level_animation(fps=fps, make_animation=False)
+        plt.close('all')
+    
+    if "heat" in args:
+        results.heat_forcing_animation(fps=fps, make_animation=False)
+        plt.close('all')
+    
+    if "temp_heat" in args:
+        results.temperature_heatforcing_animation(fps=fps, make_animation=False)
+        plt.close('all')
+    
+    if "temp" in args:
+        results.temperature_animation(fps=fps, make_animation=False)
+        plt.close('all')
+    
     
     print(f"completed {runid}")
     
@@ -54,7 +70,10 @@ if __name__=="__main__":
     set_mpl_defaults()
     
     # set the 'runid' to the model run that you would like to perform
-    runids = np.array(sys.argv)[1:]
+    runid = np.array(sys.argv)[1]
     
-    for runid in runids:
-        main(runid)
+    # possible options for args: bluff_and_toe bed heat temp_heat temp
+    args = np.array(sys.argv)[2:]
+    
+    main(runid, args)
+    

@@ -8,6 +8,10 @@ test3;1-1-2020;31-12-2021;zelfde als test 2, maar nu ook asymmetry waarden allem
 ;;;;;;;;;;;;;
 val0;1-7-2011;1-10-2011;(DD-MM-YY) used to validate ground temperature model (without xbeach);;;;;;;;\;;
 val0_xb;1-7-2011;1-10-2011;(DD-MM-YY) used to validate ground temperature model (with xbeach);;;;;;;;/;-->;both have outputs for every hour
+val1;1-7-2011;1-10-2011;(DD-MM-YY) same as val0, but slight change in enthalpy formulation. Not much changes though in the outcome.;;;;;;;;;;
+val2;1-7-2011;1-10-2011;(DD-MM-YY) same as val0, but slight change in enthalpy formulation. Also much higher ground temperature resolution used;;;;;;;;;;
+;;;;;;;;;;;;;
+;;;;;;;;;;;;;
 ;;;;;;;;;;;;;
 ;;;;;;;;;;;;;
 ;;;;;;;;;;;;;

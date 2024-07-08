@@ -730,7 +730,7 @@ class Simulation():
         
         # redefine matrices with soil properties
         self.define_soil_property_matrices(self.xgr)
-        
+             
         # get the new boundary condition
         self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id, subgrid_timestep_id)
         self.bottom_boundary_temperature = self._get_bottom_boundary_temperature()
