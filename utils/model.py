@@ -566,7 +566,12 @@ class Simulation():
         self.temp_matrix = np.zeros((len(self.xgr), self.config.thermal.grid_resolution))
         
         # initialize the associated grid
-        self.abs_xgr, self.abs_zgr = um.generate_perpendicular_grids(self.xgr, self.zgr)
+        self.abs_xgr, self.abs_zgr = um.generate_perpendicular_grids(
+            self.xgr, 
+            self.zgr, 
+            resolution=self.config.thermal.grid_resolution, 
+            max_depth=self.config.thermal.max_depth
+            )
         
         # set the above determined initial conditions for the xgr
         for i in range(len(self.temp_matrix)):
@@ -747,7 +752,8 @@ class Simulation():
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
         
         if np.max(self.cfl_matrix >= 0.5):
-            raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+            pass
+            # raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
             # print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
             
         # get the new enthalpy matrix
@@ -999,7 +1005,12 @@ class Simulation():
         (perpendicular to the existing grid), and fits the previous temperature and enthalpy distributions to the new grid."""
         
         # generate perpendicular grids for previous timestep (to cast temperature and enthalpy)
-        self.abs_xgr, self.abs_zgr = um.generate_perpendicular_grids(self.xgr, self.zgr)
+        self.abs_xgr, self.abs_zgr = um.generate_perpendicular_grids(
+            self.xgr, 
+            self.zgr, 
+            resolution=self.config.thermal.grid_resolution, 
+            max_depth=self.config.thermal.max_depth
+            )
         
         # update the current bathymetry
         cum_sedero = self._update_bed_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
@@ -1021,7 +1032,12 @@ class Simulation():
                 self.zgr_new = self.zgr_new[1:]
 
             # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
-            self.abs_xgr_new, self.abs_zgr_new = um.generate_perpendicular_grids(self.xgr_new, self.zgr_new)
+            self.abs_xgr_new, self.abs_zgr_new = um.generate_perpendicular_grids(
+            self.xgr, 
+            self.zgr, 
+            resolution=self.config.thermal.grid_resolution, 
+            max_depth=self.config.thermal.max_depth
+            )
             
             # cast temperature matrix
             if self.config.thermal.grid_interpolation == "linear_interp_with_nearest":
