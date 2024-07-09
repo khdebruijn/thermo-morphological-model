@@ -467,7 +467,7 @@ class SimulationResults():
             axs[0].set_aspect('equal')
 
         # add legend()
-        axs[0].legend(loc='upper left')
+        L0 = axs[0].legend(loc='upper left')
         axs[1].legend(loc='upper left')
         axs[2].legend(loc='upper left')
         
@@ -530,8 +530,8 @@ class SimulationResults():
             convective_heat_flux_line.set_data(xgr, convective_heat_flux)
             
             # update temperature labels
-            air_temp_label.set_label(f"2m temperature: {air_temp - 273.15:.1f} degrees C")
-            sea_temp_label.set_label(f"Sea surface temperature: {sea_temp - 273.15:.1f} degrees C")
+            L0.get_texts()[3].set_text(f"2m temperature: {air_temp - 273.15:.1f} degrees C")
+            L0.get_texts()[4].set_text(f"Sea surface temperature: {sea_temp - 273.15:.1f} degrees C")
             
             # print progress
             print(f'{output_id} / {len(animation_timesteps)}')
