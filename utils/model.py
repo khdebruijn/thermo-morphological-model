@@ -821,10 +821,10 @@ class Simulation():
             self.water_level = surge + self.runup
             
         else:  # otherwise, use a water level of z=0
-            water_level = 0
+            self.water_level = 0
         
-        dry_mask = (self.zgr >= water_level)
-        wet_mask = (self.zgr < water_level)
+        dry_mask = (self.zgr >= self.water_level)
+        wet_mask = (self.zgr < self.water_level)
         
         # determine convective transport from air (formulation from Man, 2023)
         self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=timestep_id)  # also used in output
