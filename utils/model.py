@@ -588,7 +588,7 @@ class Simulation():
         self.write_ne_layer()
         
         # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
-        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+        frozen_mask = (self.temp_matrix <= self.config.thermal.T_melt)
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
         
         # define soil properties (k, density, nb, Cs & Cl)
@@ -599,7 +599,7 @@ class Simulation():
                 self.Cs * self.temp_matrix + \
             unfrozen_mask * \
                 (self.Cl * self.temp_matrix + \
-                (self.Cl - self.Cs) * self.config.thermal.T_melt + \
+                (self.Cs - self.Cl) * self.config.thermal.T_melt + \
                 self.config.thermal.L_water_ice * self.nb_matrix)  # unit of L_water_ice is already corrected to use water density
         
         # calculate the courant-friedlichs-lewy number matrix
@@ -632,7 +632,7 @@ class Simulation():
         """This function is ran to easily define (and redefine) matrices with soil properties. 
         It is only a function of the x-grid, since the perpendicular z-grid is does not change in size."""
         # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
-        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+        frozen_mask = (self.temp_matrix <= self.config.thermal.T_melt)
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
         
         # initialize linear distribution of k, starting at min value and ending at max value (at a depth of 1m)
@@ -731,7 +731,7 @@ class Simulation():
             subgrid_timestep_id (int): id of the current subgrid timestep
         """
         # update nb matrix, soil density matrix, k-matrix, and Cs, Cl (and determine which part of the domain is frozen and unfrozen)
-        frozen_mask_old = (self.temp_matrix < self.config.thermal.T_melt)
+        frozen_mask_old = (self.temp_matrix <= self.config.thermal.T_melt)
         unfrozen_mask_old = np.ones(frozen_mask_old.shape) - frozen_mask_old
         
         # redefine matrices with soil properties
@@ -895,7 +895,7 @@ class Simulation():
             self.constant_flux = self.latent_flux + self.lw_flux + self.sw_flux
         
         # add all heat fluxes  together (also used in output)
-        self.heat_flux = self.convective_flux + self.constant_flux            
+        self.heat_flux = self.convective_flux + self.constant_flux
         
         # determine temperature of the ghost nodes
         ghost_nodes_temperature = self.temp_matrix[:,0] + self.heat_flux * self.dz / self.k_matrix[:,0]
@@ -1046,37 +1046,64 @@ class Simulation():
             
             elif self.config.thermal.grid_interpolation == "linear_interp_z":
                 
-                self.temp_matrix = um.linear_interp_z(
+                # Compute density
+                rho_value = self.config.thermal.nb_max * self.config.thermal.rho_water + (1 - self.config.thermal.nb_max) * self.config.thermal.rho_particle
+                
+                # From denisty, compute specific heat
+                Cs_value = self.config.thermal.c_soil_frozen / rho_value
+                Cl_value = self.config.thermal.c_soil_unfrozen / rho_value
+                
+                # Compute top fill value for submerged sediment
+                if (self.current_sea_temp <= self.config.thermal.Tm):
+                    enthalpy_submerged_sediment = self.current_sea_temp * Cs_value
+                else:
+                    enthalpy_submerged_sediment = self.current_sea_temp * Cl_value + (Cs_value - Cl_value) * self.config.thermal.Tm + self.config.thermal.L_water_ice * self.config.thermal.nb_max
+                    
+                # Interpolate enthalpy to new grid             
+                self.enthalpy_matrix = um.linear_interp_z(
                     self.abs_xgr, 
                     self.abs_zgr, 
-                    self.temp_matrix, 
+                    self.enthalpy_matrix, 
                     self.abs_xgr_new, 
                     self.abs_zgr_new,
                     water_level=self.current_storm_surge,
-                    fill_value_top_water=self.current_sea_temp
+                    fill_value_top_water=enthalpy_submerged_sediment,
+                    fill_value_top_air='nearest',
                     )
+                
+                
+                # determine state masks (which part of the domain is frozen, in between, or unfrozen (needed to later calculate temperature from enthalpy))
+                frozen_mask = (self.enthalpy_matrix)  < (self.config.thermal.T_melt * self.Cs)
+                
+                unfrozen_mask = (self.enthalpy_matrix) > (
+                    self.config.thermal.T_melt * self.Cl + \
+                    (self.Cs - self.Cl) * self.config.thermal.T_melt + \
+                    self.config.thermal.L_water_ice * self.nb_matrix
+                    )
+                
+                inbetween_mask = np.ones(frozen_mask.shape) - frozen_mask - unfrozen_mask
+                        
+                # from the new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
+                # again, the state masks are used to make this calculation faster
+                self.temp_matrix = \
+                    frozen_mask * \
+                        (self.enthalpy_matrix / self.Cs) + \
+                    inbetween_mask * \
+                        (self.config.thermal.T_melt) + \
+                    unfrozen_mask * \
+                        (self.enthalpy_matrix - \
+                        (self.Cl - self.Cs) * self.config.thermal.T_melt - \
+                        self.config.thermal.L_water_ice * self.nb_matrix) / \
+                            (self.Cl)
                 
                 # redefine matrices with soil properties
                 self.define_soil_property_matrices(self.xgr_new)
                 
-                # since only temperature matrix is interpolated to new grid, the enthalpy has to be recalculated
-                # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
-                frozen_mask = (self.temp_matrix <= self.config.thermal.T_melt)
-                unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
-                
-                # and enthalpy is recalculated
-                self.enthalpy_matrix = \
-                    frozen_mask * \
-                        self.Cs * self.temp_matrix + \
-                    unfrozen_mask * \
-                        (self.Cl * self.temp_matrix + \
-                        (self.Cl - self.Cs) * self.config.thermal.T_melt + \
-                        self.config.thermal.L_water_ice * self.nb_matrix)
                         
             else:
                 raise ValueError("Invalid value for grid_interpolation")
-                        
-                
+            
+            
             # set the grid to be equal to this new grid
             self.xgr = self.xgr_new
             self.zgr = self.zgr_new
