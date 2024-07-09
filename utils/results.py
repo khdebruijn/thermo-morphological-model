@@ -497,9 +497,9 @@ class SimulationResults():
             latent_heat_flux = self.get_var_timestep("latent_heat_flux", output_id)
             convective_heat_flux = self.get_var_timestep("convective_heat_flux", output_id)
             
-            abs_xgr = self.get_var_timestep("abs_xgr", output_id).values.flatten()
-            abs_zgr = self.get_var_timestep("abs_zgr", output_id).values.flatten()
-            temp = self.get_var_timestep("ground_temperature_distribution", output_id).values.flatten() - 273.15
+            abs_xgr = self.get_var_timestep("abs_xgr", output_id).flatten()
+            abs_zgr = self.get_var_timestep("abs_zgr", output_id).flatten()
+            temp = self.get_var_timestep("ground_temperature_distribution", output_id).flatten() - 273.15
             temp_norm = sm.to_rgba(temp)  # get normalized temperature values (needed to plot)
             
             air_temp = self.get_var_timestep("2m_temperature", output_id)
