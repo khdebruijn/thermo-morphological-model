@@ -1054,10 +1054,10 @@ class Simulation():
                 Cl_value = self.config.thermal.c_soil_unfrozen / rho_value
                 
                 # Compute top fill value for submerged sediment
-                if (self.current_sea_temp <= self.config.thermal.Tm):
+                if (self.current_sea_temp <= self.config.thermal.T_melt):
                     enthalpy_submerged_sediment = self.current_sea_temp * Cs_value
                 else:
-                    enthalpy_submerged_sediment = self.current_sea_temp * Cl_value + (Cs_value - Cl_value) * self.config.thermal.Tm + self.config.thermal.L_water_ice * self.config.thermal.nb_max
+                    enthalpy_submerged_sediment = self.current_sea_temp * Cl_value + (Cs_value - Cl_value) * self.config.thermal.T_melt + self.config.thermal.L_water_ice * self.config.thermal.nb_max
                     
                 # Interpolate enthalpy to new grid             
                 self.enthalpy_matrix = um.linear_interp_z(
