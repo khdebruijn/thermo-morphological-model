@@ -170,9 +170,6 @@ class Simulation():
         # interpolate bathymetry to grid
         self.zgr = np.interp(self.xgr, self.bathy_grid, self.bathy_initial)
         
-        # save a copy of the grid, which serves as the bathymetry
-        self.bathy_current = np.copy(self.zgr)
-        
         # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
         self.thaw_depth = np.zeros(self.xgr.shape)
         
@@ -229,7 +226,7 @@ class Simulation():
         
         self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=0)
         
-        self.current_storm_surge = 0
+        self.water_level = 0
         
         return None
     
@@ -252,7 +249,7 @@ class Simulation():
         })
         
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
-        self.current_storm_surge = self.conditions[timestep_id]["SS(m)"]  # used for output
+        surge = self.conditions[timestep_id]["SS(m)"]  # used for output
         
         # (including: grid/bathymetry, waves input, flow, tide and surge,
         # water level, wind input, sediment input, avalanching, vegetation, 
@@ -316,7 +313,7 @@ class Simulation():
             # tide boundary conditions
             "tideloc": 0,
             # "zs0file":
-            "zs0":self.conditions[timestep_id]["SS(m)"],
+            "zs0":surge,
 
             # wave boundary conditions
             "instat": "jons",
@@ -587,22 +584,23 @@ class Simulation():
         self.find_thaw_depth()
         self.write_ne_layer()
         
-        # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
+        # with the temperature matrix, the initial state (frozen/unfrozen can be determined). This should be the only place where state is defined through temperature
         frozen_mask = (self.temp_matrix <= self.config.thermal.T_melt)
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
         
         # define soil properties (k, density, nb, Cs & Cl)
-        self.define_soil_property_matrices(self.xgr)
+        self.define_soil_property_matrices(len(self.xgr))
             
         self.enthalpy_matrix = \
             frozen_mask * \
-                self.Cs * self.temp_matrix + \
+                self.Cs_matrix * self.temp_matrix + \
             unfrozen_mask * \
-                (self.Cl * self.temp_matrix + \
-                (self.Cs - self.Cl) * self.config.thermal.T_melt + \
+                (self.Cl_matrix * self.temp_matrix + \
+                (self.Cs_matrix - self.Cl_matrix) * self.config.thermal.T_melt + \
                 self.config.thermal.L_water_ice * self.nb_matrix)  # unit of L_water_ice is already corrected to use water density
         
         # calculate the courant-friedlichs-lewy number matrix
+        self.k_matrix = frozen_mask * self.k_frozen_matrix + unfrozen_mask * self.k_unfrozen_matrix
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
         
         if np.max(self.cfl_matrix >= 0.5):
@@ -628,12 +626,13 @@ class Simulation():
 
         return None
     
-    def define_soil_property_matrices(self, xgr):
+    def define_soil_property_matrices(self, N):
         """This function is ran to easily define (and redefine) matrices with soil properties. 
-        It is only a function of the x-grid, since the perpendicular z-grid is does not change in size."""
-        # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
-        frozen_mask = (self.temp_matrix <= self.config.thermal.T_melt)
-        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
+        It is only a function of the x-grid, since the perpendicular z-grid is does not change in size.
+        
+        Args:
+            N (int): number of surface grid points
+            """
         
         # initialize linear distribution of k, starting at min value and ending at max value (at a depth of 1m)
         id_kmax = np.argmin(np.abs(self.thermal_zgr - self.config.thermal.depth_constant_k))  # id of the grid point at which the maximum k should be reached
@@ -651,15 +650,15 @@ class Simulation():
             np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_frozen_max)
         
         # initialize k-matrix
-        self.k_matrix = frozen_mask * np.tile(self.k_frozen_distr, (len(xgr), 1)) + \
-                        unfrozen_mask * np.tile(self.k_unfrozen_distr, (len(xgr), 1))
+        self.k_frozen_matrix =  np.tile(self.k_frozen_distr, (N, 1))
+        self.k_unfrozen_matrix = np.tile(self.k_unfrozen_distr, (N, 1))
         
         # initialize distribution of ground ice content
         self.nb_distr = np.ones(self.thermal_zgr.shape)
         idz = self.config.thermal.grid_resolution * self.config.thermal.nb_switch_depth / self.config.thermal.max_depth
         self.nb_distr[:int(idz)] = self.config.thermal.nb_max  # set nb close to surface (nb_max)
         self.nb_distr[int(idz):] = self.config.thermal.nb_min  # set nb at greater depth (nb_min)
-        self.nb_matrix = np.tile(self.nb_distr, (len(xgr), 1))
+        self.nb_matrix = np.tile(self.nb_distr, (N, 1))
         
         # calculate / read in density
         if self.config.thermal.rho_soil == "None":
@@ -669,8 +668,8 @@ class Simulation():
         
         # using the states, the initial enthalpy can be determined. The enthalpy matrix is used as the 'preserved' quantity, and is used to numerically solve the
         # heat balance equation. Enthalpy formulation from Ravens et al. (2023).
-        self.Cs = self.config.thermal.c_soil_frozen / self.soil_density_matrix
-        self.Cl = self.config.thermal.c_soil_unfrozen / self.soil_density_matrix
+        self.Cs_matrix = self.config.thermal.c_soil_frozen / self.soil_density_matrix
+        self.Cl_matrix = self.config.thermal.c_soil_unfrozen / self.soil_density_matrix
         
         return None
     
@@ -730,13 +729,12 @@ class Simulation():
             timestep_id (int): id of the current timestep
             subgrid_timestep_id (int): id of the current subgrid timestep
         """
-        # update nb matrix, soil density matrix, k-matrix, and Cs, Cl (and determine which part of the domain is frozen and unfrozen)
-        frozen_mask_old = (self.temp_matrix <= self.config.thermal.T_melt)
-        unfrozen_mask_old = np.ones(frozen_mask_old.shape) - frozen_mask_old
+        # get the phase masks, based on enthalpy
+        frozen_mask, inbetween_mask, unfrozen_mask = self._get_phase_masks()
         
-        # redefine matrices with soil properties
-        self.define_soil_property_matrices(self.xgr)
-             
+        # get temperature matrix
+        self.temp_matrix = self._temperature_from_enthalpy(frozen_mask, inbetween_mask, unfrozen_mask)
+        
         # get the new boundary condition
         self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id, subgrid_timestep_id)
         self.bottom_boundary_temperature = self._get_bottom_boundary_temperature()
@@ -747,7 +745,10 @@ class Simulation():
             self.temp_matrix,
             self.bottom_boundary_temperature.reshape(len(self.xgr), 1)
             ), axis=1) 
-                
+        
+        # determine the actual k-matrix using the masks
+        self.k_matrix = (frozen_mask + inbetween_mask) * self.k_frozen_matrix + unfrozen_mask * self.k_unfrozen_matrix
+        
         # determine the courant-friedlichs-lewy number matrix
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
         
@@ -759,32 +760,36 @@ class Simulation():
         # get the new enthalpy matrix
         self.enthalpy_matrix = self.enthalpy_matrix + \
                                self.cfl_matrix * (aggregated_temp_matrix @ self.A_matrix)
-                
+        
+        return None
+    
+    def _get_phase_masks(self):
         # determine state masks (which part of the domain is frozen, in between, or unfrozen (needed to later calculate temperature from enthalpy))
-        frozen_mask = (self.enthalpy_matrix)  < (self.config.thermal.T_melt * self.Cs)
+        frozen_mask = (self.enthalpy_matrix)  < (self.config.thermal.T_melt * self.Cs_matrix)
         
         unfrozen_mask = (self.enthalpy_matrix) > (
-            self.config.thermal.T_melt * self.Cl + \
-            (self.Cs - self.Cl) * self.config.thermal.T_melt + \
+            self.config.thermal.T_melt * self.Cl_matrix + \
+            (self.Cs_matrix - self.Cl_matrix) * self.config.thermal.T_melt + \
             self.config.thermal.L_water_ice * self.nb_matrix
             )
         
         inbetween_mask = np.ones(frozen_mask.shape) - frozen_mask - unfrozen_mask
-                
-        # from the new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
-        # again, the state masks are used to make this calculation faster
-        self.temp_matrix = \
+        
+        return frozen_mask, inbetween_mask, unfrozen_mask
+    
+    def _temperature_from_enthalpy(self, frozen_mask, inbetween_mask, unfrozen_mask):
+        temp_matrix = \
             frozen_mask * \
-                (self.enthalpy_matrix / self.Cs) + \
+                (self.enthalpy_matrix / self.Cs_matrix) + \
             inbetween_mask * \
                 (self.config.thermal.T_melt) + \
             unfrozen_mask * \
                 (self.enthalpy_matrix - \
-                (self.Cl - self.Cs) * self.config.thermal.T_melt - \
+                (self.Cl_matrix - self.Cs_matrix) * self.config.thermal.T_melt - \
                 self.config.thermal.L_water_ice * self.nb_matrix) / \
-                    (self.Cl)
-        
-        return None
+                    (self.Cl_matrix)
+                    
+        return temp_matrix
      
     def _get_ghost_node_boundary_condition(self, timestep_id, subgrid_timestep_id):
         """This function uses the forcing at a specific timestep to return an array containing the ghost node temperature.
@@ -804,24 +809,8 @@ class Simulation():
         self.current_sea_temp = row['sea_surface_temperature']  # also used in output
         self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
         
-        # check wether or not this will be a storm timestep.
-        if self.xbeach_times[timestep_id] and self.config.xbeach.with_xbeach:  # If it is, use (storm surge water level + runup)
-            
-            # get storm surge
-            surge = self.conditions[timestep_id]["SS(m)"]
-            
-            # get runup
-            if subgrid_timestep_id == 0:
-                
-                ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))
-                self.runup = ds.runup.values.flatten()[-1]
-                ds.close()
-            
-            # get water level to check whether to use convective heat transfer from air or sea
-            self.water_level = surge + self.runup
-            
-        else:  # otherwise, use a water level of z=0
-            self.water_level = 0
+        # update the water level
+        self.water_level = self._update_water_level(timestep_id, subgrid_timestep_id)
         
         dry_mask = (self.zgr >= self.water_level)
         wet_mask = (self.zgr < self.water_level)
@@ -901,6 +890,28 @@ class Simulation():
         ghost_nodes_temperature = self.temp_matrix[:,0] + self.heat_flux * self.dz / self.k_matrix[:,0]
         
         return ghost_nodes_temperature
+    
+    def _update_water_level(self, timestep_id, subgrid_timestep_id=0):
+        # check wether or not this is a storm timestep.
+        if self.xbeach_times[timestep_id] and self.config.xbeach.with_xbeach:  # If it is, use (storm surge water level + runup)
+            
+            # get storm surge
+            surge = self.conditions[timestep_id]["SS(m)"]
+            
+            # get runup
+            if not subgrid_timestep_id:
+                
+                ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))
+                self.runup = ds.runup.values.flatten()[-1]
+                ds.close()
+            
+            # get water level to check whether to use convective heat transfer from air or sea
+            water_level = surge + self.runup
+            
+        else:  # otherwise, use a water level of z=0
+            water_level = 0
+            
+        return water_level
     
     def _get_bottom_boundary_temperature(self):
         """This function returns a bottom boundary condition temperature, based on the geothermal gradient. It accounts for the
@@ -1003,40 +1014,36 @@ class Simulation():
     def update_grid(self, timestep_id, fp_xbeach_output="sedero.txt"):
         """This function updates the current grid, calculates the angles of the new grid with the horizontal, generates a new thermal grid 
         (perpendicular to the existing grid), and fits the previous temperature and enthalpy distributions to the new grid."""
-        
-        # generate perpendicular grids for previous timestep (to cast temperature and enthalpy)
-        self.abs_xgr, self.abs_zgr = um.generate_perpendicular_grids(
-            self.xgr, 
-            self.zgr, 
-            resolution=self.config.thermal.grid_resolution, 
-            max_depth=self.config.thermal.max_depth
-            )
-        
         # update the current bathymetry
-        cum_sedero = self._update_bed_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
+        cum_sedero = self._get_cum_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
+        
+        # update bed level
+        bathy_current = self.zgr + cum_sedero
         
         # only update the grid of there actually was a change in bed level
         if not all(cum_sedero == 0):
         
             # generate a new xgrid and zgrid (but only if the next timestep does not require a hotstart, which requires the same xgrid)
-            if self.xbeach_times[timestep_id] and self.xbeach_times[timestep_id + 1]:
-                self.xgr_new, self.zgr_new = xgrid(self.xgr, self.bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
-                self.zgr_new = np.interp(self.xgr_new, self.xgr, self.bathy_current)
+            if not self.xbeach_times[timestep_id + 1]:
+                
+                self.xgr_new, self.zgr_new = xgrid(self.xgr, bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
+                self.zgr_new = np.interp(self.xgr_new, self.xgr, bathy_current)
+                
+                # ensure that the grid doesn't extend further offshore than the original grid (this is a bug in the xbeach python toolbox)
+                while self.xgr_new[0] < self.x_ori:
+                    self.xgr_new = self.xgr_new[1:]
+                    self.zgr_new = self.zgr_new[1:]
+                
             else:
                 self.xgr_new = self.xgr
-                self.zgr_new = self.bathy_current
-            
-            # ensure that the grid doesn't extend further offshore than the original grid (this is a bug in the xbeach python toolbox)
-            while self.xgr_new[0] < self.x_ori:
-                self.xgr_new = self.xgr_new[1:]
-                self.zgr_new = self.zgr_new[1:]
+                self.zgr_new = bathy_current
 
             # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
             self.abs_xgr_new, self.abs_zgr_new = um.generate_perpendicular_grids(
-            self.xgr, 
-            self.zgr, 
-            resolution=self.config.thermal.grid_resolution, 
-            max_depth=self.config.thermal.max_depth
+                self.xgr_new, 
+                self.zgr_new, 
+                resolution=self.config.thermal.grid_resolution, 
+                max_depth=self.config.thermal.max_depth
             )
             
             # cast temperature matrix
@@ -1058,7 +1065,10 @@ class Simulation():
                     enthalpy_submerged_sediment = self.current_sea_temp * Cs_value
                 else:
                     enthalpy_submerged_sediment = self.current_sea_temp * Cl_value + (Cs_value - Cl_value) * self.config.thermal.T_melt + self.config.thermal.L_water_ice * self.config.thermal.nb_max
-                    
+                
+                # get current water level
+                self.water_level = self._update_water_level(timestep_id)
+                
                 # Interpolate enthalpy to new grid             
                 self.enthalpy_matrix = um.linear_interp_z(
                     self.abs_xgr, 
@@ -1066,48 +1076,20 @@ class Simulation():
                     self.enthalpy_matrix, 
                     self.abs_xgr_new, 
                     self.abs_zgr_new,
-                    water_level=self.current_storm_surge,
+                    water_level=self.water_level,
                     fill_value_top_water=enthalpy_submerged_sediment,
                     fill_value_top_air='nearest',
                     )
                 
-                
-                # determine state masks (which part of the domain is frozen, in between, or unfrozen (needed to later calculate temperature from enthalpy))
-                frozen_mask = (self.enthalpy_matrix)  < (self.config.thermal.T_melt * self.Cs)
-                
-                unfrozen_mask = (self.enthalpy_matrix) > (
-                    self.config.thermal.T_melt * self.Cl + \
-                    (self.Cs - self.Cl) * self.config.thermal.T_melt + \
-                    self.config.thermal.L_water_ice * self.nb_matrix
-                    )
-                
-                inbetween_mask = np.ones(frozen_mask.shape) - frozen_mask - unfrozen_mask
-                        
-                # from the new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
-                # again, the state masks are used to make this calculation faster
-                self.temp_matrix = \
-                    frozen_mask * \
-                        (self.enthalpy_matrix / self.Cs) + \
-                    inbetween_mask * \
-                        (self.config.thermal.T_melt) + \
-                    unfrozen_mask * \
-                        (self.enthalpy_matrix - \
-                        (self.Cl - self.Cs) * self.config.thermal.T_melt - \
-                        self.config.thermal.L_water_ice * self.nb_matrix) / \
-                            (self.Cl)
-                
                 # redefine matrices with soil properties
-                self.define_soil_property_matrices(self.xgr_new)
-                
+                self.define_soil_property_matrices(len(self.xgr_new))
                         
             else:
                 raise ValueError("Invalid value for grid_interpolation")
             
-            
             # set the grid to be equal to this new grid
             self.xgr = self.xgr_new
             self.zgr = self.zgr_new
-            self.bathy_current = self.zgr_new
             
             self.abs_xgr = self.abs_xgr_new
             self.abs_zgr = self.abs_zgr_new
@@ -1124,7 +1106,7 @@ class Simulation():
         
         return self.angles
     
-    def _update_bed_sedero(self, fp_xbeach_output):
+    def _get_cum_sedero(self, fp_xbeach_output):
         """This method updates the current bed given the xbeach output.
         ---------
         fp_xbeach_output: string
@@ -1144,9 +1126,6 @@ class Simulation():
         
         # interpolate values to the used grid
         interpolated_cum_sedero = interpolation_function(self.xgr)
-        
-        # update bed level
-        self.bathy_current += interpolated_cum_sedero
         
         return cum_sedero
     
@@ -1385,6 +1364,7 @@ class Simulation():
         
         # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
         if (not timestep_id==0) and os.path.exists(os.path.join(self.cwd, "xboutput.nc")):  # check if an xbeach output file exists (it shouldn't at the first timestep)
+            
             ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
             ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep
             
@@ -1392,7 +1372,7 @@ class Simulation():
                     
             result_ds['wave_height'] = (["xgr_xb"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
             result_ds['run_up'] = ds.runup.values.flatten()  # single value
-            result_ds['storm_surge'] = self.current_storm_surge  # single value
+            result_ds['water_level'] = self.water_level  # single value
             result_ds['wave_energy'] = (["xgr_xb"], ds.E.values.flatten())  # 1D series of wave energies (associated with xgr.txt)
             result_ds['radiation_stress_xx'] = (["xgr_xb"], ds.Sxx.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
             result_ds['radiation_stress_xy'] = (["xgr_xb"], ds.Sxy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
@@ -1410,7 +1390,7 @@ class Simulation():
                             'mean_wave_angle', 'velocity_magnitude', 'orbital_velocity']:
                 result_ds[varname] = (["xgr"], np.zeros(self.xgr.shape))
                 
-            for varname in ['run_up', 'storm_surge']:
+            for varname in ['run_up', 'water_level']:
                 result_ds[varname] = 0
         
         # temperature variables

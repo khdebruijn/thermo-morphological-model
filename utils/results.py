@@ -174,7 +174,7 @@ class SimulationResults():
             zgr = self.get_var_timestep("zgr", output_id)
             
             # load water level
-            wl = self.get_var_timestep("storm_surge", output_id)
+            wl = self.get_var_timestep("water_level", output_id)
             
             # draw new bathymetry
             line, = ax.plot(xgr, zgr, color=colors[i], linewidth=3)
@@ -313,7 +313,7 @@ class SimulationResults():
             xgr = self.get_var_timestep("xgr", output_id)
             zgr = self.get_var_timestep("zgr", output_id)
             
-            wl = self.get_var_timestep("storm_surge", output_id)
+            wl = self.get_var_timestep("water_level", output_id)
             
             thaw_depth = self.get_var_timestep("thaw_depth", output_id)
             
@@ -487,7 +487,7 @@ class SimulationResults():
             xgr = self.get_var_timestep("xgr", output_id)
             zgr = self.get_var_timestep("zgr", output_id)
             
-            wl = self.get_var_timestep("storm_surge", output_id)
+            wl = self.get_var_timestep("water_level", output_id)
             
             thaw_depth = self.get_var_timestep("thaw_depth", output_id)
             

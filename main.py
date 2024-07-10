@@ -133,9 +133,6 @@ def main(sim):
         # check if xbeach is enabled for current timestep
         if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
             
-            # calculate the current thaw depth
-            sim.find_thaw_depth()
-            
             # export current thaw depth to a file
             sim.write_ne_layer()
                         
@@ -149,6 +146,7 @@ def main(sim):
                 os.path.join(sim.proj_dir, Path("xbeach/XBeach_1.24.6057_Halloween_win64_netcdf/xbeach.exe")),
                 sim.cwd
             )
+            
             try:
                 if run_succesful:
                     print(f"succesfully ran xbeach timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
@@ -166,13 +164,13 @@ def main(sim):
         else:
             sim.current_storm_surge = 0
         
-        # calculate the current thaw depth
-        sim.find_thaw_depth()
-        
         # loop through thermal subgrid timestep
         for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
             
             sim.thermal_update(timestep_id, subgrid_timestep_id)
+            
+        # calculate the current thaw depth
+        sim.find_thaw_depth()
             
 
     print(f"Total simulation time: {(time.time() - t_start) / 3600:1f} hours")

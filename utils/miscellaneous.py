@@ -199,7 +199,7 @@ def linear_interp_z(abs_xgr, abs_zgr, temp_matrix, abs_xgr_new, abs_zgr_new, wat
                 xp=z_array[sort_id], 
                 fp=temp_array[sort_id], 
                 left=(temp_array[sort_id][0] if fill_bottom=='nearest' else 0),
-                right=fill_value_top_water
+                right=fill_value_top_water if not fill_value_top_water=='nearest' else temp_array[sort_id][-1]
                 )
             
         else:
