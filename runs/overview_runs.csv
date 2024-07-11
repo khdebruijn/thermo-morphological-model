@@ -11,7 +11,7 @@ val0_xb;1-7-2011;1-10-2011;(DD-MM-YY) used to validate ground temperature model 
 val1;1-7-2011;1-10-2011;(DD-MM-YY) same as val0, but slight change in enthalpy formulation. Not much changes though in the outcome.;;;;;;;;;;
 val2;1-7-2011;1-10-2011;(DD-MM-YY) same as val0, but slight change in enthalpy formulation. Also much higher ground temperature resolution used (CFL error is surpressed manually);;;;;;;;;;
 val3;1-7-2011;1-10-2011;(DD-MM-YY) same as val0, but with new enthalpy interpolation scheme (instead of temperature), and slight changes in enthalpy formulation;;;;;;;;;;
-;;;;;;;;;;;;;
+val3_xb;1-7-2011;1-10-2011;(DD-MM-YY) same as val0_xb, but with new enthalpy interpolation scheme (instead of temperature), and slight changes in enthalpy formulation;;;;;;;;;;
 ;;;;;;;;;;;;;
 ;;;;;;;;;;;;;
 ;;;;;;;;;;;;;
