@@ -155,12 +155,11 @@ def main(sim):
             except IndexError:
                 # index error occurs when xbeach is called during the final time step, this catches it
                 print(f"xbeach ran succesfully for final timestep timestep ({sim.timestamps[timestep_id]})")
-            
-            print()
-            
+                        
             # if this was one of the first storms, the output is of higher temporal resolution and it is saved in the results folder
             if sim.copy_this_xb_output:
                 sim.copy_xb_output_to_result_dir(fp_xbeach_output="xboutput.nc")
+                print("succesfully generated high resolution storm output")
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid(timestep_id, fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
@@ -172,7 +171,9 @@ def main(sim):
             
         # calculate the current thaw depth
         sim.find_thaw_depth()
-            
+        
+        print()
+    
 
     print(f"Total simulation time: {(time.time() - t_start) / 3600:1f} hours")
     print(textbox("SIMULATION FINISHED"))
