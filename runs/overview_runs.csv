@@ -12,8 +12,8 @@ val1;1-7-2011;1-10-2011;(DD-MM-YY) same as val0, but slight change in enthalpy f
 val2;1-7-2011;1-10-2011;(DD-MM-YY) same as val0, but slight change in enthalpy formulation. Also much higher ground temperature resolution used (CFL error is surpressed manually);;;;;;;;;;
 val3;1-7-2011;1-10-2011;(DD-MM-YY) same as val0, but with new enthalpy interpolation scheme (instead of temperature), and slight changes in enthalpy formulation;;;;;;;;;;
 val3_xb;1-7-2011;1-10-2011;(DD-MM-YY) same as val0_xb, but with new enthalpy interpolation scheme (instead of temperature), and slight changes in enthalpy formulation;;;;;;;;;;
-;;;;;;;;;;;;;
-;;;;;;;;;;;;;
+val4;1-1-2020;31-12-2021;(DD-MM-YY) same as val0, but with new enthalpy interpolation scheme (instead of temperature), and slight changes in enthalpy formulation. Also, the first storm is now written as well. The simulation period is also increased, and the output interval decreased.;;;;;;;;;;
+val4_xb;1-1-2020;31-12-2021;(DD-MM-YY) same as val0_xb, but with new enthalpy interpolation scheme (instead of temperature), and slight changes in enthalpy formulation. Also, the first storm is now written as well. The simulation period is also increased, and the output interval decreased.;;;;;;;;;;
 ;;;;;;;;;;;;;
 val0;8-2-1950;7-10-2020;runs for the entire period for which there is coastal retreat data;;;;;;;;;;
 val1;;;runs for the first characteristic period;;;;;;;;;;

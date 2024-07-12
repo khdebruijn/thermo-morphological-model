@@ -83,7 +83,7 @@ xbeach:
 
   # parameters for writing the first storm
   write_first_storms : 2  # [-] The first N number of storms to write. This doesn't include intermediate XBeach runs
-  tingt_storms : 100  # [s] The output interval (only used if first storms are being written)
+  tintg_storms : 100  # [s] The output interval (only used if first storms are being written)
 
 # thermal moodel parameters
 thermal:

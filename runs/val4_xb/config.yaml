@@ -8,8 +8,8 @@ model:
   # nx: 100  # number of points in x-direction
   longitude         : -143.7  # longitude of the study site
   latitude          : 70.13  # latitude of the study site
-  time_start        : '01-07-2011'  # DD-MM-YY starting time (if -1 take entire dataset)
-  time_end          : '01-10-2011' # DD-MM-YY stopping time (if -1 take entire dataset)
+  time_start        : '01-01-2020'  # DD-MM-YY starting time (if -1 take entire dataset)
+  time_end          : '31-12-2021' # DD-MM-YY stopping time (if -1 take entire dataset)
   timestep          : 1  # size of timesteps (in hours)
   call_xbeach_inter :  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
   time_zone_diff    : -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
@@ -48,7 +48,7 @@ bathymetry:
 # xbeach parameters
 xbeach:
   # general settings
-  with_xbeach : False  # include the xbeach module in the model, default true
+  with_xbeach : True  # include the xbeach module in the model, default true
   version     : '1.24'  # version of xbeach used
 
   # physical processes:
@@ -80,7 +80,7 @@ xbeach:
   facSk: 0.10  # [-] Calibration factor time averaged flows due to wave skewness. Default is 0.15.
   facAs: 0.10  # [-] Calibration factor time averaged flows due to wave asymmetry. Default is 0.20.
   facua: 0.10  # [-] Calibration factor time averaged flows due to wave skewness and asymmetry. Default is 0.175.
-  
+
   # parameters for writing the first storm
   write_first_storms : 2  # [-] The first N number of storms to write. This doesn't include intermediate XBeach runs
   tintg_storms : 100  # [s] The output interval (only used if first storms are being written)
@@ -135,7 +135,7 @@ thermal:
 
 # output
 output:
-  output_res              : 1  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
+  output_res              : 12  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
   use_default_output_path : False  # If True, the model creates a subfolder in the same folder as the configuration file, and stores all results there. If False, the output_path variable is used and a subfolder with the run_id is created at this location
   output_path             : "P:/11210070-usgscoop-202324-arcticxb/runs/"  # "P:/11210070-usgscoop-202324-arcticxb/runs/" (absolute path to p-drive)
   write_computation_time  : True  # If True, the model writes the computation time between this output time and the last output time
