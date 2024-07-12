@@ -8,7 +8,7 @@ model:
   # nx: 100  # number of points in x-direction
   longitude         : -143.7  # longitude of the study site
   latitude          : 70.13  # latitude of the study site
-  time_start        : '01-07-2011'  # DD-MM-YY starting time (if -1 take entire dataset)
+  time_start        : '25-09-2011'  # DD-MM-YY starting time (if -1 take entire dataset)
   time_end          : '01-10-2011' # DD-MM-YY stopping time (if -1 take entire dataset)
   timestep          : 1  # size of timesteps (in hours)
   call_xbeach_inter :  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)

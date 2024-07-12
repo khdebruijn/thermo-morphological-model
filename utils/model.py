@@ -1141,7 +1141,13 @@ class Simulation():
         ds = ds.sel(globaltime = np.max(ds.globaltime.values)).squeeze()
         
         cum_sedero = ds.sedero.values
-        xgr = ds.globalx.values
+        global_x = ds.globalx.values
+        global_y = ds.globaly.values
+        
+        mask_neg = (global_x > 0)
+        mask_pos = (global_x <= 0)
+                
+        xgr = np.sqrt(global_x**2 + global_y**2) * (mask_neg * -1 + mask_pos)
         
         ds.close()
 
@@ -1392,8 +1398,18 @@ class Simulation():
             ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
             ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep
             
-            result_ds = result_ds.assign_coords(xgr_xb=ds.globalx.values.flatten())
-                    
+            # determine the x coordinates from the computational grid
+            global_x = ds.globalx.values
+            global_y = ds.globaly.values
+            
+            mask_neg = (global_x > 0)
+            mask_pos = (global_x <= 0)
+            
+            xgr_xb = np.sqrt(global_x**2 + global_y**2) * (mask_neg * -1 + mask_pos)
+            
+            # use x coordinates from the computational grid instead of global values
+            result_ds = result_ds.assign_coords(xgr_xb=xgr_xb)
+
             result_ds['wave_height'] = (["xgr_xb"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
             result_ds['run_up'] = ds.runup.values.flatten()  # single value
             result_ds['water_level'] = self.water_level  # single value
