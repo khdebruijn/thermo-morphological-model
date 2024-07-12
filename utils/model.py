@@ -348,14 +348,17 @@ class Simulation():
             "windv": wind_velocity if self.config.xbeach.with_wind else 0,
             
             # hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)
-            "writehotstart": 1 if self.xbeach_times[timestep_id + 1] else 0,
-            "hotstart": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,
+            # "writehotstart": 1 if self.xbeach_times[timestep_id + 1] else 0,  # Write hotstart during simulation
+            # "hotstart": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,  # Initialize simulation with hotstart
+            # "hotstartfileno": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,  # Number of hotstart file which should be applied as initialization
             
             # output variables
             "outputformat":"netcdf",
             "tintg":tintg,
             "tstart":0,
             "nglobalvar":[
+                "x",
+                "y",
                 "zb",  # bed level (1D array)
                 "zs",  # water level (1D array)
                 "H",  # wave height (1D array)
@@ -1141,13 +1144,7 @@ class Simulation():
         ds = ds.sel(globaltime = np.max(ds.globaltime.values)).squeeze()
         
         cum_sedero = ds.sedero.values
-        global_x = ds.globalx.values
-        global_y = ds.globaly.values
-        
-        mask_neg = (global_x > 0)
-        mask_pos = (global_x <= 0)
-                
-        xgr = np.sqrt(global_x**2 + global_y**2) * (mask_neg * -1 + mask_pos)
+        xgr = ds.x.values
         
         ds.close()
 
@@ -1395,17 +1392,11 @@ class Simulation():
         # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
         if timestep_id and os.path.exists(os.path.join(self.cwd, "xboutput.nc")) and self.xbeach_times[timestep_id]:  # check if an xbeach output file exists (it shouldn't at the first timestep)
             
-            ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
+            ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc")).squeeze()  # get xbeach data
             ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep
             
             # determine the x coordinates from the computational grid
-            global_x = ds.globalx.values
-            global_y = ds.globaly.values
-            
-            mask_neg = (global_x > 0)
-            mask_pos = (global_x <= 0)
-            
-            xgr_xb = np.sqrt(global_x**2 + global_y**2) * (mask_neg * -1 + mask_pos)
+            xgr_xb = ds.x.values
             
             # use x coordinates from the computational grid instead of global values
             result_ds = result_ds.assign_coords(xgr_xb=xgr_xb)
