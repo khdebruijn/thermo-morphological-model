@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import shutil
 import time
 import yaml
 
@@ -228,6 +229,8 @@ class Simulation():
         
         self.water_level = 0
         
+        self.storm_write_counter = 0
+        
         return None
     
     def xbeach_setup(self, timestep_id):
@@ -263,8 +266,22 @@ class Simulation():
             "fnyq":1, # placeholder
         })
         
+        # load in wind and surge data
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
         surge = self.conditions[timestep_id]["SS(m)"]  # used for output
+        
+        # check if this is a storm timestep that should be written in its entirety
+        if (
+            self.config.xbeach.write_first_storms and 
+            all(self.storm_timing[timestep_id : timestep_id+self.config.xbeach.write_first_storms])
+        ):
+            tintg = self.config.xbeach.tintg_storms  # set the output interval
+            self.config.xbeach.write_first_storms -= 1  # ensure 1 less storm is written
+            self.copy_this_xb_output = True  # this variable is later checked to see if the xbeach output should be copied to the results folder
+            self.storm_write_counter += 1  # variable used in the filename when storm is copied to results folder and renamed
+        else:
+            tintg = self.dt * 3600
+            self.copy_this_xb_output = False
         
         # (including: grid/bathymetry, waves input, flow, tide and surge,
         # water level, wind input, sediment input, avalanching, vegetation, 
@@ -336,7 +353,7 @@ class Simulation():
             
             # output variables
             "outputformat":"netcdf",
-            "tintg":self.dt * 3600,  # maybe dont have to specify this?
+            "tintg":tintg,
             "tstart":0,
             "nglobalvar":[
                 "zb",  # bed level (1D array)
@@ -393,6 +410,14 @@ class Simulation():
         return_code = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode
 
         return return_code == 0
+    
+    def copy_xb_output_to_result_dir(self, fp_xbeach_output="xboutput.nc"):
+        
+        destination_file = os.path.join(self.result_dir, f"storm{self.storm_write_counter}.nc")
+        
+        shutil.copy(fp_xbeach_output, destination_file)
+        
+        return None
         
     def _get_wind_conditions(self, timestep_id):
         """This function gets the wind conditions from the forcing dataset. Wind direction is defined in degrees
@@ -1113,7 +1138,7 @@ class Simulation():
             
         # Read output file
         ds = xr.load_dataset(fp_xbeach_output)
-        ds = ds.sel(globaltime = ds.globaltime != 0).squeeze()
+        ds = ds.sel(globaltime = np.max(ds.globaltime.values)).squeeze()
         
         cum_sedero = ds.sedero.values
         xgr = ds.globalx.values
@@ -1126,7 +1151,7 @@ class Simulation():
         # interpolate values to the used grid
         interpolated_cum_sedero = interpolation_function(self.xgr)
         
-        return cum_sedero
+        return interpolated_cum_sedero
     
     def _get_solar_flux(self, I0, timestep_id):
         """This function is used to obtain an array of incoming solar radiation for some timestep_id, with values for each grid point in the computational domain.

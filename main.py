@@ -157,6 +157,10 @@ def main(sim):
                 print(f"xbeach ran succesfully for final timestep timestep ({sim.timestamps[timestep_id]})")
             
             print()
+            
+            # if this was one of the first storms, the output is of higher temporal resolution and it is saved in the results folder
+            if sim.copy_this_xb_output:
+                sim.copy_xb_output_to_result_dir(fp_xbeach_output="xboutput.nc")
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid(timestep_id, fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)

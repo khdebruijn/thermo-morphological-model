@@ -8,36 +8,51 @@ import matplotlib.pyplot as plt
 
 from utils.results import SimulationResults
 
-def main(runid, args):
+def main(runid, args, attempt_counter_max=100):
     
     print(f"initializing {runid}")
     results = SimulationResults(runid=runid)
 
     if "bluff_and_toe" in args:
-        print('Computing bluff toe & shoreline positions')    
+        print('Computing bluff toe & shoreline positions')
         results.get_bluff_toes_and_shorelines()
 
     print(f"creating animations for {runid}")
     frame_num = len(results.timestep_output_ids)
     fps = frame_num / 120  # for a 120 second animation
+    
+    attempt_counter = 0
 
-    if "bed" in args:
-        results.bed_level_animation(fps=fps, make_animation=False)
-        plt.close('all')
+    while attempt_counter < attempt_counter_max:
+        
+        try:
+        
+            if "bed" in args:
+                results.bed_level_animation(fps=fps, make_animation=False)
+                args.remove('bed')
+                plt.close('all')
+            
+            if "heat" in args:
+                results.heat_forcing_animation(fps=fps, make_animation=False)
+                args.remove('heat')
+                plt.close('all')
+            
+            if "temp_heat" in args:
+                results.temperature_heatforcing_animation(fps=fps, make_animation=False)
+                args.remove('temp_heat')
+                plt.close('all')
+            
+            if "temp" in args:
+                results.temperature_animation(fps=fps, make_animation=False)
+                args.remove('temp')
+                plt.close('all')
+            
+            break
     
-    if "heat" in args:
-        results.heat_forcing_animation(fps=fps, make_animation=False)
-        plt.close('all')
-    
-    if "temp_heat" in args:
-        results.temperature_heatforcing_animation(fps=fps, make_animation=False)
-        plt.close('all')
-    
-    if "temp" in args:
-        results.temperature_animation(fps=fps, make_animation=False)
-        plt.close('all')
-    
-    
+        except ValueError:
+            
+            attempt_counter += 1
+        
     print(f"completed {runid}")
     
     return None
@@ -73,7 +88,7 @@ if __name__=="__main__":
     runid = np.array(sys.argv)[1]
     
     # possible options for args: bluff_and_toe bed heat temp_heat temp
-    args = np.array(sys.argv)[2:]
+    args = list(np.array(sys.argv)[2:])
     
     main(runid, args)
     
