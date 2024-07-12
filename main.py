@@ -160,9 +160,6 @@ def main(sim):
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid(timestep_id, fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
-            
-        else:
-            sim.current_storm_surge = 0
         
         # loop through thermal subgrid timestep
         for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):

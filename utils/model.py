@@ -735,6 +735,9 @@ class Simulation():
         # get temperature matrix
         self.temp_matrix = self._temperature_from_enthalpy(frozen_mask, inbetween_mask, unfrozen_mask)
         
+        # determine the actual k-matrix using the masks
+        self.k_matrix = (frozen_mask + inbetween_mask) * self.k_frozen_matrix + unfrozen_mask * self.k_unfrozen_matrix
+        
         # get the new boundary condition
         self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id, subgrid_timestep_id)
         self.bottom_boundary_temperature = self._get_bottom_boundary_temperature()
@@ -745,9 +748,6 @@ class Simulation():
             self.temp_matrix,
             self.bottom_boundary_temperature.reshape(len(self.xgr), 1)
             ), axis=1) 
-        
-        # determine the actual k-matrix using the masks
-        self.k_matrix = (frozen_mask + inbetween_mask) * self.k_frozen_matrix + unfrozen_mask * self.k_unfrozen_matrix
         
         # determine the courant-friedlichs-lewy number matrix
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
@@ -764,6 +764,7 @@ class Simulation():
         return None
     
     def _get_phase_masks(self):
+        "Returns phase masks from current enthalpy distribution."
         # determine state masks (which part of the domain is frozen, in between, or unfrozen (needed to later calculate temperature from enthalpy))
         frozen_mask = (self.enthalpy_matrix)  < (self.config.thermal.T_melt * self.Cs_matrix)
         
@@ -778,6 +779,7 @@ class Simulation():
         return frozen_mask, inbetween_mask, unfrozen_mask
     
     def _temperature_from_enthalpy(self, frozen_mask, inbetween_mask, unfrozen_mask):
+        """Returns the temperature matrix for given phase masks."""
         temp_matrix = \
             frozen_mask * \
                 (self.enthalpy_matrix / self.Cs_matrix) + \
