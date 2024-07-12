@@ -233,9 +233,24 @@ class Simulation():
     def xbeach_setup(self, timestep_id):
         """This function initializes an xbeach run, i.e., it writes all inputs to files
         """
+        # create instance of XBeachModelSetup (https://github.com/openearth/xbeach-toolbox/blob/main/xbTools/xbeachtools.py)
         self.xb_setup = XBeachModelSetup(f"Run {self.cwd}: timestep {timestep_id}")
         
-        self.xb_setup.set_grid(self.xgr, None, self.zgr, posdwn=-1)
+        # set the grid
+        self.xb_setup.set_grid(
+            self.xgr, 
+            None, 
+            self.zgr, 
+            posdwn=-1,
+            xori=0,
+            yori=0,
+            alfa=self.config.bathymetry.grid_orientation - 180,  # counter-clockwise from the east
+            thetamin=self.config.xbeach.thetamin,
+            thetamax=self.config.xbeach.thetamax,
+            dtheta=self.config.xbeach.dtheta,
+            )
+        
+        # set the waves
         self.xb_setup.set_waves('parametric', {
             # need to give each parameter as series (in this case, with length 1)
             "Hm0":self.conditions[timestep_id]["Hs(m)"],  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
@@ -256,8 +271,7 @@ class Simulation():
         # drifters ipnut, output selection)
         self.xb_setup.set_params({
             # grid parameters
-            "xori": 0,
-            "yori": 0,
+            # - already specified with xb_setup.set_grid(...)
             
             # sediment parameters
             "D50": self.config.xbeach.D50,
@@ -281,17 +295,9 @@ class Simulation():
             # general
             "befriccoef":self.config.xbeach.bedfriccoef,  # placeholder
             
-            # grid parameters
-            # most already specified with xb_setup.set_grid(...)
-            "alfa": self.config.bathymetry.grid_orientation - 180,  # counter-clockwise from the east
-            "thetamin": -90,
-            "thetamax": 90,
-            "dtheta": 15,
-            "thetanaut": 0,
-            
             # model time
             "tstop":self.dt * 3600,  # convert from [h] to [s]
-            "CFL": 0.9,
+            "CFL": self.config.wrapper.CFL_xbeach,
             
             # morphology parameters
             "morfac": 1,
@@ -308,16 +314,15 @@ class Simulation():
             "morphology": 1,  # Turn on morphology
             "sedtrans": 1,  # Turn on sediment transport
             "wind": 1 if self.config.xbeach.with_wind else 0,  # Include wind in flow solver
-            "struct": 1,  # required for working with ne_layer
+            "struct": 1 if self.config.xbeach.with_ne_layer else 0,  # required for working with ne_layer
 
             # tide boundary conditions
             "tideloc": 0,
-            # "zs0file":
             "zs0":surge,
 
             # wave boundary conditions
-            "instat": "jons",
-            "bcfile": "jonswap.txt",
+            "instat": self.config.xbeach.wbctype,
+            "bcfile": self.config.xbeach.bcfile,
             "wavemodel":"surfbeat",
             
             # wind boundary condition
@@ -387,14 +392,6 @@ class Simulation():
         return_code = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode
 
         return return_code == 0
-    
-    # def _generate_batch_file(self):
-    #     xb_run_script_win()  # not used yet (could develop in future)
-    # def load_tide_conditions(self, fp_wave):
-    #     pass
-    # def load_wave_conditions(self, fp_wave):
-    #     with open(fp_wave) as f:
-    #         pass
         
     def _get_wind_conditions(self, timestep_id):
         """This function gets the wind conditions from the forcing dataset. Wind direction is defined in degrees
@@ -542,7 +539,7 @@ class Simulation():
         """This function initializes the thermal module of the model.
 
         Raises:
-            ValueError: raised if CFL > 0.5
+            ValueError: raised if CFL > config.wrapper.CFL_thermal
         """
         
         # read initial conditions
@@ -603,9 +600,9 @@ class Simulation():
         self.k_matrix = frozen_mask * self.k_frozen_matrix + unfrozen_mask * self.k_unfrozen_matrix
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
         
-        if np.max(self.cfl_matrix >= 0.5):
-            # raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
-            print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+        if np.max(self.cfl_matrix >= self.config.wrapper.CFL_thermal):
+            raise ValueError(f"CFL should be smaller than {self.config.wrapper.CFL_thermal}, currently {np.max(self.cfl_matrix):.4f}")
+            # print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
         
         # get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points
         # at the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative
@@ -752,9 +749,8 @@ class Simulation():
         # determine the courant-friedlichs-lewy number matrix
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
         
-        if np.max(self.cfl_matrix >= 0.5):
-            pass
-            # raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+        if np.max(self.cfl_matrix >= self.config.wrapper.CFL_thermal):
+            raise ValueError(f"CFL should be smaller than {self.config.wrapper.CFL_thermal}, currently {np.max(self.cfl_matrix):.4f}")
             # print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
             
         # get the new enthalpy matrix
@@ -1365,7 +1361,7 @@ class Simulation():
         result_ds["angles"] = (["xgr"], self.angles)  # 1D series of angles (in radians)
         
         # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
-        if (not timestep_id==0) and os.path.exists(os.path.join(self.cwd, "xboutput.nc")):  # check if an xbeach output file exists (it shouldn't at the first timestep)
+        if timestep_id and os.path.exists(os.path.join(self.cwd, "xboutput.nc")) and self.xbeach_times[timestep_id]:  # check if an xbeach output file exists (it shouldn't at the first timestep)
             
             ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
             ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep

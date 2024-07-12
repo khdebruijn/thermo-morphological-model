@@ -1,7 +1,7 @@
 # data parameters
 data:
-  storm_data_path: 'database/ts_datasets/storms_erikson.csv'  # path to storm dataset
-  forcing_data_path: 'database/ts_datasets/era5.csv'  # path to forcing data
+  storm_data_path   : 'database/ts_datasets/storms_erikson.csv'  # path to storm dataset
+  forcing_data_path : 'database/ts_datasets/era5.csv'  # path to forcing data
 
 # model settings
 model:
@@ -14,12 +14,11 @@ model:
   call_xbeach_inter :  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
   time_zone_diff    : -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
 
-
 # wrapper parameters:
 wrapper:
-  dir:  'runs/...'         # location of model run
-  sea_ice_threshold: 0.15  # Only run xbeach if sea ice fraction is below threshold, otherwise assume all wave action attenuated
-
+  sea_ice_threshold  : 0.15  # Only run xbeach if sea ice fraction is below threshold, otherwise assume all wave action attenuated
+  CFL_thermal        : 0.5  # maximum CFL for thermal module
+  CFL_xbeach         : 0.9  # maximum CFL for XBeach module
 
 # bathymetry parameters
 bathymetry:
@@ -53,16 +52,17 @@ xbeach:
   version     : '1.24'  # version of xbeach used
 
   # physical processes:
-  with_wind: False  # include wind in the xbeach model
+  with_wind     : False  # include wind in the xbeach model
+  with_ne_layer : True  # if True include 'struct' (and thereby ne_layer) in XBeach computation
 
   # grid settings
-  thetamin  : '-90'  # minimum angle
-  thetamax  :  '90'  # maximum angle
-  dtheta    : '180'  # bin width
+  thetamin  : -90  # minimum angle
+  thetamax  :  90  # maximum angle
+  dtheta    : 180  # bin width
 
   # hydrodynamics settings
   wbctype : 'jons'   # type of wave boundary condition
-  bcfile  : 'filelist.txt'  # file containing the bc specifications
+  bcfile  : 'jonswap.txt'  # file containing the bc specifications
   rho_sea_water : 1025  # [kg/m3] density (sea) water
   visc_kin      : 0.000006  # [m2/s] kinematic viscosity sea water (placeholder)
 
