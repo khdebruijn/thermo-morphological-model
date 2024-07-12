@@ -297,12 +297,13 @@ class Simulation():
             
             # model time
             "tstop":self.dt * 3600,  # convert from [h] to [s]
-            "CFL": self.config.wrapper.CFL_xbeach,
+            "CFL": 0.95 if not "CFL_xbeach" in self.config.wrapper.keys() else self.config.wrapper.CFL_xbeach,
             
             # morphology parameters
             "morfac": 1,
             "morstart": 0,
             "ne_layer": "ne_layer.txt",
+            "lsgrad": 0 if not "lsgrad" in self.config.xbeach.keys() else self.config.xbeach.lsgrad,
             
             # physical constant
             "rho": self.config.xbeach.rho_sea_water,
@@ -783,7 +784,7 @@ class Simulation():
                 (self.config.thermal.T_melt) + \
             unfrozen_mask * \
                 (self.enthalpy_matrix - \
-                (self.Cl_matrix - self.Cs_matrix) * self.config.thermal.T_melt - \
+                (self.Cs_matrix - self.Cl_matrix) * self.config.thermal.T_melt - \
                 self.config.thermal.L_water_ice * self.nb_matrix) / \
                     (self.Cl_matrix)
                     

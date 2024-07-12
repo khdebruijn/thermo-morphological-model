@@ -73,6 +73,9 @@ xbeach:
   rho_solid   : 2650  # [kg/m3] density of sediment particles
   bedfriccoef : 0.01  # [-] bed friction coefficient (placeholder)
 
+  # morphological parameters
+  lsgrad : 0.0  # [1/m] Factor to include longshore transport gradient in 1d simulations; dsy/dy=lsgrad*sy; dimension 1/length scale of longshore gradients
+
   # wave asymmetry factors
   facSk: 0.10  # [-] Calibration factor time averaged flows due to wave skewness. Default is 0.15.
   facAs: 0.10  # [-] Calibration factor time averaged flows due to wave asymmetry. Default is 0.20.
