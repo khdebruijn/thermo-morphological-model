@@ -46,6 +46,11 @@ def main(runid, args, attempt_counter_max=100):
                 results.temperature_animation(fps=fps, make_animation=False)
                 args.remove('temp')
                 plt.close('all')
+                
+            if "all" in args:
+                results.bed_temperature_thawdepth_heatforcing_animation(fps=fps, make_animation=False)
+                args.remove('all')
+                plt.close('all')
             
             break
     
