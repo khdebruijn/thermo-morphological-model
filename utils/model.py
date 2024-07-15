@@ -1348,7 +1348,7 @@ class Simulation():
                 x1 = x_thaw_sorted[mask1][-1]
                 z1 = z_thaw_sorted[mask1][-1]
                 
-                mask2 = np.nonzero((x_thaw_sorted > x))
+                mask2 = np.nonzero((x_thaw_sorted >= x))
                 x2 = x_thaw_sorted[mask2][0]
                 z2 = z_thaw_sorted[mask2][0]
                 

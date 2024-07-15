@@ -10,45 +10,57 @@ from utils.results import SimulationResults
 
 def main(runid, args, attempt_counter_max=100):
     
+    # initialize simulation
     print(f"initializing {runid}")
     results = SimulationResults(runid=runid)
 
+    # compute and write bluff edge and shore line
     if "bluff_and_toe" in args:
         print('Computing bluff toe & shoreline positions')
         results.get_bluff_toes_and_shorelines()
 
     print(f"creating animations for {runid}")
+    
+    # determine number of frames
     frame_num = len(results.timestep_output_ids)
+    
+    # failsave (matplotlib sometimes crashes)
+    attempt_counter = 0
+    
+    ##########################
+    ##  define kwargs here  ##
+    ##########################
+    make_animation = False
+    xmin, xmax = 1300, 1400
     fps = frame_num / 120  # for a 120 second animation
     
-    attempt_counter = 0
 
     while attempt_counter < attempt_counter_max:
         
         try:
         
             if "bed" in args:
-                results.bed_level_animation(fps=fps, make_animation=False)
+                results.bed_level_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
                 args.remove('bed')
                 plt.close('all')
             
             if "heat" in args:
-                results.heat_forcing_animation(fps=fps, make_animation=False)
+                results.heat_forcing_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
                 args.remove('heat')
                 plt.close('all')
             
             if "temp_heat" in args:
-                results.temperature_heatforcing_animation(fps=fps, make_animation=False)
+                results.temperature_heatforcing_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
                 args.remove('temp_heat')
                 plt.close('all')
             
             if "temp" in args:
-                results.temperature_animation(fps=fps, make_animation=False)
+                results.temperature_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
                 args.remove('temp')
                 plt.close('all')
                 
             if "all" in args:
-                results.bed_temperature_thawdepth_heatforcing_animation(fps=fps, make_animation=False)
+                results.bed_temperature_thawdepth_heatforcing_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
                 args.remove('all')
                 plt.close('all')
             

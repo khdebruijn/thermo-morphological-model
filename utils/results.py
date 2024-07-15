@@ -184,7 +184,7 @@ class SimulationResults():
             wl_line.set_ydata([wl, wl])
             
             # print progress
-            print(f'{output_id} / {len(animation_timesteps)}')
+            print(f'{i} / {len(animation_timesteps)}')
             
             return None
                 
@@ -217,7 +217,7 @@ class SimulationResults():
                 
                 animation_function(frame)
                 
-                fig.savefig(os.path.join(fig_dir, str(frame) + ".png"))
+                fig.savefig(os.path.join(fig_dir, str(self.timestep_output_ids[frame]) + ".png"))
             
             plt.close()
             
@@ -341,7 +341,7 @@ class SimulationResults():
             convective_heat_flux_line.set_data(xgr, convective_heat_flux)
             
             # print progress
-            print(f'{output_id} / {len(animation_timesteps)}')
+            print(f'{i} / {len(animation_timesteps)}')
             
             return None
 
@@ -374,7 +374,7 @@ class SimulationResults():
                 
                 animation_function(frame)
                 
-                fig.savefig(os.path.join(fig_dir, str(frame) + ".png"))
+                fig.savefig(os.path.join(fig_dir, str(self.timestep_output_ids[frame]) + ".png"))
                 
             plt.close()
             
@@ -405,7 +405,8 @@ class SimulationResults():
         sm = ScalarMappable(norm, cmap='coolwarm')
 
         # initialize temperature scatter plot
-        temp_scatter = axs[0].scatter([], [], color=[], s=1)
+        s = (1500) / (xmax-xmin)
+        temp_scatter = axs[0].scatter([], [], color=[], s=s)
         
         # create colorbar
         plt.colorbar(
@@ -534,7 +535,7 @@ class SimulationResults():
             L0.get_texts()[4].set_text(f"Sea surface temperature: {sea_temp - 273.15:.1f} degrees C")
             
             # print progress
-            print(f'{output_id} / {len(animation_timesteps)}')
+            print(f'{i} / {len(animation_timesteps)}')
             
             return None
 
@@ -567,18 +568,11 @@ class SimulationResults():
                 
                 animation_function(frame)
                 
-                fig.savefig(os.path.join(fig_dir, str(frame) + ".png"))
+                fig.savefig(os.path.join(fig_dir, str(self.timestep_output_ids[frame]) + ".png"))
                 
             plt.close()
             
         return None
-    
-    
-    
-    
-    
-    
-    
     
     def bed_temperature_thawdepth_heatforcing_animation(
         self,
@@ -609,7 +603,7 @@ class SimulationResults():
         bed_level_lines = []
         
         # create figure
-        fig, axs = plt.subplots(4, 1, figsize=(15,20), sharex=True, gridspec_kw={'height_ratios':[2,2,1,1]})
+        fig, axs = plt.subplots(4, 1, figsize=(20,20), sharex=True, gridspec_kw={'height_ratios':[2,2,1,1]}, layout='constrained')
         
         # create normalization
         norm = Normalize(vmin=vmin, vmax=vmax)
@@ -618,10 +612,11 @@ class SimulationResults():
         sm = ScalarMappable(norm, cmap='coolwarm')
 
         # initialize temperature scatter plot
-        temp_scatter = axs[1].scatter([], [], color=[], s=1)
+        s = (1500) / (xmax-xmin)
+        temp_scatter = axs[1].scatter([], [], color=[], s=s)
         
         # create colorbar
-        plt.colorbar(
+        cbar_temp = plt.colorbar(
             sm, 
             ax=axs[1], 
             orientation='vertical', 
@@ -676,7 +671,7 @@ class SimulationResults():
         axs[0].set_ylabel('z [m]')
         axs[1].set_ylabel('z [m]')
         axs[2].set_ylabel('Thaw depth [m]')
-        axs[2].set_ylabel('heat flux at surface [W/m2]')
+        axs[3].set_ylabel('heat flux at surface [W/m2]')
 
         axs[3].set_xlabel('x [m]')
         
@@ -756,7 +751,7 @@ class SimulationResults():
             L0.get_texts()[4].set_text(f"Sea surface temperature: {sea_temp - 273.15:.1f} degrees C")
             
             # print progress
-            print(f'{output_id} / {len(animation_timesteps)}')
+            print(f'{i} / {len(animation_timesteps)}')
             
             return None
         
@@ -790,26 +785,12 @@ class SimulationResults():
                 
                 animation_function(frame)
                 
-                fig.savefig(os.path.join(fig_dir, str(frame) + ".png"))
+                fig.savefig(os.path.join(fig_dir, str(self.timestep_output_ids[frame]) + ".png"))
                 
             plt.close()
             
         return None
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
     def temperature_animation(
         self,
         animation_timesteps=None,
@@ -875,7 +856,7 @@ class SimulationResults():
             psm.set_color(temp_colors)
             
             # print progress
-            print(f'{output_id} / {len(animation_timesteps)}')
+            print(f'{i} / {len(animation_timesteps)}')
             
             return None
 
@@ -908,7 +889,7 @@ class SimulationResults():
                 
                 animation_function(frame)
                 
-                fig.savefig(os.path.join(fig_dir, str(frame) + ".png"))
+                fig.savefig(os.path.join(fig_dir, str(self.timestep_output_ids[frame]) + ".png"))
                 
             plt.close()
             
