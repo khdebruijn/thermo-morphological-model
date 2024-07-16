@@ -707,7 +707,7 @@ class Simulation():
         return None
     
     @classmethod
-    def _compute_nb_distr(nb_max, nb_min, nb_max_depth, nb_min_depth, N, max_depth):
+    def _compute_nb_distr(self, nb_max, nb_min, nb_max_depth, nb_min_depth, N, max_depth):
         """This function returns an nb distribution, with a sigmoid type curve connecting constant values above and below the min and max depth
 
         Args:
@@ -1478,7 +1478,7 @@ class Simulation():
         result_ds['ground_enthalpy_distribution'] = (["xgr", "depth_id"], self.enthalpy_matrix)  # 2D grid of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
         result_ds['nb'] = (["xgr", "depth_id"], self.nb_matrix)  # 2D grid of nb values
         result_ds['k'] = (["xgr", "depth_id"], self.k_matrix)  # 2D grid of k values
-        result_ds['rho'] = (["xgr", "depth_id"], self.rho_matrix)  # 2D grid of density values
+        result_ds['rho'] = (["xgr", "depth_id"], self.soil_density_matrix)  # 2D grid of density values
         result_ds['2m_temperature'] = self.current_air_temp  # single value
         result_ds['sea_surface_temperature'] = self.current_sea_temp  # single value
         
