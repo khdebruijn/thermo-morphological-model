@@ -1375,7 +1375,10 @@ class Simulation():
             max_depth=self.config.thermal.max_depth)
         
         # determine indices of thaw depth in perpendicular model
-        indices = um.count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt))
+        indices = um.count_nonzero_until_n_zeros(
+            self.temp_matrix > self.config.thermal.T_melt, 
+            dN=(self.config.thermal.N_thaw_threshold if "N_thaw_threshold" in self.config.thermal.keys() else 1)
+            )
         
         # find associated coordinates of these points
         x_thaw = x_matrix[np.arange(x_matrix.shape[0]), indices]

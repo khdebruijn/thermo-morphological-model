@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import LinearNDInterpolator
+from scipy.signal import convolve
+
 
 def textbox(text):
     """Function to quickly generate text boxes.
@@ -82,6 +84,33 @@ def count_nonzero_until_zero(matrix):
     mask = (indices == matrix.shape[1]-1)
     
     indices[mask] = -1
+    
+    return indices
+
+def count_nonzero_until_n_zeros(matrix, dN=1):
+    """Returns the number of grid points with a nonzero input, counted for each row from the lowest index until the first dN consecutive zero inputs.
+
+    Args:
+        matrix (np.array): a matrix
+        dN (int): integer indicating the minimum amount of consecutive zeros needed to stop counting (from the top)
+
+    Returns:
+        result: number of grid points for each row before dN consecutive zero inputs (-1 if no dN consecutive zeros in the entire row)
+    """
+    
+    # Create the convolution kernel to detect dN consecutive zeros
+    kernel = np.ones(dN)
+    
+    # Convolve the matrix rows with the kernel
+    convolved = convolve(matrix == 0, kernel[None, :], mode='same')
+    
+    # Find the index of the first occurrence of dN consecutive zeros in each row
+    indices = np.argmax(convolved >= dN, axis=1)
+    
+    # If the first occurrence is at the end, we need to check if it's a valid detection
+    valid_indices = convolved[np.arange(convolved.shape[0]), indices] >= dN
+    indices[~valid_indices] = -1
+    indices[valid_indices] -= dN//2
     
     return indices
 
