@@ -60,13 +60,14 @@ def main(runid, args, attempt_counter_max=100):
                 plt.close('all')
                 
             if "all" in args:
-                results.bed_temperature_thawdepth_heatforcing_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
+                results.bed_temperature_thawdepth_heatforcing_xbtimes_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
                 args.remove('all')
                 plt.close('all')
             
             break
     
         except ValueError:
+            plt.close('all')
             
             attempt_counter += 1
         

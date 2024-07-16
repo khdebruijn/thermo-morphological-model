@@ -30,7 +30,7 @@ class SimulationResults():
         self.result_dir = os.path.join(runs_folder, str(runid) + "/")
         
         self.timestep_output_ids = np.int32(np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestep_output_ids.txt")))
-        self.xbeach_times = np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "xbeach_times.txt"))
+        self.xbeach_times = (np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "xbeach_times.txt")) >= 0)
         self.timestamps = np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestamps.txt"))
         self.timestep_ids = np.int32(np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestep_ids.txt")))
         
@@ -574,7 +574,7 @@ class SimulationResults():
             
         return None
     
-    def bed_temperature_thawdepth_heatforcing_animation(
+    def bed_temperature_thawdepth_heatforcing_xbtimes_animation(
         self,
         animation_timesteps=None,
         xmin=0, 
@@ -598,12 +598,14 @@ class SimulationResults():
         # create colors for the bed level
         cmap_bed = colormaps[cmap]
         colors=cmap_bed(np.linspace(0, 1, len(animation_timesteps)))
+        norm_bed = Normalize()
+        sm_bed = ScalarMappable(norm_bed, cmap=cmap_bed)
         
         # initialize lines list
         bed_level_lines = []
         
         # create figure
-        fig, axs = plt.subplots(4, 1, figsize=(20,20), sharex=True, gridspec_kw={'height_ratios':[2,2,1,1]}, layout='constrained')
+        fig, axs = plt.subplots(5, 1, figsize=(25,25), gridspec_kw={'height_ratios':[2,2,1,1, 0.5]}, layout='constrained')
         
         # create normalization
         norm = Normalize(vmin=vmin, vmax=vmax)
@@ -616,6 +618,18 @@ class SimulationResults():
         temp_scatter = axs[1].scatter([], [], color=[], s=s)
         
         # create colorbar
+        cbar_bed = plt.colorbar(
+            sm_bed, 
+            ax=axs[0], 
+            orientation='vertical', 
+            fraction=0.05, 
+            pad=0.05, 
+            ticks=[0, 1], 
+            label='Color of bed relative to simulation length', 
+            aspect=40
+        )
+        cbar_bed.ax.set_yticklabels(['start', 'end'])
+        
         cbar_temp = plt.colorbar(
             sm, 
             ax=axs[1], 
@@ -646,12 +660,17 @@ class SimulationResults():
         # create plots for sea temperature label and air temperature label
         air_temp_label = axs[1].scatter([],[], label='2m air temperature: ', alpha=0)
         sea_temp_label = axs[1].scatter([],[], label='sea surface temperature: ', alpha=0)
+        
+        # create initial plot for xbeach times plot
+        axs[4].plot(np.arange(len(self.xbeach_times)), self.xbeach_times, color='k')
+        current_timestep_line, = axs[4].plot([0, 0], [-2, 2], color='r', label='current timestep')
 
         # some visual stuff
         axs[0].grid()
         axs[1].grid()
         axs[2].grid()
         axs[3].grid()
+        axs[4].grid()
 
         axs[0].set_xlim((xmin, xmax))
         axs[1].set_xlim((xmin, xmax))
@@ -662,11 +681,14 @@ class SimulationResults():
         axs[1].set_ylim((-10, 15))
         axs[2].set_ylim((-1, 3))
         axs[3].set_ylim((-1000, 1000))
+        axs[4].set_ylim((-0.5, 1.5))
+        axs[4].set_yticks((0, 1), ("Don't run XB", "Run XB"))
 
         axs[0].set_title(("Bed level"))
         axs[1].set_title(("Bed level + ground temperature distribution"))
         axs[2].set_title(("Thaw depth"))
         axs[3].set_title(("Surface heat fluxes"))
+        axs[4].set_title(("Whether or not to XBeach"))
 
         axs[0].set_ylabel('z [m]')
         axs[1].set_ylabel('z [m]')
@@ -674,6 +696,7 @@ class SimulationResults():
         axs[3].set_ylabel('heat flux at surface [W/m2]')
 
         axs[3].set_xlabel('x [m]')
+        axs[4].set_xlabel('timestep')
         
         if aspect_equal:
             axs[0].set_aspect('equal')
@@ -682,6 +705,7 @@ class SimulationResults():
         L0 = axs[1].legend(loc='upper left')
         axs[2].legend(loc='upper left')
         axs[3].legend(loc='lower left')
+        axs[4].legend(loc='upper left')
 
         def animation_function(i):
             # get current timestep id
@@ -749,6 +773,9 @@ class SimulationResults():
             # update temperature labels (in plot 1)
             L0.get_texts()[3].set_text(f"2m temperature: {air_temp - 273.15:.1f} degrees C")
             L0.get_texts()[4].set_text(f"Sea surface temperature: {sea_temp - 273.15:.1f} degrees C")
+            
+            # plot current timestep (in plot 4)
+            current_timestep_line.set_xdata([output_id, output_id])
             
             # print progress
             print(f'{i} / {len(animation_timesteps)}')
