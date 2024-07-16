@@ -30,7 +30,7 @@ class SimulationResults():
         self.result_dir = os.path.join(runs_folder, str(runid) + "/")
         
         self.timestep_output_ids = np.int32(np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestep_output_ids.txt")))
-        self.xbeach_times = (np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "xbeach_times.txt")) >= 0)
+        self.xbeach_times = (np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "xbeach_times.txt")) >= 1)
         self.timestamps = np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestamps.txt"))
         self.timestep_ids = np.int32(np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestep_ids.txt")))
         
