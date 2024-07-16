@@ -615,7 +615,7 @@ class Simulation():
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
         
         # define soil properties (k, density, nb, Cs & Cl)
-        self.define_soil_property_matrices(len(self.xgr))
+        self.define_soil_property_matrices(len(self.xgr), define_nb=True)
             
         self.enthalpy_matrix = \
             frozen_mask * \
@@ -652,12 +652,13 @@ class Simulation():
 
         return None
     
-    def define_soil_property_matrices(self, N):
+    def define_soil_property_matrices(self, N, define_nb=True):
         """This function is ran to easily define (and redefine) matrices with soil properties. 
         It is only a function of the x-grid, since the perpendicular z-grid is does not change in size.
         
         Args:
             N (int): number of surface grid points
+            define_nb (bool): whether or not to (re)define nb. Defaults to True.
             """
         
         # initialize linear distribution of k, starting at min value and ending at max value (at a depth of 1m)
@@ -680,12 +681,18 @@ class Simulation():
         self.k_unfrozen_matrix = np.tile(self.k_unfrozen_distr, (N, 1))
         
         # initialize distribution of ground ice content
-        self.nb_distr = np.ones(self.thermal_zgr.shape)
-        idz = self.config.thermal.grid_resolution * self.config.thermal.nb_switch_depth / self.config.thermal.max_depth
-        self.nb_distr[:int(idz)] = self.config.thermal.nb_max  # set nb close to surface (nb_max)
-        self.nb_distr[int(idz):] = self.config.thermal.nb_min  # set nb at greater depth (nb_min)
-        self.nb_matrix = np.tile(self.nb_distr, (N, 1))
-        
+        if define_nb:
+            self.nb_distr = Simulation._compute_nb_distr(
+                nb_max=self.config.thermal.nb_max,
+                nb_min=self.config.thermal.nb_min,
+                nb_max_depth=self.config.thermal.nb_max_depth,
+                nb_min_depth=self.config.thermal.nb_min_depth,
+                N=self.config.thermal.grid_resolution,
+                max_depth=self.config.thermal.max_depth
+            )            
+            
+            self.nb_matrix = np.tile(self.nb_distr, (N, 1))
+            
         # calculate / read in density
         if self.config.thermal.rho_soil == "None":
             self.soil_density_matrix = self.nb_matrix * self.config.thermal.rho_water + (1 - self.nb_matrix) * self.config.thermal.rho_particle
@@ -698,6 +705,33 @@ class Simulation():
         self.Cl_matrix = self.config.thermal.c_soil_unfrozen / self.soil_density_matrix
         
         return None
+    
+    @classmethod
+    def _compute_nb_distr(nb_max, nb_min, nb_max_depth, nb_min_depth, N, max_depth):
+        """This function returns an nb distribution, with a sigmoid type curve connecting constant values above and below the min and max depth
+
+        Args:
+            nb_max (float): maximum value of nb (used close to surface),
+            nb_min (float): minimum value of nb (used at depth),
+            nb_max_depth (float): depth at which the nb value starts going down,
+            nb_min_depth (float): depth at which minimum nb value is reached. Below this depth, nb is constant,
+            N (int): number of (evenly spaced) grid points,
+            max_depth (float): maixmum depth
+
+        Returns:
+            array: array containing nb values for the given grid.
+        """
+        nb = np.zeros(N)
+        z = np.linspace(0, max_depth, N)
+
+        mid = (nb_max_depth + nb_min_depth) / 2
+            
+        nb = (1 / (1 + np.exp(-(z - mid) * 10 / (nb_min_depth - nb_max_depth)))) * (nb_min - nb_max) + nb_max
+        
+        nb[np.argwhere(z<=nb_max_depth)] = nb_max
+        nb[np.argwhere(z>=nb_min_depth)] = nb_min
+            
+        return nb
     
     def print_and_return_A_matrix(self):
         """This function prints and returns the A_matrix"""
@@ -1108,9 +1142,21 @@ class Simulation():
                     fill_value_top_air='nearest',
                     )
                 
+                # interpolate nb to new grid
+                self.nb_matrix = um.linear_interp_z(
+                    self.abs_xgr,
+                    self.abs_zgr,
+                    self.nb_matrix,
+                    self.abs_xgr_new,
+                    self.abs_zgr_new,
+                    water_level=self.water_level,
+                    fill_value_top_water=self.config.thermal.nb_max,
+                    fill_value_top_air=self.config.thermal.nb_max,
+                )
+                
                 # redefine matrices with soil properties
-                self.define_soil_property_matrices(len(self.xgr_new))
-                        
+                self.define_soil_property_matrices(len(self.xgr_new), define_nb=False)
+                
             else:
                 raise ValueError("Invalid value for grid_interpolation")
             
@@ -1428,8 +1474,11 @@ class Simulation():
         result_ds['thaw_depth'] = (["xgr"], self.thaw_depth)  # 1D series of thaw depths
         result_ds['abs_xgr'] = (["xgr", "depth_id"], self.abs_xgr)  # 1D series of x-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
         result_ds['abs_zgr'] = (["xgr", "depth_id"], self.abs_zgr)  # 1D series of z-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
-        result_ds['ground_temperature_distribution'] = (["xgr", "depth_id"], self.temp_matrix)  # 1D series of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
-        result_ds['ground_enthalpy_distribution'] = (["xgr", "depth_id"], self.enthalpy_matrix)  # 1D series of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
+        result_ds['ground_temperature_distribution'] = (["xgr", "depth_id"], self.temp_matrix)  # 2D grid of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
+        result_ds['ground_enthalpy_distribution'] = (["xgr", "depth_id"], self.enthalpy_matrix)  # 2D grid of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
+        result_ds['nb'] = (["xgr", "depth_id"], self.nb_matrix)  # 2D grid of nb values
+        result_ds['k'] = (["xgr", "depth_id"], self.k_matrix)  # 2D grid of k values
+        result_ds['rho'] = (["xgr", "depth_id"], self.rho_matrix)  # 2D grid of density values
         result_ds['2m_temperature'] = self.current_air_temp  # single value
         result_ds['sea_surface_temperature'] = self.current_sea_temp  # single value
         
@@ -1531,6 +1580,12 @@ class Simulation():
     ##            # LEGACY CODE                   ##
     ##                                            ##
     ################################################
+    
+    # Old nb code
+        # self.nb_distr = np.ones(self.thermal_zgr.shape)
+        # idz = self.config.thermal.grid_resolution * self.config.thermal.nb_switch_depth / self.config.thermal.max_depth
+        # self.nb_distr[:int(idz)] = self.config.thermal.nb_max  # set nb close to surface (nb_max)
+        # self.nb_distr[int(idz):] = self.config.thermal.nb_min  # set nb at greater depth (nb_min)
     
     # Old code for writing output:
             # create directory
