@@ -679,7 +679,7 @@ class SimulationResults():
 
         axs[0].set_ylim((-10, 15))
         axs[1].set_ylim((-10, 15))
-        axs[2].set_ylim((-1, 3))
+        axs[2].set_ylim((-1, 4))
         axs[3].set_ylim((-1000, 1000))
         axs[4].set_ylim((-0.5, 1.5))
         axs[4].set_yticks((0, 1), ("Don't run XB", "Run XB"))
