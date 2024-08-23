@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+import shutil
+import time
 import yaml
 
 from datetime import datetime
@@ -15,13 +17,13 @@ from scipy.interpolate import interp1d
 import xarray as xr
 
 import xbTools
-from xbTools.grid.creation import xgrid, ygrid
+from xbTools.grid.creation import xgrid
 from xbTools.xbeachtools import XBeachModelSetup
 from xbTools.general.executing_runs import xb_run_script_win
 from xbTools.general.wave_functions import dispersion
 
 from utils.visualization import block_print, enable_print
-from utils.miscellaneous import interpolate_points, get_A_matrix, count_nonzero_until_zero, generate_perpendicular_grids, linear_interp_with_nearest
+import utils.miscellaneous as um
 
 class Simulation():
     
@@ -39,9 +41,9 @@ class Simulation():
         config_file: string
             string that contains the name of the configuration file, default config.yaml, in the runid folder"""
         self.runid = runid
-        self._set_directory()
         self.read_config(config_file)
-    
+        self._set_directory()
+        
     def __repr__(self) -> str:
         """Provides a string representation of the current simulation."""
         
@@ -62,13 +64,18 @@ class Simulation():
         self.cwd = os.path.join(os.getcwd(), 'runs', self.runid)
         self.ts_dir = os.path.join(self.proj_dir, "database/ts_datasets/")
         
+        # change working directory to folder containing the config.yaml file
         os.chdir(self.cwd)    
 
         # setup output location
-        if not os.path.exists(os.path.join(self.cwd, "results/")):
-            os.mkdir(os.path.join(self.cwd, "results/"))
+        if self.config.output.use_default_output_path:  # check if results should be stored in the working directory
+            self.result_dir = os.path.join(self.cwd, "results/")
+        else:  # or somewhere else
+            self.result_dir = os.path.join(Path(self.config.output.output_path), self.runid)
             
-        self.result_dir = os.path.join(self.cwd, "results/")
+        # create output directory
+        if not os.path.exists(self.result_dir):
+            os.mkdir(self.result_dir)
     
     def read_config(self, config_file):
         '''
@@ -87,7 +94,9 @@ class Simulation():
                 super(AttrDict, self).__init__(*args, **kwargs)
                 self.__dict__ = self
                     
-        with open(os.path.join(self.cwd, config_file)) as f:
+        cwd = os.path.join(os.getcwd(), 'runs', self.runid)
+                    
+        with open(os.path.join(cwd, config_file)) as f:
             cfg = yaml.safe_load(f)
             
         self.config = AttrDict(cfg)
@@ -102,8 +111,8 @@ class Simulation():
         
         # set start and end time, and time step
         self.dt = dt
-        self.t_start = pd.to_datetime(t_start)
-        self.t_end = pd.to_datetime(t_end)
+        self.t_start = pd.to_datetime(t_start, dayfirst=True)
+        self.t_end = pd.to_datetime(t_end, dayfirst=True)
         
         # this variable will be used to keep track of time
         self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left')
@@ -113,6 +122,11 @@ class Simulation():
         
         # this array defines when to generate output files
         self.temp_output_ids = np.arange(0, len(self.timestamps), self.config.output.output_res)
+        
+        # output timestep ids and timestamps to results directory
+        self._check_and_write("timestamps", self.timestamps, self.result_dir)
+        self._check_and_write("timestep_ids", self.T, self.result_dir)
+        self._check_and_write("timestep_output_ids", self.temp_output_ids, self.result_dir)
         
     def generate_initial_grid(self, 
                               nx=None, 
@@ -152,16 +166,16 @@ class Simulation():
             self.xgr = np.linspace(min(self.bathy_grid), max(self.bathy_grid), self.config.model.nx)
         else:
             # transform into a more suitable grid for xbeach
-            self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2)
+            self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2, ppwl=self.config.bathymetry.ppwl)
         
         # interpolate bathymetry to grid
         self.zgr = np.interp(self.xgr, self.bathy_grid, self.bathy_initial)
         
-        # save a copy of the grid, which serves as the bathymetry
-        self.bathy_current = np.copy(self.zgr)
-        
         # also initialize the current active layer depth here (denoted by "ne_layer", or non-erodible layer)
         self.thaw_depth = np.zeros(self.xgr.shape)
+        
+        # set origin of x-grid
+        self.x_ori = np.min(self.xgr)
         
         return self.xgr, self.zgr, self.thaw_depth
 
@@ -185,11 +199,10 @@ class Simulation():
             self.bathy_grid = np.loadtxt(f)
             
             
-    def load_forcing(self, fname_in_ts_datasets="era5.csv"):
+    def load_forcing(self, fpath):
         """This function loads in the forcing data and makes it an attribute of the simulation instance"""
         # read in forcing concditions
-        fpath = os.path.join(self.proj_dir, "database/ts_datasets/")
-        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, os.path.join(fpath, fname_in_ts_datasets))
+        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, fpath)
         return None
     
     ################################################
@@ -197,62 +210,117 @@ class Simulation():
     ##            # XBEACH FUNCTIONS              ##
     ##                                            ##
     ################################################
+    
+    def initialize_xbeach_module(self):
+        """This method initializes the xbeach module. Currently only used to set values for the first output at t=0.
+
+        Returns:
+            None
+        """       
+        # first get the correct forcing timestep
+        row = self.forcing_data.iloc[0]
+        
+        # with associated forcing values
+        self.current_air_temp = row["2m_temperature"]  # also used in output
+        self.current_sea_temp = row['sea_surface_temperature']  # also used in output
+        self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
+        
+        self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=0)
+        
+        self.water_level = 0
+        
+        self.storm_write_counter = 0
+        
+        return None
+    
     def xbeach_setup(self, timestep_id):
         """This function initializes an xbeach run, i.e., it writes all inputs to files
         """
+        # create instance of XBeachModelSetup (https://github.com/openearth/xbeach-toolbox/blob/main/xbTools/xbeachtools.py)
         self.xb_setup = XBeachModelSetup(f"Run {self.cwd}: timestep {timestep_id}")
         
-        self.xb_setup.set_grid(self.xgr, None, self.zgr, posdwn=-1)
+        # set the grid
+        self.xb_setup.set_grid(
+            self.xgr, 
+            None, 
+            self.zgr, 
+            posdwn=-1,
+            xori=0,
+            yori=0,
+            alfa=self.config.bathymetry.grid_orientation - 180,  # counter-clockwise from the east
+            thetamin=self.config.xbeach.thetamin,
+            thetamax=self.config.xbeach.thetamax,
+            dtheta=self.config.xbeach.dtheta,
+            )
+        
+        # set the waves
         self.xb_setup.set_waves('parametric', {
             # need to give each parameter as series (in this case, with length 1)
-            "Hm0":self.conditions[timestep_id]["Hs(m)"],
+            "Hm0":self.conditions[timestep_id]["Hs(m)"],  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
             "Tp":self.conditions[timestep_id]["Tp(s)"],
             "mainang":self.conditions[timestep_id]["Dp(deg)"],  # relative to true north
             "gammajsp": 1.3,  # placeholder
             "s": 10,     # placeholder
-            "duration": self.dt,
+            "duration": self.dt * 3600,
             "dtbc": 60, # placeholder
             "fnyq":1, # placeholder
         })
         
+        # load in wind and surge data
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
+        surge = self.conditions[timestep_id]["SS(m)"]  # used for output
+        
+        # check if this is a storm timestep that should be written in its entirety
+        if (
+            self.config.xbeach.write_first_storms and 
+            all(self.storm_timing[timestep_id : timestep_id+self.config.xbeach.write_first_storms])
+        ):
+            tintg = self.config.xbeach.tintg_storms  # set the output interval
+            self.config.xbeach.write_first_storms -= 1  # ensure 1 less storm is written
+            self.copy_this_xb_output = True  # this variable is later checked to see if the xbeach output should be copied to the results folder
+            self.storm_write_counter += 1  # variable used in the filename when storm is copied to results folder and renamed
+        else:
+            tintg = self.dt * 3600
+            self.copy_this_xb_output = False
         
         # (including: grid/bathymetry, waves input, flow, tide and surge,
         # water level, wind input, sediment input, avalanching, vegetation, 
         # drifters ipnut, output selection)
         self.xb_setup.set_params({
+            # grid parameters
+            # - already specified with xb_setup.set_grid(...)
+            
             # sediment parameters
             "D50": self.config.xbeach.D50,
+            "D90": self.config.xbeach.D50 * 1.5,  # placeholder
             "rhos": self.config.xbeach.rho_solid,
-            "reposeangle": self.config.xbeach.reposeangle,
+            # "reposeangle": self.config.xbeach.reposeangle,  # currently unused, since dryslp and wetslp are already defined
             "dryslp": self.config.xbeach.dryslp,
             "wetslp": self.config.xbeach.wetslp,
             
             # flow boundary condition parameters
+            "front": "abs_1d",
+            "back": "wall",
             "left": "neumann",
             "right": "neumann",
             
-            #flow parameters
-            # -----
+            # flow parameters
+            "facSk": 0.15 if not "facSk" in self.config.xbeach.keys() else self.config.xbeach.facSk,
+            "facAs": 0.20 if not "facAs" in self.config.xbeach.keys() else self.config.xbeach.facAs,
+            "facua": 0.175 if not "facua" in self.config.xbeach.keys() else self.config.xbeach.facua,
 
             # general
             "befriccoef":self.config.xbeach.bedfriccoef,  # placeholder
             
-            # grid parameters
-            # most already specified with xb_setup.set_grid(...)
-            "alfa": self.config.bathymetry.grid_orientation,
-            "thetamin": -90,
-            "thetamax": 90,
-            "dtheta": 15,
-            "thetanaut": 0,
-            
             # model time
-            "tstop":self.dt,
+            "tstop":self.dt * 3600,  # convert from [h] to [s]
+            "CFL": 0.95 if not "CFL_xbeach" in self.config.wrapper.keys() else self.config.wrapper.CFL_xbeach,
             
             # morphology parameters
             "morfac": 1,
             "morstart": 0,
             "ne_layer": "ne_layer.txt",
+            "lsgrad": 0 if not "lsgrad" in self.config.xbeach.keys() else self.config.xbeach.lsgrad,
             
             # physical constant
             "rho": self.config.xbeach.rho_sea_water,
@@ -261,40 +329,56 @@ class Simulation():
             # physical processes
             "avalanching": 1,  # Turn on avalanching
             "flow": 1,  # Turn on flow calculation
-            "lwave": 1,  # Turn on short wave forcing on nlsw equations and boundary conditions
             "morphology": 1,  # Turn on morphology
             "sedtrans": 1,  # Turn on sediment transport
-            "swave": 1,  # Turn on short waves
-            "swrunup": 1,  # Turn on short wave runup
-            "viscosity": 1,  # Include viscosity in flow solver
-            "wind": 1,  # Include wind in flow solver
+            "wind": 1 if self.config.xbeach.with_wind else 0,  # Include wind in flow solver
+            "struct": 1 if self.config.xbeach.with_ne_layer else 0,  # required for working with ne_layer
 
             # tide boundary conditions
             "tideloc": 0,
-            # "zs0file":
-            "zs0":self.conditions[timestep_id]["SS(m)"],
+            "zs0":surge,
 
             # wave boundary conditions
-            "bcfile": "jonswap.txt",
+            "instat": self.config.xbeach.wbctype,
+            "bcfile": self.config.xbeach.bcfile,
             "wavemodel":"surfbeat",
-            "break":"roelvink1",
             
             # wind boundary condition
-            "windh": wind_direction,
-            "windv": wind_velocity,
+            "windth": wind_direction if self.config.xbeach.with_wind else 0,  # degrees clockwise from the north
+            "windv": wind_velocity if self.config.xbeach.with_wind else 0,
+            
+            # hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)
+            # "writehotstart": 1 if self.xbeach_times[timestep_id + 1] else 0,  # Write hotstart during simulation
+            # "hotstart": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,  # Initialize simulation with hotstart
+            # "hotstartfileno": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,  # Number of hotstart file which should be applied as initialization
             
             # output variables
             "outputformat":"netcdf",
-            "tint":3600,
+            "tintg":tintg,
             "tstart":0,
-            "nglobalvar":["zb","zs","H","runup","sedero"]
+            "nglobalvar":[
+                "x",
+                "y",
+                "zb",  # bed level (1D array)
+                "zs",  # water level (1D array)
+                "H",  # wave height (1D array)
+                "runup",  # run up (value)
+                "sedero",  # cumulative erosion/sedimentation (1D array)
+                "E",  # wave energy (1D array)
+                "Sxx",  # radiation stress (1D array)
+                "Sxy",  # radiation stress (1D array)
+                "Syy",  # radiation stress (1D array)
+                "thetamean",  # mean wave angle  (radians)
+                "vmag",  # Velocity magnitude in cell centre (1D array)
+                "urms",  # Orbital velocity (1D array)
+                ]
         })
         
         # block printing while writing the output (the xbeach toolbox by default prints that it can't plot parametric conditions)
         block_print()
         
         # write model setup
-        self.xb_setup.write_model(self.cwd)
+        self.xb_setup.write_model(self.cwd, figure=False)
         
         # close figures generated during writing
         plt.close()
@@ -330,16 +414,17 @@ class Simulation():
 
         return return_code == 0
     
-    # def _generate_batch_file(self):
-    #     xb_run_script_win()  # not used yet (could develop in future)
-    # def load_tide_conditions(self, fp_wave):
-    #     pass
-    # def load_wave_conditions(self, fp_wave):
-    #     with open(fp_wave) as f:
-    #         pass
+    def copy_xb_output_to_result_dir(self, fp_xbeach_output="xboutput.nc"):
+        
+        destination_file = os.path.join(self.result_dir, f"storm{self.storm_write_counter}.nc")
+        
+        shutil.copy(fp_xbeach_output, destination_file)
+        
+        return None
         
     def _get_wind_conditions(self, timestep_id):
-        """This function gets the wind conditions from the forcing dataset.
+        """This function gets the wind conditions from the forcing dataset. Wind direction is defined in degrees
+        clockwise from the north (i.e., east = 90 degrees)
 
         Args:
             timestep_id (int): timestep id for the current timestep for which wind dta is requested
@@ -352,7 +437,7 @@ class Simulation():
         u = row["10m_u_component_of_wind"]
         v = row["10m_v_component_of_wind"]
         
-        direction = math.atan2(u, v) / (2*np.pi) * 360
+        direction = math.atan2(u, v) / (2*np.pi) * 360  # clockwise from the nord
         
         velocity = math.sqrt(u**2 + v**2)
         
@@ -380,6 +465,9 @@ class Simulation():
 
         # ran xbeach for storm and inter-storm timesteps, but never when too much sea ice
         self.xbeach_times = self.storm_timing * self.xbeach_sea_ice + self.xbeach_inter
+        
+        # output these xbeach timestep ids
+        self._check_and_write('xbeach_times', self.xbeach_times, self.result_dir)
 
         return self.xbeach_times
     
@@ -438,8 +526,10 @@ class Simulation():
         
         # for these intervals, if not conditions are supplied from the storm projections, set conditions to '0'
         zero_conditions = {
-                    "Hso(m)": 0.001,
-                    "Hs(m)": 0.001,
+                    # "Hso(m)": 0.001,
+                    # "Hs(m)": 0.001,
+                    "Hso(m)": 0.2,  # placeholder
+                    "Hs(m)": 0.2,  # placeholder
                     # "Hso(m)": 0,
                     # "Hs(m)": 0,
                     "Dp(deg)": 270,                    
@@ -478,24 +568,33 @@ class Simulation():
         """This function initializes the thermal module of the model.
 
         Raises:
-            ValueError: raised if CFL > 0.5
+            ValueError: raised if CFL > config.wrapper.CFL_thermal
         """
         
         # read initial conditions
-        ground_temp_distr_dry, ground_temp_distr_wet = self._generate_initial_ground_temperature_distribution(self.forcing_data, 
-                                                                                                             self.t_start, 
-                                                                                                             self.config.thermal.grid_resolution,
-                                                                                                             self.config.thermal.max_depth)
+        ground_temp_distr_dry, ground_temp_distr_wet = self._generate_initial_ground_temperature_distribution(
+            self.forcing_data, 
+            self.t_start, 
+            self.config.thermal.grid_resolution,
+            self.config.thermal.max_depth
+            )
+        
         # save the grid resolution
         self.dz = self.config.thermal.max_depth / (self.config.thermal.grid_resolution - 1) 
-        
+               
+        # save thermal grid distribution
         self.thermal_zgr = ground_temp_distr_dry[:,0]
-        
+                
         # initialize temperature matrix, which is used to keep track of temperatures through the grid
         self.temp_matrix = np.zeros((len(self.xgr), self.config.thermal.grid_resolution))
         
         # initialize the associated grid
-        self.abs_xgr, self.abs_zgr = generate_perpendicular_grids(self.xgr, self.zgr)
+        self.abs_xgr, self.abs_zgr = um.generate_perpendicular_grids(
+            self.xgr, 
+            self.zgr, 
+            resolution=self.config.thermal.grid_resolution, 
+            max_depth=self.config.thermal.max_depth
+            )
         
         # set the above determined initial conditions for the xgr
         for i in range(len(self.temp_matrix)):
@@ -511,10 +610,57 @@ class Simulation():
         self.find_thaw_depth()
         self.write_ne_layer()
         
-        # with the temperature matrix, the initial state (frozen/unfrozen can be determined)
-        frozen_mask = (self.temp_matrix < self.config.thermal.T_melt)
+        # with the temperature matrix, the initial state (frozen/unfrozen can be determined). This should be the only place where state is defined through temperature
+        frozen_mask = (self.temp_matrix <= self.config.thermal.T_melt)
         unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask
-                    
+        
+        # define soil properties (k, density, nb, Cs & Cl)
+        self.define_soil_property_matrices(len(self.xgr), define_nb=True)
+            
+        self.enthalpy_matrix = \
+            frozen_mask * \
+                self.Cs_matrix * self.temp_matrix + \
+            unfrozen_mask * \
+                (self.Cl_matrix * self.temp_matrix + \
+                (self.Cs_matrix - self.Cl_matrix) * self.config.thermal.T_melt + \
+                self.config.thermal.L_water_ice * self.nb_matrix)  # unit of L_water_ice is already corrected to use water density
+        
+        # calculate the courant-friedlichs-lewy number matrix
+        self.k_matrix = frozen_mask * self.k_frozen_matrix + unfrozen_mask * self.k_unfrozen_matrix
+        self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
+        
+        if np.max(self.cfl_matrix >= self.config.wrapper.CFL_thermal):
+            raise ValueError(f"CFL should be smaller than {self.config.wrapper.CFL_thermal}, currently {np.max(self.cfl_matrix):.4f}")
+            # print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+        
+        # get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points
+        # at the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative
+        self.A_matrix = um.get_A_matrix(self.config.thermal.grid_resolution)
+        
+        # initialize angles
+        self._update_angles()
+        
+        # initialize output
+        self.factors = np.zeros(self.xgr.shape)
+        self.sw_flux = np.zeros(self.xgr.shape)
+        
+        self.latent_flux = np.zeros(self.xgr.shape)  # also used in output
+        self.lw_flux = np.zeros(self.xgr.shape)  # also used in output  # also used in output
+        
+        self.convective_flux = np.zeros(self.xgr.shape)
+        self.heat_flux = np.zeros(self.xgr.shape)
+
+        return None
+    
+    def define_soil_property_matrices(self, N, define_nb=True):
+        """This function is ran to easily define (and redefine) matrices with soil properties. 
+        It is only a function of the x-grid, since the perpendicular z-grid is does not change in size.
+        
+        Args:
+            N (int): number of surface grid points
+            define_nb (bool): whether or not to (re)define nb. Defaults to True.
+            """
+        
         # initialize linear distribution of k, starting at min value and ending at max value (at a depth of 1m)
         id_kmax = np.argmin(np.abs(self.thermal_zgr - self.config.thermal.depth_constant_k))  # id of the grid point at which the maximum k should be reached
         self.k_unfrozen_distr = np.append(
@@ -530,43 +676,62 @@ class Simulation():
                 len(self.thermal_zgr[:id_kmax])), 
             np.ones(len(self.thermal_zgr[id_kmax:])) * self.config.thermal.k_soil_frozen_max)
         
-        # initialize distribution of ground ice content, uniform for now (placeholder)
-        self.nb_distr = np.ones(self.thermal_zgr.shape) * self.config.thermal.nb
+        # initialize k-matrix
+        self.k_frozen_matrix =  np.tile(self.k_frozen_distr, (N, 1))
+        self.k_unfrozen_matrix = np.tile(self.k_unfrozen_distr, (N, 1))
+        
+        # initialize distribution of ground ice content
+        if define_nb:
+            self.nb_distr = Simulation._compute_nb_distr(
+                nb_max=self.config.thermal.nb_max,
+                nb_min=self.config.thermal.nb_min,
+                nb_max_depth=self.config.thermal.nb_max_depth,
+                nb_min_depth=self.config.thermal.nb_min_depth,
+                N=self.config.thermal.grid_resolution,
+                max_depth=self.config.thermal.max_depth
+            )            
+            
+            self.nb_matrix = np.tile(self.nb_distr, (N, 1))
+            
+        # calculate / read in density
+        if self.config.thermal.rho_soil == "None":
+            self.soil_density_matrix = self.nb_matrix * self.config.thermal.rho_water + (1 - self.nb_matrix) * self.config.thermal.rho_particle
+        else:
+            self.soil_density_matrix = np.ones(self.nb_matrix.shape) * self.config.thermal.rho_soil
         
         # using the states, the initial enthalpy can be determined. The enthalpy matrix is used as the 'preserved' quantity, and is used to numerically solve the
         # heat balance equation. Enthalpy formulation from Ravens et al. (2023).
-        self.enthalpy_matrix = \
-            frozen_mask * \
-                self.config.thermal.c_soil_frozen * self.temp_matrix + \
-            unfrozen_mask * \
-                (self.config.thermal.c_soil_unfrozen * self.temp_matrix + \
-                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) * self.config.thermal.T_melt + \
-                self.config.thermal.L_water_ice * self.config.thermal.nb)
-
-        # initialize c-matrix
-        self.c_matrix = frozen_mask * self.config.thermal.c_soil_frozen + unfrozen_mask * self.config.thermal.c_soil_unfrozen
+        self.Cs_matrix = self.config.thermal.c_soil_frozen / self.soil_density_matrix
+        self.Cl_matrix = self.config.thermal.c_soil_unfrozen / self.soil_density_matrix
         
-        # initialize k-matrix
-        self.k_matrix = frozen_mask * np.tile(self.k_frozen_distr, (len(self.xgr), 1)) + unfrozen_mask * np.tile(self.k_unfrozen_distr, (len(self.xgr), 1))
-        
-        # calculate the courant-friedlichs-lewy number matrix
-        self.cfl_matrix = self.k_matrix / self.c_matrix * self.config.thermal.dt / self.dz**2
-        
-        # check that all cfl's are <0.5, which is required for this discretization of the 1D heat equation
-        # self.cfl_frozen = (self.config.thermal.k_soil_frozen / self.rho_frozen / self.config.thermal.c_soil_frozen) * (self.config.thermal.dt / (self.dz)**2)
-        # self.cfl_unfrozen = (self.config.thermal.k_soil_unfrozen / self.rho_unfrozen / self.config.thermal.c_soil_unfrozen) * (self.config.thermal.dt / (self.dz)**2)
-        
-        if np.max(self.cfl_matrix >= 0.5):
-            raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
-        
-        # get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points
-        # at the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative
-        self.A_matrix = get_A_matrix(self.config.thermal.grid_resolution)
-        
-        # initialize angles
-        self._update_angles()
-
         return None
+    
+    @classmethod
+    def _compute_nb_distr(self, nb_max, nb_min, nb_max_depth, nb_min_depth, N, max_depth):
+        """This function returns an nb distribution, with a sigmoid type curve connecting constant values above and below the min and max depth
+
+        Args:
+            nb_max (float): maximum value of nb (used close to surface),
+            nb_min (float): minimum value of nb (used at depth),
+            nb_max_depth (float): depth at which the nb value starts going down,
+            nb_min_depth (float): depth at which minimum nb value is reached. Below this depth, nb is constant,
+            N (int): number of (evenly spaced) grid points,
+            max_depth (float): maixmum depth
+
+        Returns:
+            array: array containing nb values for the given grid.
+        """
+        nb = np.zeros(N)
+        z = np.linspace(0, max_depth, N)
+
+        mid = (nb_max_depth + nb_min_depth) / 2
+            
+        nb = (1 / (1 + np.exp(-(z - mid) * 10 / (nb_min_depth - nb_max_depth)))) * (nb_min - nb_max) + nb_max
+        
+        nb[np.argwhere(z<=nb_max_depth)] = nb_max
+        nb[np.argwhere(z>=nb_min_depth)] = nb_min
+            
+        return nb
     
     def print_and_return_A_matrix(self):
         """This function prints and returns the A_matrix"""
@@ -601,7 +766,7 @@ class Simulation():
             [(2.29+max_depth)/2, df.soil_temperature_level_4.values[0]],
         ])
         
-        ground_temp_distr_dry = interpolate_points(dry_points[0,:], dry_points[1,:], n)
+        ground_temp_distr_dry = um.interpolate_points(dry_points[:,0], dry_points[:,1], n)
         
         wet_points = np.array([
             [0, df.soil_temperature_level_1_offs.values[0]],
@@ -612,88 +777,87 @@ class Simulation():
             [(2.29+max_depth)/2, df.soil_temperature_level_4_offs.values[0]],
         ])
         
-        ground_temp_distr_wet = interpolate_points(wet_points[0,:], wet_points[1,:], n)
+        ground_temp_distr_wet = um.interpolate_points(wet_points[:,0], wet_points[:,1], n)
         
         return ground_temp_distr_dry, ground_temp_distr_wet
         
     def thermal_update(self, timestep_id, subgrid_timestep_id):
         """This function is called each subgrid timestep of each timestep, and performs the thermal update of the model.
+        The C-matrices are not updated as they are a function of only density.
 
         Args:
             timestep_id (int): id of the current timestep
             subgrid_timestep_id (int): id of the current subgrid timestep
         """
-        # get the new boundary condition
-        self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id)
-        self.bottom_boundary_temperature = self._get_bottom_boundary_temperature()
+        # get the phase masks, based on enthalpy
+        frozen_mask, inbetween_mask, unfrozen_mask = self._get_phase_masks()
         
+        # get temperature matrix
+        self.temp_matrix = self._temperature_from_enthalpy(frozen_mask, inbetween_mask, unfrozen_mask)
+        
+        # determine the actual k-matrix using the masks
+        self.k_matrix = (frozen_mask + inbetween_mask) * self.k_frozen_matrix + unfrozen_mask * self.k_unfrozen_matrix
+        
+        # get the new boundary condition
+        self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id, subgrid_timestep_id)
+        self.bottom_boundary_temperature = self._get_bottom_boundary_temperature()
+                
         # aggregate temperature matrix
         aggregated_temp_matrix = np.concatenate((
             self.ghost_nodes_temperature.reshape(len(self.xgr), 1),
             self.temp_matrix,
             self.bottom_boundary_temperature.reshape(len(self.xgr), 1)
-            ), axis=1)
-        
-        # determine which part of the domain is frozen and unfrozen (for the aggregated temperature matrix)
-        frozen_mask_aggr = (aggregated_temp_matrix < self.config.thermal.T_melt)
-        unfrozen_mask_aggr = np.ones(frozen_mask_aggr.shape) - frozen_mask_aggr
-        
-        # determine c-matrix
-        self.c_matrix = frozen_mask_aggr * self.config.thermal.c_soil_frozen + \
-                        unfrozen_mask_aggr * self.config.thermal.c_soil_unfrozen
-        
-        # determine k-matrix (extend k-distribution with one copied value at the top and bottom boundary to include ghost nodes)
-        k_frozen_distr_aggr = np.concatenate((
-            np.array([self.k_frozen_distr[0]]),
-            self.k_frozen_distr,
-            np.array([self.k_frozen_distr[-1]])))
-        k_unfrozen_distr_aggr = np.concatenate((
-            np.array([self.k_unfrozen_distr[0]]),
-            self.k_frozen_distr,
-            np.array([self.k_unfrozen_distr[-1]])))
-        
-        self.k_matrix = frozen_mask_aggr * np.tile(k_frozen_distr_aggr, (len(self.xgr), 1)) + \
-                        unfrozen_mask_aggr * np.tile(k_unfrozen_distr_aggr, (len(self.xgr), 1))
+            ), axis=1) 
         
         # determine the courant-friedlichs-lewy number matrix
-        self.cfl_matrix = self.k_matrix / self.c_matrix * self.config.thermal.dt / self.dz**2
+        self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
         
-        if np.max(self.cfl_matrix >= 0.5):
-            raise ValueError(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
-        
+        if np.max(self.cfl_matrix >= self.config.wrapper.CFL_thermal):
+            raise ValueError(f"CFL should be smaller than {self.config.wrapper.CFL_thermal}, currently {np.max(self.cfl_matrix):.4f}")
+            # print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+            
         # get the new enthalpy matrix
         self.enthalpy_matrix = self.enthalpy_matrix + \
-                               (self.cfl_matrix * self.c_matrix * aggregated_temp_matrix) @ self.A_matrix
-        
-        # determine state masks (which part of the domain is frozen, in between, or unfrozen (needed to later calculate temperature from enthalpy))
-        frozen_mask = (self.enthalpy_matrix / self.config.thermal.c_soil_frozen < self.config.thermal.T_melt)
-        inbetween_mask = ((self.enthalpy_matrix / self.config.thermal.c_soil_frozen) >= self.config.thermal.T_melt) * \
-                         ((self.enthalpy_matrix - \
-                             (self.config.thermal.c_soil_frozen - self.config.thermal.c_soil_unfrozen) * self.config.thermal.T_melt - \
-                              self.config.thermal.L_water_ice * self.config.thermal.nb) < self.config.thermal.T_melt)
-                          
-        unfrozen_mask = np.ones(frozen_mask.shape) - frozen_mask - inbetween_mask
-        
-        # from this new enthalpy, the temperature distribution can be determined, depending on the state from the PREVIOUS timestep
-        # again, the state masks are used to make this calculation faster
-        self.temp_matrix = \
-            frozen_mask * \
-                (self.enthalpy_matrix / (self.config.thermal.c_soil_frozen)) + \
-            inbetween_mask * \
-                (self.config.thermal.T_melt) * \
-            unfrozen_mask * \
-                (self.enthalpy_matrix - \
-                (self.config.thermal.c_soil_unfrozen - self.config.thermal.c_soil_frozen) * self.config.thermal.T_melt - \
-                self.config.thermal.L_water_ice * self.config.thermal.nb) / \
-                    (self.config.thermal.c_soil_unfrozen)
+                               self.cfl_matrix * (aggregated_temp_matrix @ self.A_matrix)
         
         return None
+    
+    def _get_phase_masks(self):
+        "Returns phase masks from current enthalpy distribution."
+        # determine state masks (which part of the domain is frozen, in between, or unfrozen (needed to later calculate temperature from enthalpy))
+        frozen_mask = (self.enthalpy_matrix)  < (self.config.thermal.T_melt * self.Cs_matrix)
+        
+        unfrozen_mask = (self.enthalpy_matrix) > (
+            self.config.thermal.T_melt * self.Cl_matrix + \
+            (self.Cs_matrix - self.Cl_matrix) * self.config.thermal.T_melt + \
+            self.config.thermal.L_water_ice * self.nb_matrix
+            )
+        
+        inbetween_mask = np.ones(frozen_mask.shape) - frozen_mask - unfrozen_mask
+        
+        return frozen_mask, inbetween_mask, unfrozen_mask
+    
+    def _temperature_from_enthalpy(self, frozen_mask, inbetween_mask, unfrozen_mask):
+        """Returns the temperature matrix for given phase masks."""
+        temp_matrix = \
+            frozen_mask * \
+                (self.enthalpy_matrix / self.Cs_matrix) + \
+            inbetween_mask * \
+                (self.config.thermal.T_melt) + \
+            unfrozen_mask * \
+                (self.enthalpy_matrix - \
+                (self.Cs_matrix - self.Cl_matrix) * self.config.thermal.T_melt - \
+                self.config.thermal.L_water_ice * self.nb_matrix) / \
+                    (self.Cl_matrix)
+                    
+        return temp_matrix
      
-    def _get_ghost_node_boundary_condition(self, timestep_id):
+    def _get_ghost_node_boundary_condition(self, timestep_id, subgrid_timestep_id):
         """This function uses the forcing at a specific timestep to return an array containing the ghost node temperature.
 
         Args:
             timestep_id (int): index of the current timestep.
+            subgrid_timestep_id (int): id of the current subgrid timestep
 
         Returns:
             array: temperature values for the ghost nodes.
@@ -702,25 +866,22 @@ class Simulation():
         row = self.forcing_data.iloc[timestep_id]
         
         # with associated forcing values
-        air_temp = row["2m_temperature"]
-        sea_temp = row['sea_surface_temperature']
+        self.current_air_temp = row["2m_temperature"]  # also used in output
+        self.current_sea_temp = row['sea_surface_temperature']  # also used in output
+        self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
         
-        # check wether or not this will be a storm timestep. If it is, use the storm surge water level.
-        # otherwise, use a water level of z=0
-        if self.xbeach_times[timestep_id]:
-            # get water level to check whether to use convective heat transfer from air or sea
-            water_level = self.conditions[timestep_id]["SS(m)"]
-        else:
-            water_level = 0
+        # update the water level
+        self.water_level = self._update_water_level(timestep_id, subgrid_timestep_id)
         
-        dry_mask = (self.zgr >= water_level)
-        wet_mask = (self.zgr < water_level)
+        dry_mask = (self.zgr >= self.water_level)
+        wet_mask = (self.zgr < self.water_level)
         
         # determine convective transport from air (formulation from Man, 2023)
+        self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=timestep_id)  # also used in output
         convective_transport_air = Simulation._calculate_sensible_heat_flux_air(
-            self._get_wind_conditions(timestep_id=timestep_id)[1], 
+            self.wind_velocity, 
             self.temp_matrix[:,0], 
-            air_temp, 
+            self.current_air_temp, 
             )
         
         # use either an educated guess from Kobayashi et al (1999), or their entire formulation
@@ -729,7 +890,7 @@ class Simulation():
             hc = self.config.thermal.hc_guess
         else:
             # determine hydraulic parameters for convective heat transfer computation
-            if self.xb_times[timestep_id]:
+            if self.xb_times[timestep_id] and self.config.xbeach.with_xbeach:
                 
                 data_path = os.path.join(self.cwd, "xboutput.nc")
                 
@@ -741,6 +902,8 @@ class Simulation():
                 
                 d = np.maximum(wl - ds.zb.values.flatten(), np.zeros(H.shape))
                 T = self.conditions[timestep_id]["Tp(s)"]
+                
+                ds.close()
                                 
             else:
                 H = np.ones(self.xgr.shape) * 0.001
@@ -757,32 +920,59 @@ class Simulation():
             )
         
         # scale hc with temperature difference
-        convective_transport_water = hc * (sea_temp - self.temp_matrix[:,0])
+        convective_transport_water = hc * (self.current_sea_temp - self.temp_matrix[:,0])
             
         # compute total convective transport
-        convective_transport = dry_mask * convective_transport_air + wet_mask * convective_transport_water
+        self.convective_flux = dry_mask * convective_transport_air + wet_mask * convective_transport_water  # also used in output
         
-        # determine radiation, assuming radiation only influences the dry domain
-        latent_flux = row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0
-        lw_flux = row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0
+        if subgrid_timestep_id == 0:  # determine radiation fluxes only during first timestep, as they are constant for each subgrid timestep
         
-        if self.config.thermal.with_solar:
-            I0 = row["mean_surface_net_short_wave_radiation_flux"]
+            # determine radiation, assuming radiation only influences the dry domain
+            self.latent_flux = dry_mask * (row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0)  # also used in output
+            self.lw_flux = dry_mask * (row["mean_surface_net_long_wave_radiation_flux"] if self.config.thermal.with_longwave else 0)  # also used in output
             
-            if self.config.thermal.with_solar_flux_calculator:
-                sw_flux = self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
+            if self.config.thermal.with_solar:  # also used in output
+                I0 = row["mean_surface_net_short_wave_radiation_flux"]  # float value
+                
+                if self.config.thermal.with_solar_flux_calculator:
+                    self.sw_flux = dry_mask * self._get_solar_flux(I0, timestep_id)  # sw_flux is now an array instead of a float
+                else:
+                    self.sw_flux = dry_mask * I0
             else:
-                sw_flux = I0
-        else:
-            sw_flux = 0
+                self.sw_flux = np.zeros(self.xgr.shape)
+            
+            # save this constant flux
+            self.constant_flux = self.latent_flux + self.lw_flux + self.sw_flux
         
-        # add all heat fluxes  together
-        heat_flux = convective_transport + latent_flux + lw_flux + sw_flux
+        # add all heat fluxes  together (also used in output)
+        self.heat_flux = self.convective_flux + self.constant_flux
         
         # determine temperature of the ghost nodes
-        ghost_nodes_temperature = self.temp_matrix[:,0] + heat_flux * self.dz / self.k_matrix[:,0]
+        ghost_nodes_temperature = self.temp_matrix[:,0] + self.heat_flux * self.dz / self.k_matrix[:,0]
         
         return ghost_nodes_temperature
+    
+    def _update_water_level(self, timestep_id, subgrid_timestep_id=0):
+        # check wether or not this is a storm timestep.
+        if self.xbeach_times[timestep_id] and self.config.xbeach.with_xbeach:  # If it is, use (storm surge water level + runup)
+            
+            # get storm surge
+            surge = self.conditions[timestep_id]["SS(m)"]
+            
+            # get runup
+            if not subgrid_timestep_id:
+                
+                ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))
+                self.runup = ds.runup.values.flatten()[-1]
+                ds.close()
+            
+            # get water level to check whether to use convective heat transfer from air or sea
+            water_level = surge + self.runup
+            
+        else:  # otherwise, use a water level of z=0
+            water_level = 0
+            
+        return water_level
     
     def _get_bottom_boundary_temperature(self):
         """This function returns a bottom boundary condition temperature, based on the geothermal gradient. It accounts for the
@@ -798,7 +988,7 @@ class Simulation():
         return bottom_temp + vertical_dist * self.config.thermal.geothermal_gradient
     
     @classmethod
-    def _calculate_sensible_heat_flux_air(v_w, T_soil_surface, T_air, L_e=0.003, nu_air=1.33*10**-5, Pr=0.71, k_air=0.024):
+    def _calculate_sensible_heat_flux_air(self, v_w, T_soil_surface, T_air, L_e=0.003, nu_air=1.33*10**-5, Pr=0.71, k_air=0.024):
         """This function computes the sensible heat flux Qs [W/m2] at the soil surface, using a formulation described by Man (2023).
             A positive flux means that the flux is directed into the soil.
 
@@ -882,36 +1072,105 @@ class Simulation():
         return 0.05
 
     
-    def update_grid(self, fp_xbeach_output="sedero.txt"):
+    def update_grid(self, timestep_id, fp_xbeach_output="sedero.txt"):
         """This function updates the current grid, calculates the angles of the new grid with the horizontal, generates a new thermal grid 
         (perpendicular to the existing grid), and fits the previous temperature and enthalpy distributions to the new grid."""
-        
-        # generate perpendicular grids for previous timestep (to cast temperature and enthalpy)
-        self.abs_xgr, self.abs_zgr = generate_perpendicular_grids(self.xgr, self.zgr)
-        
         # update the current bathymetry
-        cum_sedero = self._update_bed_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
+        cum_sedero = self._get_cum_sedero(fp_xbeach_output=fp_xbeach_output)  # placeholder
+        
+        # update bed level
+        bathy_current = self.zgr + cum_sedero
         
         # only update the grid of there actually was a change in bed level
-        if not all(cum_sedero) == 0:
+        if not all(cum_sedero == 0):
         
-            # generate a new xgrid and zgrid
-            self.xgr_new, self.zgr_new = xgrid(self.xgr, self.bathy_current, dxmin=2)
-            self.zgr_new = np.interp(self.xgr_new, self.xgr, self.bathy_current)
-            
+            # generate a new xgrid and zgrid (but only if the next timestep does not require a hotstart, which requires the same xgrid)
+            if not self.xbeach_times[timestep_id + 1]:
+                
+                self.xgr_new, self.zgr_new = xgrid(self.xgr, bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
+                self.zgr_new = np.interp(self.xgr_new, self.xgr, bathy_current)
+                
+                # ensure that the grid doesn't extend further offshore than the original grid (this is a bug in the xbeach python toolbox)
+                while self.xgr_new[0] < self.x_ori:
+                    self.xgr_new = self.xgr_new[1:]
+                    self.zgr_new = self.zgr_new[1:]
+                
+            else:
+                self.xgr_new = self.xgr
+                self.zgr_new = bathy_current
+
             # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
-            self.abs_xgr_new, self.abs_zgr_new = generate_perpendicular_grids(self.xgr_new, self.zgr_new)
+            self.abs_xgr_new, self.abs_zgr_new = um.generate_perpendicular_grids(
+                self.xgr_new, 
+                self.zgr_new, 
+                resolution=self.config.thermal.grid_resolution, 
+                max_depth=self.config.thermal.max_depth
+            )
             
             # cast temperature matrix
-            self.temp_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new)
-            self.enthalpy_matrix = linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.enthalpy_matrix, self.abs_xgr_new, self.abs_zgr_new)
-
+            if self.config.thermal.grid_interpolation == "linear_interp_with_nearest":
+                self.temp_matrix = um.linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.temp_matrix, self.abs_xgr_new, self.abs_zgr_new)
+                self.enthalpy_matrix = um.linear_interp_with_nearest(self.abs_xgr, self.abs_zgr, self.enthalpy_matrix, self.abs_xgr_new, self.abs_zgr_new)
+            
+            elif self.config.thermal.grid_interpolation == "linear_interp_z":
+                
+                # Compute density
+                rho_value = self.config.thermal.nb_max * self.config.thermal.rho_water + (1 - self.config.thermal.nb_max) * self.config.thermal.rho_particle
+                
+                # From denisty, compute specific heat
+                Cs_value = self.config.thermal.c_soil_frozen / rho_value
+                Cl_value = self.config.thermal.c_soil_unfrozen / rho_value
+                
+                # Compute top fill value for submerged sediment
+                if (self.current_sea_temp <= self.config.thermal.T_melt):
+                    enthalpy_submerged_sediment = self.current_sea_temp * Cs_value
+                else:
+                    enthalpy_submerged_sediment = self.current_sea_temp * Cl_value + (Cs_value - Cl_value) * self.config.thermal.T_melt + self.config.thermal.L_water_ice * self.config.thermal.nb_max
+                
+                # get current water level
+                self.water_level = self._update_water_level(timestep_id)
+                
+                # Interpolate enthalpy to new grid             
+                self.enthalpy_matrix = um.linear_interp_z(
+                    self.abs_xgr, 
+                    self.abs_zgr, 
+                    self.enthalpy_matrix, 
+                    self.abs_xgr_new, 
+                    self.abs_zgr_new,
+                    water_level=self.water_level,
+                    fill_value_top_water=enthalpy_submerged_sediment,
+                    fill_value_top_air='nearest',
+                    )
+                
+                # interpolate nb to new grid
+                self.nb_matrix = um.linear_interp_z(
+                    self.abs_xgr,
+                    self.abs_zgr,
+                    self.nb_matrix,
+                    self.abs_xgr_new,
+                    self.abs_zgr_new,
+                    water_level=self.water_level,
+                    fill_value_top_water=self.config.thermal.nb_max,
+                    fill_value_top_air=self.config.thermal.nb_max,
+                )
+                
+                # redefine matrices with soil properties
+                self.define_soil_property_matrices(len(self.xgr_new), define_nb=False)
+                
+            else:
+                raise ValueError("Invalid value for grid_interpolation")
+            
             # set the grid to be equal to this new grid
             self.xgr = self.xgr_new
             self.zgr = self.zgr_new
             
+            self.abs_xgr = self.abs_xgr_new
+            self.abs_zgr = self.abs_zgr_new
+            
             # update the angles
             self._update_angles()
+        
+        return None
         
     def _update_angles(self):
         """This function geneartes an array of local angles (in radians) for the grid, based on the central differences method.
@@ -920,27 +1179,28 @@ class Simulation():
         
         return self.angles
     
-    def _update_bed_sedero(self, fp_xbeach_output):
+    def _get_cum_sedero(self, fp_xbeach_output):
         """This method updates the current bed given the xbeach output.
         ---------
         fp_xbeach_output: string
             filepath to the xbeach sedero (sedimentation-erosion) output relative to the current working directory."""
             
         # Read output file
-        ds = xr.open_dataset(fp_xbeach_output).squeeze()
-        cum_sedero = ds.sedero.values
-        xgr = ds.globalx.values
+        ds = xr.load_dataset(fp_xbeach_output)
+        ds = ds.sel(globaltime = np.max(ds.globaltime.values)).squeeze()
         
+        cum_sedero = ds.sedero.values
+        xgr = ds.x.values
+        
+        ds.close()
+
         # Create an interpolation function
         interpolation_function = interp1d(xgr, cum_sedero, kind='linear', fill_value='extrapolate')
         
         # interpolate values to the used grid
         interpolated_cum_sedero = interpolation_function(self.xgr)
         
-        # update bed level
-        self.bathy_current += interpolated_cum_sedero
-        
-        return cum_sedero
+        return interpolated_cum_sedero
     
     def _get_solar_flux(self, I0, timestep_id):
         """This function is used to obtain an array of incoming solar radiation for some timestep_id, with values for each grid point in the computational domain.
@@ -951,15 +1211,23 @@ class Simulation():
 
         Returns:
             array: incoming solar radiation for each grid point in the computational domain
-        """
+        """        
+        # get current timestamp
+        timestamp = self.timestamps[timestep_id]
         
-        factors = np.zeros(self.angles.shape)
+        # get id of current timestamp w.r.t. solar_flux_map (-1 because: 'minimum id is 0' and 'minimum day of year is 1')
+        id_t = timestamp.dayofyear - 1  # factors are associated with day of year only (as it is based on maximum angle per day)
         
-        for i in range(len(self.angles)):
-            
-            factors[i] = self.solar_flux_map[int(self.angles[i])][int(self.timestamps[timestep_id].day_of_year - 1)]  # index starts at 0, while day_of_year starts at 1, hence -1
+        # get correct row in solar flux map (so row corresponding to current day of the year)
+        row = self.solar_flux_map[id_t, :]
         
-        solar_flux = I0 * factors
+        # transform angles to ids (first convert to degrees)
+        ids_angle = np.int32((self.angles / (2*np.pi) * 360 - self.config.thermal.angle_min) / self.config.thermal.delta_angle)
+        
+        # use ids to get correct factors in correct order from the row of solar fluxes
+        self.factors = row[ids_angle]
+        
+        solar_flux = I0 * self.factors
         
         return solar_flux
         
@@ -978,18 +1246,26 @@ class Simulation():
 
         Returns:
             dictionary: the mapping variable used to quickly obtain solar flux enhancement factor values.
-        """
-        self.solar_flux_map = {}
+        """        
+        self.solar_flux_angles = np.arange(angle_min, angle_max+1, delta_angle)
         
-        for angle in np.arange(angle_min, angle_max+1, delta_angle):
+        t_start_datetime = pd.to_datetime(t_start)
+        t_end_datetime = pd.to_datetime(t_end)
+        self.solar_flux_times = pd.date_range(t_start_datetime, t_end_datetime, freq='1h', inclusive='left')
+                
+        self.solar_flux_map = np.zeros((np.int32(len(self.solar_flux_times)/24), len(self.solar_flux_angles)))
+        
+        for angle in self.solar_flux_angles:
             
-            t_start_datetime = pd.to_datetime(t_start)
-            t_end_datetime = pd.to_datetime(t_end)
-            
-            t = pd.date_range(t_start_datetime, t_end_datetime, freq='1h', inclusive='left')
+            angle_id = np.nonzero(angle==self.solar_flux_angles)
             
             # for each integer angle in the angle range, an array of enhancement factors is saved, indexable by N (i.e., the N-th day of the year)
-            self.solar_flux_map[angle] = self._calculate_solar_flux_factors(t, angle, timezone_diff)
+            self.solar_flux_map[:, angle_id] = self._calculate_solar_flux_factors(self.solar_flux_times, angle, timezone_diff).reshape((-1, 1, 1))
+            
+        # can't have negative factors (which may occur in winter when the angle between light rays and a flat surface is negative but between light rays and inclined surface (facing southward) is positive)
+        self.solar_flux_map[np.nonzero(self.solar_flux_map < 0)] = 0
+            
+        np.savetxt(os.path.join(self.result_dir, 'solar_flux_map.txt'), self.solar_flux_map)
         
         return self.solar_flux_map
     
@@ -1061,19 +1337,22 @@ class Simulation():
         
         # 9) in order to avoid very peaky scales, let us take the daily maximum and use that for scaling.
         sin_theta_2d = sin_theta.reshape((-1, 24))
-        sin_theta_daily_max_2d = np.max(sin_theta_2d, axis=1)
-        sin_theta_daily_max = np.repeat(sin_theta_daily_max_2d.flatten(), 24)
+        sin_theta_daily_max = np.max(sin_theta_2d, axis=1).flatten()
 
         sin_0_2d = sin_0.reshape((-1, 24))
-        sin_0_daily_max_2d = np.max(sin_0_2d, axis=1)
-        sin_0_daily_max = np.repeat(sin_0_daily_max_2d.flatten(), 24)
+        sin_0_daily_max = np.max(sin_0_2d, axis=1).flatten()
 
-        # 10) calculate enhancement factor
+        # 10) calculate enhancement factor for each day
         factor = sin_theta_daily_max / sin_0_daily_max
         
         # 11) filter out values where it the angle theta is negative (as that means radiation hits the surface from below)
-        shadow_mask = np.nonzero(theta < 0)
-        factor[shadow_mask] = 0
+        shadow_mask = np.zeros(factor.shape)
+        
+        for i, row in enumerate(theta.reshape((-1, 24))):
+            if all(row < 0):
+                shadow_mask[i] = 1
+            
+        factor[np.nonzero(shadow_mask)] = 0
         
         return factor
         
@@ -1081,7 +1360,7 @@ class Simulation():
         """This function writes the thaw depth obtained from the thermal update to a file to be used by xbeach.
         """
         np.savetxt(os.path.join(self.cwd, "ne_layer.txt"), self.thaw_depth)
-        
+                
         return None
         
     def find_thaw_depth(self):
@@ -1090,17 +1369,20 @@ class Simulation():
         self.thaw_depth = np.zeros(self.xgr.shape)
 
         # get the points from the temperature models
-        x_matrix, z_matrix = generate_perpendicular_grids(
+        x_matrix, z_matrix = um.generate_perpendicular_grids(
             self.xgr, self.zgr, 
             resolution=self.config.thermal.grid_resolution, 
             max_depth=self.config.thermal.max_depth)
         
         # determine indices of thaw depth in perpendicular model
-        indices = count_nonzero_until_zero((self.temp_matrix > self.config.thermal.T_melt))
+        indices = um.count_nonzero_until_n_zeros(
+            self.temp_matrix > self.config.thermal.T_melt, 
+            dN=(self.config.thermal.N_thaw_threshold if "N_thaw_threshold" in self.config.thermal.keys() else 1)
+            )
         
         # find associated coordinates of these points
-        x_thaw = x_matrix[indices]
-        z_thaw = z_matrix[indices]
+        x_thaw = x_matrix[np.arange(x_matrix.shape[0]), indices]
+        z_thaw = z_matrix[np.arange(x_matrix.shape[0]), indices]
         
         # sort 
         sort_indices = np.argsort(x_thaw)
@@ -1115,7 +1397,7 @@ class Simulation():
                 x1 = x_thaw_sorted[mask1][-1]
                 z1 = z_thaw_sorted[mask1][-1]
                 
-                mask2 = np.nonzero((x_thaw_sorted > x))
+                mask2 = np.nonzero((x_thaw_sorted >= x))
                 x2 = x_thaw_sorted[mask2][0]
                 z2 = z_thaw_sorted[mask2][0]
                 
@@ -1125,30 +1407,109 @@ class Simulation():
             except:
                 self.thaw_depth[i] = 0
         
+        # ensure thaw depth is larger than zero everywhere
+        self.thaw_depth = np.max(np.column_stack((self.thaw_depth, np.zeros(self.thaw_depth.shape))), axis=1)
+        
         return self.thaw_depth
         
+    ################################################
+    ##                                            ##
+    ##            # OUTPUT FUNCTIONS              ##
+    ##                                            ##
+    ################################################
         
-    def write_output(self, timestep_id):
+    def write_output(self, timestep_id, t_start):
         """This function writes output in the results folder, and creates subfolders for each timestep for which results are output.
-        """
-        result_dir_timestep = os.path.join(self.result_dir, str(timestep_id) + "/")
+        """        
+        # create dataset
+        result_ds = xr.Dataset(
+            coords={
+                "xgr":self.xgr,  # 1D series of x-values
+                "depth_id":np.arange(self.config.thermal.grid_resolution),  # 1D series of id's representing the node number (zero meaning surface, one the first node below surface, etc.)
+                }
+            )
         
-        # create directory
-        if not os.path.exists(result_dir_timestep):
-            os.makedirs(result_dir_timestep)
+        # time variables
+        result_ds['timestep_id'] = timestep_id
+        result_ds['timestamp'] = self.timestamps[timestep_id]
+        result_ds['cumulative_computational_time'] = time.time() - t_start
         
-        if "bathymetry" in self.config.output.output_vars:
-            # save xgrid and zgrid of bathymetry
-            np.savetxt(os.path.join(result_dir_timestep, "xgr.txt"), self.xgr)
-            np.savetxt(os.path.join(result_dir_timestep, "zgr.txt"), self.zgr)
+        # bathymetric variables
+        result_ds["zgr"] = (["xgr"], self.zgr)  # 1D series of z-values
+        result_ds["angles"] = (["xgr"], self.angles)  # 1D series of angles (in radians)
         
-        if "ground_temperature_distribution" in self.config.output.output_vars:
-            np.savetxt(os.path.join(result_dir_timestep, "xgrid_ground_temperature_distribution.txt"), self.abs_xgr.flatten())
-            np.savetxt(os.path.join(result_dir_timestep, "zgrid_ground_temperature_distribution.txt"), self.abs_zgr.flatten())
-            np.savetxt(os.path.join(result_dir_timestep, "ground_temperature_distribution.txt"), self.temp_matrix.flatten())
+        # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
+        if timestep_id and os.path.exists(os.path.join(self.cwd, "xboutput.nc")) and self.xbeach_times[timestep_id]:  # check if an xbeach output file exists (it shouldn't at the first timestep)
+            
+            ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc")).squeeze()  # get xbeach data
+            ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep
+            
+            # determine the x coordinates from the computational grid
+            xgr_xb = ds.x.values
+            
+            # use x coordinates from the computational grid instead of global values
+            result_ds = result_ds.assign_coords(xgr_xb=xgr_xb)
+
+            result_ds['wave_height'] = (["xgr_xb"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
+            result_ds['run_up'] = ds.runup.values.flatten()  # single value
+            result_ds['water_level'] = self.water_level  # single value
+            result_ds['wave_energy'] = (["xgr_xb"], ds.E.values.flatten())  # 1D series of wave energies (associated with xgr.txt)
+            result_ds['radiation_stress_xx'] = (["xgr_xb"], ds.Sxx.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
+            result_ds['radiation_stress_xy'] = (["xgr_xb"], ds.Sxy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
+            result_ds['radiation_stress_yy'] = (["xgr_xb"], ds.Syy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
+            # result_ds['mean_wave_angle'] = (["xgr_xb"], ds.thetamean.values.flatten())  # 1D series of mean wave angles in radians (associated with xgr.txt)
+            result_ds['velocity_magnitude'] = (["xgr_xb"], ds.vmag.values.flatten())  # 1D series of velocities (associated with xgr.txt)
+            result_ds['orbital_velocity'] = (["xgr_xb"], ds.urms.values.flatten())  # 1D series of velocities (associated with xgr.txt                
         
-        if "thaw_depth" in self.config.output.output_vars:
-            np.savetxt(os.path.join(result_dir_timestep, "thaw_depth.txt"), self.thaw_depth)
+            ds.close()
+            
+        else:
+            
+            for varname in ['wave_height', 'wave_energy', 
+                            'radiation_stress_xx', 'radiation_stress_xy', 'radiation_stress_yy', 
+                            'mean_wave_angle', 'velocity_magnitude', 'orbital_velocity']:
+                result_ds[varname] = (["xgr"], np.zeros(self.xgr.shape))
+                
+            for varname in ['run_up', 'water_level']:
+                result_ds[varname] = 0
+        
+        # temperature variables
+        result_ds['thaw_depth'] = (["xgr"], self.thaw_depth)  # 1D series of thaw depths
+        result_ds['abs_xgr'] = (["xgr", "depth_id"], self.abs_xgr)  # 1D series of x-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        result_ds['abs_zgr'] = (["xgr", "depth_id"], self.abs_zgr)  # 1D series of z-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        result_ds['ground_temperature_distribution'] = (["xgr", "depth_id"], self.temp_matrix)  # 2D grid of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
+        result_ds['ground_enthalpy_distribution'] = (["xgr", "depth_id"], self.enthalpy_matrix)  # 2D grid of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
+        result_ds['nb'] = (["xgr", "depth_id"], self.nb_matrix)  # 2D grid of nb values
+        result_ds['k'] = (["xgr", "depth_id"], self.k_matrix)  # 2D grid of k values
+        result_ds['rho'] = (["xgr", "depth_id"], self.soil_density_matrix)  # 2D grid of density values
+        result_ds['2m_temperature'] = self.current_air_temp  # single value
+        result_ds['sea_surface_temperature'] = self.current_sea_temp  # single value
+        
+        # heat flux variables
+        result_ds['solar_radiation_factor'] = (["xgr"], self.factors)  # 1D series of factors
+        result_ds['solar_radiation_flux'] = (["xgr"], self.sw_flux)  # 1D series of heat fluxes
+        result_ds['long_wave_radiation_flux'] = (["xgr"], self.lw_flux)  # 1D series of heat fluxes
+        result_ds['latent_heat_flux'] = (["xgr"], self.latent_flux)  # 1D series of heat fluxes
+        result_ds['convective_heat_flux'] = (["xgr"], self.convective_flux)  # 1D series of heat fluxes
+        result_ds['total_heat_flux'] = (["xgr"], self.heat_flux)  # 1D series of heat fluxes
+        
+        # sea ice variables
+        result_ds['sea_ice_cover'] = self.current_sea_ice  # single value
+        
+        # wind variables
+        result_ds['wind_velocity'] = self.wind_velocity  # single value
+        result_ds['wind_direction'] = self.wind_direction  # single value (degrees, clockwise from the north)
+        
+        result_ds.to_netcdf(os.path.join(self.result_dir, str(timestep_id) + ".nc"))
+        
+        result_ds.close()
+        
+        return None
+    
+    def _check_and_write(self, varname, save_var, dirname):
+        
+        if varname in self.config.output.output_vars:
+            np.savetxt(os.path.join(dirname, f"{varname}" + ".txt"), save_var)
         
         return None
         
@@ -1222,6 +1583,110 @@ class Simulation():
     ##            # LEGACY CODE                   ##
     ##                                            ##
     ################################################
+    
+    # Old nb code
+        # self.nb_distr = np.ones(self.thermal_zgr.shape)
+        # idz = self.config.thermal.grid_resolution * self.config.thermal.nb_switch_depth / self.config.thermal.max_depth
+        # self.nb_distr[:int(idz)] = self.config.thermal.nb_max  # set nb close to surface (nb_max)
+        # self.nb_distr[int(idz):] = self.config.thermal.nb_min  # set nb at greater depth (nb_min)
+    
+    # Old code for writing output:
+            # create directory
+        #     if not os.path.exists(result_dir_timestep):
+        #         os.makedirs(result_dir_timestep)
+                
+        #     # bathymetric variables
+        #     self._check_and_write('xgr', self.xgr, dirname=result_dir_timestep)  # 1D series of x-values
+        #     self._check_and_write('zgr', self.zgr, dirname=result_dir_timestep)  # 1D series of z-values
+        #     self._check_and_write('angles', self.angles, dirname=result_dir_timestep)  # 1D series of angles (in radians)
+            
+        #     # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
+        #     xb_output_path = os.path.join(self.cwd, "xboutput.nc")
+            
+        #     if os.path.isfile(xb_output_path):  # check if an xbeach output file exists (it shouldn't at the first timestep)
+                
+        #         ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))  # get xbeach data
+                
+        #         self._check_and_write('wave_height', ds.H.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
+        #         self._check_and_write('run_up', np.ones(1) * (ds.runup.values.flatten()), dirname=result_dir_timestep)  # single value
+        #         self._check_and_write('storm_surge', np.ones(1) * (self.current_storm_surge), dirname=result_dir_timestep)  # single value
+        #         self._check_and_write('wave_energy', ds.E.values.flatten(), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_xx', ds.Sxx.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_xy', ds.Sxy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_yy', ds.Syy.values.flatten(), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('mean_wave_angle', ds.thetamean.values.flatten(), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
+        #         self._check_and_write('velocity_magnitude', ds.vmag.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+        #         self._check_and_write('orbital_velocity', ds.urms.values.flatten(), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+                
+        #         ds.close()
+            
+        #     else:        
+        #         self._check_and_write('wave_height', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of wave heights (associated with xgr.txt)
+        #         self._check_and_write('run_up', np.ones(1) * (0), dirname=result_dir_timestep)  # single value
+        #         self._check_and_write('storm_surge', np.ones(1) * (0), dirname=result_dir_timestep)  # single value
+        #         self._check_and_write('wave_energy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of wave energies (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_xx', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_xy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('radiation_stress_yy', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of radiation stresses (associated with xgr.txt)
+        #         self._check_and_write('mean_wave_angle', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of mean wave angles in radians (associated with xgr.txt)
+        #         self._check_and_write('velocity_magnitude', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+        #         self._check_and_write('orbital_velocity', np.zeros(self.xgr.shape), dirname=result_dir_timestep)  # 1D series of velocities (associated with xgr.txt)
+            
+        #     # temperature variables
+        #     self._check_and_write('thaw_depth', self.thaw_depth, dirname=result_dir_timestep)  # 1D series of thaw depths
+        #     self._check_and_write('abs_xgr', self.abs_xgr.flatten(), dirname=result_dir_timestep)  # 1D series of x-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        #     self._check_and_write('abs_zgr', self.abs_zgr.flatten(), dirname=result_dir_timestep)  # 1D series of z-values (corresponding to ground_temperature_distribution.txt and grount_enthalpy_distribution.txt)
+        #     self._check_and_write('ground_temperature_distribution', self.temp_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of temperature values (associated with abs_xgr.txt and abs_zgr.txt)
+        #     self._check_and_write('ground_enthalpy_distribution', self.enthalpy_matrix.flatten(), dirname=result_dir_timestep)  # 1D series of enthalpy values (associated with abs_xgr.txt and abs_zgr.txt)
+        #     self._check_and_write("2m_temperature", np.ones(1) * (self.current_air_temp), dirname=result_dir_timestep)  # single value
+        #     self._check_and_write("sea_surface_temperature",  np.ones(1) * (self.current_sea_temp), dirname=result_dir_timestep)  # single value
+            
+        #     # heat flux variables
+        #     self._check_and_write('solar_radiation_factor', self.factors, dirname=result_dir_timestep)  # 1D series of factors
+        #     self._check_and_write('solar_radiation_flux', self.sw_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        #     self._check_and_write('long_wave_radiation_flux', np.ones(1) * (self.lw_flux), dirname=result_dir_timestep)  # single value of heat flux
+        #     self._check_and_write('latent_heat_flux',np.ones(1) * (self.latent_flux), dirname=result_dir_timestep)  # single value of heat flux
+        #     self._check_and_write('convective_heat_flux', self.convective_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+        #     self._check_and_write('total_heat_flux', self.heat_flux, dirname=result_dir_timestep)  # 1D series of heat fluxes
+            
+        #     # sea ice variables
+        #     self._check_and_write('sea_ice_cover', np.ones(1) * (self.current_sea_ice), dirname=result_dir_timestep)  # single value
+            
+        #     # wind variables
+        #     self._check_and_write('wind_velocity', np.ones(1) * (self.wind_velocity), dirname=result_dir_timestep)  # single value
+        #     self._check_and_write('wind_direction', np.ones(1) * (self.wind_direction), dirname=result_dir_timestep) # single value (degrees, clockwise from the north)
+            
+        #     return None
+        
+    
+        
+    
+    # Old code from determining aggregated matrices (but that turned out to be the wrong order)
+            
+        # # determine which part of the domain is frozen and unfrozen (for the aggregated temperature matrix)
+        # frozen_mask_aggr = (aggregated_temp_matrix < self.config.thermal.T_melt)
+        # unfrozen_mask_aggr = np.ones(frozen_mask_aggr.shape) - frozen_mask_aggr
+        
+        # # determine k-matrix (extend k-distribution with one copied value at the top and bottom boundary to include ghost nodes)
+        # k_frozen_distr_aggr = np.concatenate((
+        #     np.array([self.k_frozen_distr[0]]),
+        #     self.k_frozen_distr,
+        #     np.array([self.k_frozen_distr[-1]])))
+        
+        # k_unfrozen_distr_aggr = np.concatenate((
+        #     np.array([self.k_unfrozen_distr[0]]),
+        #     self.k_frozen_distr,
+        #     np.array([self.k_unfrozen_distr[-1]])))
+        
+        # self.k_matrix = frozen_mask_aggr * np.tile(k_frozen_distr_aggr, (len(self.xgr), 1)) + \
+        #                 unfrozen_mask_aggr * np.tile(k_unfrozen_distr_aggr, (len(self.xgr), 1))
+        
+        # # determine aggregated density matrix
+        # self.soil_density_matrix_aggr = np.hstack((
+        #     self.soil_density_matrix[:,0].reshape((-1, 1)),
+        #     self.soil_density_matrix,
+        #     self.soil_density_matrix[:,-1].reshape((-1, 1)),
+        # ))
     
     # Old code from ghost nodes
     # temperature difference for convective heat transfer (define temperature flux as positive when it is directed into the ground)

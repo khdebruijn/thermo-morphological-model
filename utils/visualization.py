@@ -393,7 +393,7 @@ class SimulationPlot(object):
             with open(os.path.join(path, 'zgr.txt')) as f:
                 zgr = np.loadtxt(f)
 
-            bluff_edge_position, bluff_toe_position = calculate_bluff_edge_toe_position(xgr, zgr)
+            bluff_edge_position, bluff_toe_position, distances = calculate_bluff_edge_toe_position(xgr, zgr)
             
             dates.append(self.sim.timestamps[int(id)])
             bluff_edge_positions.append(bluff_edge_position)

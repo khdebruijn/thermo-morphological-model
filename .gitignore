@@ -1,3 +1,4 @@
+# standard files to be ignored
 *.ist
 *.pkl
 __pycache__
@@ -6,18 +7,41 @@ __pycache__
 *ipynb_checkpoints*
 *.virtual_documents*
 
+# raw datasets
 database/raw_datasets/era5/*/*.nc
+database/raw_datasets/era5/*.nc
 database/raw_datasets/gibbs/*/*
 database/raw_datasets/erikson/*/*
 database/raw_datasets/cmip5/*/*
 database/raw_datasets/engelstad/*.nc
 
+# timeseries datasets
 database/ts_datasets/*.csv
 
+# initial condition data
 database/initial_conditions/*.txt
+database/initial_conditions/*.dep
+database/initial_conditions/*.grd
+database/initial_conditions/*.grd
 
+# transects data
+database/transects/*.dep
+database/transects/*.txt
+database/transects/*.grd
+
+# testing data
 test/*.nc
 
+# run output (in the runs folder)
 runs/*/results/*/*.txt
+runs/*/results/*.txt
+runs/*/*.dep
+runs/*/*.png
+runs/*/*.bcf
+runs/*/*.txt
+runs/*/*.bat
+runs/*/*.grd
+runs/*/*.nc
 
+# .env file
 .env

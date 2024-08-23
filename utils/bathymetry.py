@@ -48,13 +48,10 @@ def calculate_bluff_edge_toe_position(xgr, zgr):
             
         distances[i] = np.cross(p2-p1, p3-p1) / np.linalg.norm(p2-p1)
         
-        if zgr[i] < xgr[i] * (zgr[-1] - zgr[0]) / (xgr[-1] - xgr[0]) + zgr[0]:
-            distances[i] *= -1
-        
     bluff_edge_id = np.argmax(distances)
     bluff_toe_id = np.argmin(distances)
     
-    return xgr[bluff_edge_id], xgr[bluff_toe_id]
+    return xgr[bluff_edge_id], xgr[bluff_toe_id], distances
 
 def generate_schematized_bathymetry(
         bluff_flat_length,
@@ -76,6 +73,7 @@ def generate_schematized_bathymetry(
         with_artificial=False,
         artificial_max_depth=500,
         artificial_slope=1/50,
+        artificial_flat=60, # meters
         
         N=100
     ):
@@ -93,6 +91,7 @@ def generate_schematized_bathymetry(
     x_offs_cont = x_near_offs + (offshore_max_depth - nearshore_max_depth) / offshore_slope
     x_cont_arti = x_offs_cont + contintental_flat_width
     x_end = x_cont_arti + artificial_max_depth / artificial_slope
+    x_flat_extension = x_end + artificial_flat
     
     z_wl = 0
     z_toe = z_wl + beach_width * beach_slope
@@ -102,6 +101,7 @@ def generate_schematized_bathymetry(
     z_offs_cont = z_wl - offshore_max_depth
     z_cont_arti = z_wl - offshore_max_depth
     z_end = z_wl - artificial_max_depth
+    z_flat_extension = z_end
     
     xs = [
         x_start,
@@ -126,6 +126,11 @@ def generate_schematized_bathymetry(
     if with_artificial:
         xs.append(x_end)
         zs.append(z_end)
+        
+        xs.append(x_flat_extension)
+        zs.append(z_flat_extension)
+        
+        
     
     total_x = np.array([])
     total_z = np.array([])
@@ -136,6 +141,10 @@ def generate_schematized_bathymetry(
         
         total_x = np.append(total_x, np.linspace(x1, x2, N))
         total_z = np.append(total_z, np.linspace(z1, z2, N))
+        
+    # x=0 should be the furthest offshore point, and increase with distance to shore
+    total_x = total_x[::-1] * -1 + np.max(total_x)
+    total_z = total_z[::-1]
 
     return total_x, total_z
 

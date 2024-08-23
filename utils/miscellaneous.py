@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import LinearNDInterpolator
+from scipy.signal import convolve
+
 
 def textbox(text):
     """Function to quickly generate text boxes.
@@ -85,6 +87,33 @@ def count_nonzero_until_zero(matrix):
     
     return indices
 
+def count_nonzero_until_n_zeros(matrix, dN=1):
+    """Returns the number of grid points with a nonzero input, counted for each row from the lowest index until the first dN consecutive zero inputs.
+
+    Args:
+        matrix (np.array): a matrix
+        dN (int): integer indicating the minimum amount of consecutive zeros needed to stop counting (from the top)
+
+    Returns:
+        result: number of grid points for each row before dN consecutive zero inputs (-1 if no dN consecutive zeros in the entire row)
+    """
+    
+    # Create the convolution kernel to detect dN consecutive zeros
+    kernel = np.ones(dN)
+    
+    # Convolve the matrix rows with the kernel
+    convolved = convolve(matrix == 0, kernel[None, :], mode='same')
+    
+    # Find the index of the first occurrence of dN consecutive zeros in each row
+    indices = np.argmax(convolved >= dN, axis=1)
+    
+    # If the first occurrence is at the end, we need to check if it's a valid detection
+    valid_indices = convolved[np.arange(convolved.shape[0]), indices] >= dN
+    indices[~valid_indices] = -1
+    indices[valid_indices] -= dN//2
+    
+    return indices
+
 def generate_perpendicular_grids(xgr, zgr, resolution=30, max_depth=3):
     """This function takes an xgrid and a zgrid, as well as a resolution and maximum depth, and returns a (temperature) grid perpendicular to the existing x and z-grid.
     ----------
@@ -157,6 +186,62 @@ def linear_interp_with_nearest(xgr, zgr, values, new_xgr, new_zgr):
     # Reshape the interpolated temperature values to match the shape of new_x_points and new_y_points
     new_temperature_values = new_temperature_values.reshape(new_xgr.shape)
 
+    return new_temperature_values
+
+def linear_interp_z(abs_xgr, abs_zgr, temp_matrix, abs_xgr_new, abs_zgr_new, water_level, fill_value_top_water, fill_value_top_air='nearest', fill_bottom='nearest'):
+    """This function takes an old x-grid and z-grid, and associated values (e.g., temperature), and casts them to a new grid of x and z values. 
+    For each new 1D perpendicular model, the closest surface coordinate from the old grid is taken, and new temperature values are based on the 
+    old perpendicular model related to this surface node. New values are computed through interpolation based on depth only. Grid points above the
+    surface get a new set temperature (given as argument), and grid cells below the old grid get set to the nearest value.
+
+    Args:
+        xgr (np.Array): x-grid (m x n), with every 1D model being assigned to a row
+        zgr (np.Array): z-grid (m x n), with every 1D model being assigned to a row
+        values (np.Array): matrix of same shape as xgr and zgr with associated valeus
+        new_xgr (np.Array): new x-grid (p x q)
+        new_zgr (np.Array): new z-grid (q x q)
+        water_level (float): current water level
+        fill_value_top_water (float): value given to grid cells above the old grid (below the water level)
+        fill_value_top_air (float or string): if 'nearest', set temperature to nearest grid cell. If float, use that value.
+        fill_bottom (string): strategy to use for setting bottom values below the old grid. Defaults to 'nearest'.
+
+    Returns:
+        np.Array: new matrix of associated values for the new grid (shape p x q)
+    """
+    # initialize new temperature matrix
+    new_temperature_values = np.zeros(abs_xgr_new.shape)
+    
+    for i in range(len(new_temperature_values)):
+        
+        grid_id = np.argmin(np.abs(abs_xgr_new[i, 0] - abs_xgr[:, 0]))
+        
+        z_array = abs_zgr[grid_id,:]
+        temp_array = temp_matrix[grid_id,:]
+        
+        sort_id = np.argsort(z_array)
+        
+        new_z_array = abs_zgr_new[i,:]
+        
+        if new_z_array[0] < water_level:
+            new_temp_array = np.interp(
+                x=new_z_array, 
+                xp=z_array[sort_id], 
+                fp=temp_array[sort_id], 
+                left=(temp_array[sort_id][0] if fill_bottom=='nearest' else 0),
+                right=fill_value_top_water if not fill_value_top_water=='nearest' else temp_array[sort_id][-1]
+                )
+            
+        else:
+            new_temp_array = np.interp(
+                x=new_z_array, 
+                xp=z_array[sort_id], 
+                fp=temp_array[sort_id], 
+                left=(temp_array[sort_id][0] if fill_bottom=='nearest' else 0),
+                right=(temp_array[sort_id][-1] if fill_value_top_air=='nearest' else fill_value_top_air)
+            )
+        
+        new_temperature_values[i,:] = new_temp_array
+    
     return new_temperature_values
     
     
