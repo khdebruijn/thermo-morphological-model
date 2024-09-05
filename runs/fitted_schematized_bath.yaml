@@ -1,0 +1,19 @@
+# Copy the lines below into the config.yaml file to get the use the fitted schematized profile. This fitted profile was made based on transects from the available data. However, the slope of the bluff seems unreasonably low.
+  
+  # schematized bathymetry parameters
+  with_schematized_bathymetry :  True  # whether or not to generate a schematized bathymetry upon initialization
+  bluff_flat_length           :  100  # [m] length of the flat attached to the crest of the bluff
+  bluff_height                :  12  # [m] height of the bluff
+  bluff_slope                 :  0.5  # [-] slope of the bluff, i.e., height/width
+  beach_width                 :  12.5  # [m] width of the beach
+  beach_slope                 :  0.1  # [-] slope of the beach, i.e., height/width
+  nearshore_max_depth         :  3  # [m] maximum depth of the nearshore
+  nearshore_slope             :  0.03  # [-] slope of the nearshore section, i.e., height/width
+  offshore_max_depth          :  5  # [m] maximum offshore depth
+  offshore_slope              :  0.007  # [-] slope of the offshore section, i.e., height/width
+  continental_flat_width      :  400  # [m] width of the continental flat section
+  with_artificial             :  True  # whether or not to extend to bathymetry with an artificial depth increase (if required by xbeach)
+  artificial_max_depth        :  10  # [m] maximum depth of the artificial section (wave heights in dataset are defined at a depth of 10m, so that value is recommended)
+  artificial_slope            :  0.02  # [-] slope of the artificial section, i.e., height/width
+  N                           :  100 # number of points of each section
+  artificial_flat             : 60  # [m] length of flat section at the end of artificial slope
