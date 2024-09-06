@@ -91,6 +91,11 @@ tstart              = 0
 
 bcfile              = jonswap.txt
 
+%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)
+
+writehotstart: 1
+hotstart: 1
+
 %% Output variables 
 
 nglobalvar          = 14
