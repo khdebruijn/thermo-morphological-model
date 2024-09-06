@@ -82,7 +82,7 @@ xbeach:
   facua: 0.10  # [-] Calibration factor time averaged flows due to wave skewness and asymmetry. Default is 0.175.
 
   # parameters for writing the first storm
-  write_first_storms : 2  # [-] The first N number of storms to write. This doesn't include intermediate XBeach runs
+  write_first_storms : 5  # [-] The first N number of storms to write. This doesn't include intermediate XBeach runs
   tintg_storms : 100  # [s] The output interval (only used if first storms are being written)
 
 # thermal moodel parameters
