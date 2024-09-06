@@ -350,6 +350,7 @@ class Simulation():
             # hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)
             # "writehotstart": 1 if self.xbeach_times[timestep_id + 1] else 0,  # Write hotstart during simulation
             # "hotstart": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,  # Initialize simulation with hotstart
+            # "hotstartfileno": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,  # Initialize simulation with hotstart
             
             # output variables
             "outputformat":"netcdf",
@@ -393,8 +394,9 @@ class Simulation():
                 
             hotstart_text = [
                 "%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)\n\n",
-                f"writehotstart = {1 if self.xbeach_times[timestep_id + 1] else 0}\n",
-                f"hotstart      = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
+                f"writehotstart  = {1 if self.xbeach_times[timestep_id + 1] else 0}\n",
+                f"hotstart       = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
+                f"hotstartfileno = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
                 "\n"
                 ]
                 
