@@ -388,6 +388,26 @@ class Simulation():
         # re-enable print
         enable_print()
         
+        # the hotstart can not be added using the python toolbox, so it is manually added to the params.txt file here
+        hotstart_in_toolbox = False
+        if not hotstart_in_toolbox:
+            with open('params.txt', 'r') as f:
+                text = f.readlines()
+                
+            hotstart_text = [
+                "%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)\n\n",
+                "writehotstart: 1\n",
+                "hotstart: 1\n",
+                "\n"
+                ]
+                
+            for i, line in enumerate(text):
+                if r"%% Output variables" in line:
+                    text = text[:i] + hotstart_text + text[i:]
+                
+            with open('params.txt', 'w') as f:
+                f.writelines(text)
+        
         return None
     
     def start_xbeach(self, xbeach_path, params_path, batch_fname="run.bat"):
