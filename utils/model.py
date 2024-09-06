@@ -1512,6 +1512,18 @@ class Simulation():
             np.savetxt(os.path.join(dirname, f"{varname}" + ".txt"), save_var)
         
         return None
+    
+    def dump_xb_output(self, timestep_id):
+        """This method copies the XB output from the run folder (including log files, param files, etc.) to the results directory."""
+        
+        destination_folder = os.path.join(self.result_dir, "xb_files", str(timestep_id))
+        
+        if not os.path.exists(destination_folder):
+            os.makedirs(destination_folder)
+
+        shutil.copytree(self.cwd, destination_folder, ignore=shutil.ignore_patterns('config.yaml'))
+
+        return None
         
     # functions below are used to quickly obtain values for forcing data
     def _get_sw_flux(self, timestep_id):
