@@ -396,8 +396,8 @@ class Simulation():
                 
             hotstart_text = [
                 "%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)\n\n",
-                "writehotstart: 1\n",
-                "hotstart: 1\n",
+                "writehotstart = 1\n",
+                "hotstar       = 1\n",
                 "\n"
                 ]
                 
