@@ -42,6 +42,7 @@ runs/*/*.txt
 runs/*/*.bat
 runs/*/*.grd
 runs/*/*.nc
+runs/*/*.dat
 
 # .env file
 .env
