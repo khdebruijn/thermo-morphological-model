@@ -163,6 +163,10 @@ def main(sim):
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid(timestep_id, fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
+            
+            # copy all xb output to the results folder 
+            # # (this is necessary as the xb output in the run folder will be overwritten after the next xb iteration)
+            sim.dump_xb_output(timestep_id)
         
         # loop through thermal subgrid timestep
         for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
