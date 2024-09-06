@@ -1517,11 +1517,13 @@ class Simulation():
         """This method copies the XB output from the run folder (including log files, param files, etc.) to the results directory."""
         
         destination_folder = os.path.join(self.result_dir, "xb_files", str(timestep_id))
-        
+
         if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
-
-        shutil.copytree(self.cwd, destination_folder, ignore=shutil.ignore_patterns('config.yaml'))
+            
+        shutil.copytree(self.cwd, destination_folder, ignore=shutil.ignore_patterns('config.yaml'), dirs_exist_ok=True)
+        
+        # os.rename(os.path.join())
 
         return None
         
