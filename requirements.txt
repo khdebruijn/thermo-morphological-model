@@ -2,6 +2,7 @@ numpy
 pandas
 matplotlib
 geopandas
+geodatasets
 xarray
 pyyaml
 xbTools
@@ -15,3 +16,7 @@ bottleneck
 IPython
 shapely
 ffmpeg
+hvplot
+geoviews
+cartopy
+pyproj
