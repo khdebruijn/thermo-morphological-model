@@ -518,38 +518,36 @@ class Simulation():
             df = df[mask]
         
         # first check which database is being used, as they vary slightly with column names and available data
-        if 'erikson' in fp_storm:
+        # if 'engelstad' in fp_storm:  IMPLEMENT DATABASE SPECIFIC VARIABLES HERE
             
-            for i, row in df.iterrows():
+            # for i, row in df.iterrows():
                 
-                index = np.argwhere(self.timestamps==row.time)
+            #     index = np.argwhere(self.timestamps==row.time)
                 
-                st[index] = 1
+            #     st[index] = 1
                 
-                # safe storm conditions for this timestep as well            
-                self.conditions[index] = {
-                        "Hso(m)": row["Hso(m)"],
-                        "Hs(m)": row["Hs(m)"],
-                        "Dp(deg)": row["Dp(deg)"],
-                        "Tp(s)": row["Tp(s)"],
-                        "SS(m)": row["SS(m)"],
-                            }
-                
-        elif 'engelstad' in fp_storm:
+            #     # safe storm conditions for this timestep as well            
+            #     self.conditions[index] = {
+            #             "Hso(m)": row["Hso(m)"],
+            #             "Hs(m)": row["Hs(m)"],
+            #             "Dp(deg)": row["Dp(deg)"],
+            #             "Tp(s)": row["Tp(s)"],
+            #             "SS(m)": row["SS(m)"],
+            #                 }
+                        
+        for i, row in df.iterrows():
             
-            for i, row in df.iterrows():
-                
-                index = np.argwhere(self.timestamps==row.time)
-                
-                st[index] = 1
-                
-                # safe storm conditions for this timestep as well            
-                self.conditions[index] = {
-                        "Hs(m)": row["Hs(m)"],
-                        "Dp(deg)": row["Dp(deg)"],
-                        "Tp(s)": row["Tp(s)"],
-                        "SS(m)": row["SS(m)"],
-                            }
+            index = np.argwhere(self.timestamps==row.time)
+            
+            st[index] = 1
+            
+            # safe storm conditions for this timestep as well            
+            self.conditions[index] = {
+                    "Hs(m)": row["Hs(m)"],
+                    "Dp(deg)": row["Dp(deg)"],
+                    "Tp(s)": row["Tp(s)"],
+                    "SS(m)": row["SS(m)"],
+                        }
         
         else:
             raise NameError("The given storm path is not recognized. Ensure that either 'erikson' or 'engelstad' is present in the file name.")
