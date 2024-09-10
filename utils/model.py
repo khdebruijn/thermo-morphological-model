@@ -253,6 +253,8 @@ class Simulation():
             dtheta=self.config.xbeach.dtheta,
             )
         
+        # check if Erikson or Engelstad data, as these datasets look a bit different.
+        
         # set the waves
         self.xb_setup.set_waves('parametric', {
             # need to give each parameter as series (in this case, with length 1)
@@ -493,7 +495,9 @@ class Simulation():
         return self.xbeach_times
     
     def _when_storms_projection(self, fp_storm):
-        """This function is used to determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
+        """This function is used to determine when storms occur, and what the conditions are. It uses either 
+        'database/ts_datasets/storms_erikson.csv' (for cmip hindcast) or 'database/ts_datasets/storms_engelstad.csv' 
+        (for era5 hindcast).
 
         Args:
             fp_storm (Path): path to storm dataset
@@ -512,22 +516,43 @@ class Simulation():
             mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
             
             df = df[mask]
-                    
-        for i, row in df.iterrows():
+        
+        # first check which database is being used, as they vary slightly with column names and available data
+        if 'erikson' in fp_storm:
             
-            index = np.argwhere(self.timestamps==row.time)
+            for i, row in df.iterrows():
+                
+                index = np.argwhere(self.timestamps==row.time)
+                
+                st[index] = 1
+                
+                # safe storm conditions for this timestep as well            
+                self.conditions[index] = {
+                        "Hso(m)": row["Hso(m)"],
+                        "Hs(m)": row["Hs(m)"],
+                        "Dp(deg)": row["Dp(deg)"],
+                        "Tp(s)": row["Tp(s)"],
+                        "SS(m)": row["SS(m)"],
+                            }
+                
+        elif 'engelstad' in fp_storm:
             
-            st[index] = 1
-            
-            # safe storm conditions for this timestep as well
-            self.conditions[index] = {
-                       "Hso(m)": row["Hso(m)"],
-                       "Hs(m)": row["Hs(m)"],
-                       "Dp(deg)": row["Dp(deg)"],
-                       "Tp(s)": row["Tp(s)"],
-                       "SS(m)": row["SS(m)"],
-                       "Hindcast_or_projection": row["Hindcast_or_projection"]
-                        }
+            for i, row in df.iterrows():
+                
+                index = np.argwhere(self.timestamps==row.time)
+                
+                st[index] = 1
+                
+                # safe storm conditions for this timestep as well            
+                self.conditions[index] = {
+                        "Hs(m)": row["Hs(m)"],
+                        "Dp(deg)": row["Dp(deg)"],
+                        "Tp(s)": row["Tp(s)"],
+                        "SS(m)": row["SS(m)"],
+                            }
+        
+        else:
+            raise NameError("The given storm path is not recognized. Ensure that either 'erikson' or 'engelstad' is present in the file name.")
         
         return st
                 
