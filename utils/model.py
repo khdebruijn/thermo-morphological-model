@@ -535,7 +535,7 @@ class Simulation():
             #             "SS(m)": row["SS(m)"],
             #                 }
                         
-        for i, row in df.iterrows():
+        for i, row in df[df['Hs(m)'] > self.config.wrapper.wave_height_threshold].iterrows():
             
             index = np.argwhere(self.timestamps==row.time)
             
@@ -549,8 +549,8 @@ class Simulation():
                     "SS(m)": row["SS(m)"],
                         }
         
-        else:
-            raise NameError("The given storm path is not recognized. Ensure that either 'erikson' or 'engelstad' is present in the file name.")
+        # else:
+        #     raise NameError("The given storm path is not recognized. Ensure that either 'erikson' or 'engelstad' is present in the file name.")
         
         return st
                 
