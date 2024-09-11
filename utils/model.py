@@ -326,7 +326,6 @@ class Simulation():
             
             # physical constant
             "rho": self.config.xbeach.rho_sea_water,
-            "vicmol": self.config.xbeach.visc_kin,
             
             # physical processes
             "avalanching": 1,  # Turn on avalanching
@@ -534,8 +533,10 @@ class Simulation():
             #             "Tp(s)": row["Tp(s)"],
             #             "SS(m)": row["SS(m)"],
             #                 }
+            
+        df_dropna = df.dropna(axis=0)
                         
-        for i, row in df[df['Hs(m)'] > self.config.wrapper.wave_height_threshold].iterrows():
+        for i, row in df_dropna[df_dropna['Hs(m)'] > self.config.wrapper.wave_height_threshold].iterrows():
             
             index = np.argwhere(self.timestamps==row.time)
             
@@ -548,6 +549,8 @@ class Simulation():
                     "Tp(s)": row["Tp(s)"],
                     "SS(m)": row["SS(m)"],
                         }
+            
+        self.water_levels = df['SS(m)'].values
         
         # else:
         #     raise NameError("The given storm path is not recognized. Ensure that either 'erikson' or 'engelstad' is present in the file name.")
@@ -915,7 +918,7 @@ class Simulation():
         self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
         
         # update the water level
-        self.water_level = self._update_water_level(timestep_id, subgrid_timestep_id)
+        self.water_level = (self.water_levels[timestep_id] if 'engelstad' in self.config.data.storm_data_path else self._update_water_level(timestep_id))
         
         dry_mask = (self.zgr >= self.water_level)
         wet_mask = (self.zgr < self.water_level)
@@ -1172,7 +1175,7 @@ class Simulation():
                     enthalpy_submerged_sediment = self.current_sea_temp * Cl_value + (Cs_value - Cl_value) * self.config.thermal.T_melt + self.config.thermal.L_water_ice * self.config.thermal.nb_max
                 
                 # get current water level
-                self.water_level = self._update_water_level(timestep_id)
+                self.water_level = (self.water_levels[timestep_id] if 'engelstad' in self.config.data.storm_data_path else self._update_water_level(timestep_id))
                 
                 # Interpolate enthalpy to new grid             
                 self.enthalpy_matrix = um.linear_interp_z(
@@ -1496,7 +1499,6 @@ class Simulation():
 
             result_ds['wave_height'] = (["xgr_xb"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
             result_ds['run_up'] = ds.runup.values.flatten()  # single value
-            result_ds['water_level'] = self.water_level  # single value
             result_ds['wave_energy'] = (["xgr_xb"], ds.E.values.flatten())  # 1D series of wave energies (associated with xgr.txt)
             result_ds['radiation_stress_xx'] = (["xgr_xb"], ds.Sxx.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
             result_ds['radiation_stress_xy'] = (["xgr_xb"], ds.Sxy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
@@ -1514,8 +1516,11 @@ class Simulation():
                             'mean_wave_angle', 'velocity_magnitude', 'orbital_velocity']:
                 result_ds[varname] = (["xgr"], np.zeros(self.xgr.shape))
                 
-            for varname in ['run_up', 'water_level']:
+            for varname in ['run_up']:
                 result_ds[varname] = 0
+        
+        # water level
+        result_ds['water_level'] = (self.water_levels[timestep_id] if 'engelstad' in self.config.data.storm_data_path else self._update_water_level(timestep_id))
         
         # temperature variables
         result_ds['thaw_depth'] = (["xgr"], self.thaw_depth)  # 1D series of thaw depths

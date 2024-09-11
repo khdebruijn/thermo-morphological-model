@@ -65,7 +65,6 @@ xbeach:
   wbctype : 'jons'   # type of wave boundary condition
   bcfile  : 'jonswap.txt'  # file containing the bc specifications
   rho_sea_water : 1025  # [kg/m3] density (sea) water
-  visc_kin      : 0.000006  # [m2/s] kinematic viscosity sea water (placeholder)
 
   # sediment properties
   dryslp      : 0.55  # [dz/dx] Critical avalanching slope above water (dz/dx and dz/dy) (placeholder)
