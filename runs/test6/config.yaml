@@ -1,6 +1,6 @@
 # data parameters
 data:
-  storm_data_path   : 'database/ts_datasets/storms_erikson.csv'  # path to storm dataset
+  storm_data_path   : 'database/ts_datasets/storms_engelstad.csv'  # path to storm dataset
   forcing_data_path : 'database/ts_datasets/era5.csv'  # path to forcing data
 
 # model settings
