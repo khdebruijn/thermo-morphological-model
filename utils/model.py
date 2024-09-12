@@ -1138,15 +1138,17 @@ class Simulation():
         if not all(cum_sedero == 0):
         
             # generate a new xgrid and zgrid (but only if the next timestep does not require a hotstart, which requires the same xgrid)
-            if not self.xbeach_times[timestep_id + 1]:
+            if timestep_id + 1 < len(self.xbeach_timesteps):
                 
-                self.xgr_new, self.zgr_new = xgrid(self.xgr, bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
-                self.zgr_new = np.interp(self.xgr_new, self.xgr, bathy_current)
-                
-                # ensure that the grid doesn't extend further offshore than the original grid (this is a bug in the xbeach python toolbox)
-                while self.xgr_new[0] < self.x_ori:
-                    self.xgr_new = self.xgr_new[1:]
-                    self.zgr_new = self.zgr_new[1:]
+                if not self.xbeach_times[timestep_id + 1]:
+                    
+                    self.xgr_new, self.zgr_new = xgrid(self.xgr, bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
+                    self.zgr_new = np.interp(self.xgr_new, self.xgr, bathy_current)
+                    
+                    # ensure that the grid doesn't extend further offshore than the original grid (this is a bug in the xbeach python toolbox)
+                    while self.xgr_new[0] < self.x_ori:
+                        self.xgr_new = self.xgr_new[1:]
+                        self.zgr_new = self.zgr_new[1:]
                 
             else:
                 self.xgr_new = self.xgr
