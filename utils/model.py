@@ -395,9 +395,8 @@ class Simulation():
             
             # add check too see if this is the last timestep
             writehotstart = 0
-            if timestep_id + 1 < len(self.xbeach_times):
-                if self.xbeach_times[timestep_id + 1]:
-                    writehotstart = 1
+            if timestep_id + 1 < len(self.xbeach_times) and self.xbeach_times[timestep_id + 1]:
+                writehotstart = 1
             
             hotstart_text = [
                 "%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)\n\n",
@@ -1138,17 +1137,15 @@ class Simulation():
         if not all(cum_sedero == 0):
         
             # generate a new xgrid and zgrid (but only if the next timestep does not require a hotstart, which requires the same xgrid)
-            if timestep_id + 1 < len(self.xbeach_times):
+            if timestep_id + 1 < len(self.xbeach_times) and not self.xbeach_times[timestep_id + 1]:
+                                
+                self.xgr_new, self.zgr_new = xgrid(self.xgr, bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
+                self.zgr_new = np.interp(self.xgr_new, self.xgr, bathy_current)
                 
-                if not self.xbeach_times[timestep_id + 1]:
-                    
-                    self.xgr_new, self.zgr_new = xgrid(self.xgr, bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
-                    self.zgr_new = np.interp(self.xgr_new, self.xgr, bathy_current)
-                    
-                    # ensure that the grid doesn't extend further offshore than the original grid (this is a bug in the xbeach python toolbox)
-                    while self.xgr_new[0] < self.x_ori:
-                        self.xgr_new = self.xgr_new[1:]
-                        self.zgr_new = self.zgr_new[1:]
+                # ensure that the grid doesn't extend further offshore than the original grid (this is a bug in the xbeach python toolbox)
+                while self.xgr_new[0] < self.x_ori:
+                    self.xgr_new = self.xgr_new[1:]
+                    self.zgr_new = self.zgr_new[1:]
                 
             else:
                 self.xgr_new = self.xgr
