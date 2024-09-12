@@ -1138,7 +1138,7 @@ class Simulation():
         if not all(cum_sedero == 0):
         
             # generate a new xgrid and zgrid (but only if the next timestep does not require a hotstart, which requires the same xgrid)
-            if timestep_id + 1 < len(self.xbeach_timesteps):
+            if timestep_id + 1 < len(self.xbeach_times):
                 
                 if not self.xbeach_times[timestep_id + 1]:
                     
