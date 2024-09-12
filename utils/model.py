@@ -392,10 +392,15 @@ class Simulation():
         if not hotstart_in_toolbox:
             with open('params.txt', 'r') as f:
                 text = f.readlines()
-                
+            
+            # add check too see if this is the last timestep
+            if timestep_id + 1 < len(self.xbeach_times):
+                if self.xbeach_times[timestep_id + 1]:
+                    writehotstart = 1
+            
             hotstart_text = [
                 "%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)\n\n",
-                f"writehotstart  = {1 if self.xbeach_times[timestep_id + 1] else 0}\n",
+                f"writehotstart  = {writehotstart}\n",
                 f"hotstart       = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
                 f"hotstartfileno = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
                 "\n"
