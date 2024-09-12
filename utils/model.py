@@ -394,6 +394,7 @@ class Simulation():
                 text = f.readlines()
             
             # add check too see if this is the last timestep
+            writehotstart = 0
             if timestep_id + 1 < len(self.xbeach_times):
                 if self.xbeach_times[timestep_id + 1]:
                     writehotstart = 1
