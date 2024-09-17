@@ -516,7 +516,7 @@ class Simulation():
         with open(fp_storm) as f:
             
             df = pd.read_csv(f, parse_dates=['time'])
-                        
+                                    
             mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
             
             df = df[mask]
@@ -554,7 +554,7 @@ class Simulation():
                     "Tp(s)": row["Tp(s)"],
                     "SS(m)": row["SS(m)"],
                         }
-            
+        
         self.water_levels = df['SS(m)'].values
         
         # else:
@@ -1570,7 +1570,7 @@ class Simulation():
     def dump_xb_output(self, timestep_id):
         """This method copies the XB output from the run folder (including log files, param files, etc.) to the results directory."""
         
-        destination_folder = os.path.join(self.result_dir, "xb_files", str(timestep_id))
+        destination_folder = os.path.join(self.result_dir, "xb_files/", str(timestep_id) + '/')
 
         if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
