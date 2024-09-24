@@ -1518,7 +1518,7 @@ class Simulation():
             
         else:
             
-            for varname in ['wave_height', 'wave_energy', 
+            for varname in ['wave_height', 'wave_energy', 'zb', 'zs',
                             'radiation_stress_xx', 'radiation_stress_xy', 'radiation_stress_yy', 
                             'mean_wave_angle', 'velocity_magnitude', 'orbital_velocity']:
                 result_ds[varname] = (["xgr"], np.zeros(self.xgr.shape))
