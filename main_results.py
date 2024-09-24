@@ -11,6 +11,8 @@ from utils.results import SimulationResults
 
 def main(runid, args, attempt_counter_max=100):
     
+    t_start = time.time()
+    
     # initialize simulation
     print(f"initializing {runid}")
     results = SimulationResults(runid=runid)
@@ -73,7 +75,9 @@ def main(runid, args, attempt_counter_max=100):
             attempt_counter += 1
         
     print(f"completed {runid}")
-    print(f"finished at {time.time()}")
+    print(f"Processing started at: {(t_start)}")
+    print(f"Processing finished at: {time.time()}")
+    print(f"Total processing time: {(time.time() - t_start) / 3600:1f} hours")
     
     return None
     
