@@ -1490,8 +1490,8 @@ class Simulation():
         result_ds["zgr"] = (["xgr"], self.zgr)  # 1D series of z-values
         result_ds["angles"] = (["xgr"], self.angles)  # 1D series of angles (in radians)
         
-        # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
-        if timestep_id and os.path.exists(os.path.join(self.cwd, "xboutput.nc")) and self.xbeach_times[timestep_id]:  # check if an xbeach output file exists (it shouldn't at the first timestep)
+        # hydrodynamic variables (note: obtained from xbeach output from previous timestep, so not necessarily accurate with other output data)
+        if timestep_id and os.path.exists(os.path.join(self.cwd, "xboutput.nc")) and self.xbeach_times[timestep_id-1]:  # check if an xbeach output file exists (it shouldn't at the first timestep)
             
             ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc")).squeeze()  # get xbeach data
             ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep
