@@ -49,7 +49,7 @@ def main(runid):
     output_video_path = os.path.join(animation_folder, str(folder) + ".mp4")
     
     # write video
-    clip.write_video(output_video_path, codec="libx264")
+    clip.write_videofile(output_video_path, codec="libx264")
     
     print(f"MP4 animation saved as {output_video_path}")
     
