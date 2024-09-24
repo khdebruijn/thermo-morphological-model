@@ -40,10 +40,14 @@ def main(sim):
     )
     print("succesfully loaded forcing")
     
-    # this variable is used to determine if xbeach should be ran for each timestep
-    xb_times = sim.timesteps_with_xbeach_active(
+    # load hydrodynamic forcing
+    sim.initialize_hydro_forcing(
         os.path.join(sim.proj_dir, sim.config.data.storm_data_path),
         )
+    print("succesfully loaded hydrodynamic forcing")
+    
+    # this variable is used to determine if xbeach should be ran for each timestep (not looking at 2% runup yet)
+    xb_times = sim.timesteps_with_xbeach_active()
     print("succesfully generated xbeach times")
     
     # generate schematized bathymetry
@@ -130,8 +134,11 @@ def main(sim):
             
             print("sucessfully generated output")
             
+        # check whether to run XBeach or not for this timestep
+        sim.xbeach_times[timestep_id] = sim.check_xbeach(timestep_id)
+            
         # check if xbeach is enabled for current timestep
-        if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
+        if sim.xbeach_times[timestep_id] and sim.config.xbeach.with_xbeach:
             
             # export current thaw depth to a file
             sim.write_ne_layer()
@@ -178,6 +185,8 @@ def main(sim):
         
         print()
     
+    # write xbeach timesteps
+    sim.write_xb_timesteps()
 
     print(textbox("SIMULATION FINISHED"))
     print(f"{repr(sim)}")

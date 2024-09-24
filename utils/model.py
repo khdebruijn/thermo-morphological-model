@@ -228,11 +228,156 @@ class Simulation():
         self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=0)
         
         self.water_level = 0
+        self.xb_check = 0
+        self.R2 = 0
         
         self.storm_write_counter = 0
         
         return None
     
+    def initialize_hydro_forcing(self, fp_storm):
+        """This function is used to initialize hydrodynamic forcing conditions, and what the conditions are. It uses either 
+        'database/ts_datasets/storms_erikson.csv' (for cmip hindcast) or 'database/ts_datasets/storms_engelstad.csv' 
+        (for era5 hindcast).
+
+        Args:
+            fp_storm (Path): path to storm dataset
+
+        Returns:
+            array: array of length T that for each timestep contains hydrodynamic forcing
+        """
+                
+        self.conditions = np.zeros(self.T.shape, dtype=object)  # also directly read wave conditions here
+        
+        with open(fp_storm) as f:
+            
+            df = pd.read_csv(f, parse_dates=['time'])
+                                    
+            mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
+            
+            df = df[mask]
+            
+        df_dropna = df.dropna(axis=0)
+                        
+        for i, row in df_dropna.iterrows():
+            
+            index = np.argwhere(self.timestamps==row.time)
+                        
+            # safe storm conditions for this timestep as well            
+            self.conditions[index] = {
+                    "Hs(m)": row["Hs(m)"],
+                    "Dp(deg)": row["Dp(deg)"],
+                    "Tp(s)": row["Tp(s)"],
+                    "WL(m)": row["WL(m)"],
+                        }
+        
+        self.water_levels = df['WL(m)'].values
+        
+        return self.conditions
+    
+    def timesteps_with_xbeach_active(self):
+        """This function gets the timestep ids for which xbeach should be active, without looking at 2% runup threshold yet.
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
+        
+        # get inter-storm timestep ids
+        self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
+        
+        # get sea-ice timestep ids
+        self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.wrapper.sea_ice_threshold)
+
+        # run xbeach for storm and inter-storm timesteps, but never when too much sea ice
+        # whether or not there is actually a storm is computed during each timestep, and is based on a 2% runup threshold
+        self.xbeach_times =  self.xbeach_sea_ice + self.xbeach_inter
+
+        return self.xbeach_times
+    
+    
+    def _when_xbeach_inter(self, call_xbeach_inter):
+        """This function determines the timestamps that xbeach is called regardless of sea-ice or storms.
+
+        Args:
+            call_xbeach_inter (int): Call xbeach every 'call_xbeach_inter' timestamps, regardsless of the presence of sea ice or a storm.
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
+        ct = np.zeros(self.T.shape)
+        
+        # set xbeach active at provided intervals
+        ct[::call_xbeach_inter] = 1
+        
+        # for these intervals, if not conditions are supplied from the storm projections, set conditions to '0'
+        zero_conditions = {
+                    # "Hso(m)": 0.001,
+                    # "Hs(m)": 0.001,
+                    "Hso(m)": 0.2,  # placeholder
+                    "Hs(m)": 0.2,  # placeholder
+                    # "Hso(m)": 0,
+                    # "Hs(m)": 0,
+                    "Dp(deg)": 270,                    
+                    # "Dp(deg)": 0,
+                    "Tp(s)": 10,
+                    # "Tp(s)": 0,
+                    "WL(m)": 0,
+                    "Hindcast_or_projection": 0,
+                    }
+        
+        mask = np.nonzero((ct==1) * (self.conditions==0))
+
+        self.conditions[mask] = zero_conditions
+        
+        return ct
+    
+    def _when_xbeach_no_sea_ice(self, sea_ice_threshold):
+        """This function determines when xbeach should not be ran due to sea ice, based on a threshold value)
+
+        Args:
+            sea_ice_threshold (float): _description_
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach can be ran and 0 if not (w.r.t. sea ice).
+        """
+        it =  (self.forcing_data.sea_ice_cover.values < sea_ice_threshold)
+                
+        return it
+    
+    def check_xbeach(self, timestep_id):
+        """This function checks whether XBeach should be ran for the upcoming timestep.
+
+        Args:
+            timestep_id (int): id of the current timestep
+
+        Returns:
+            int: whether or not to run XBeach. 1 if yes, 0 if no.
+        """
+        # read hydrodynamic conditions for current timestep
+        H = self.conditions[timestep_id]['Hs(m)']
+        T = self.conditions[timestep_id]['Tp(s)']
+        wl = self.conditions[timestep_id]['WL(m)']
+        
+        # assume these are the deep water conditions
+        H0 = H
+        L0 = 9.81 * T**2 / (2 * np.pi)
+        
+        # determine the +- 2*sigma envelope (for the stockdon, 2006 formulation)
+        sigma = H / 4
+        mask = np.nonzero((self.zgr > wl - 2*sigma) * (self.zgr < wl + 2*sigma))
+        z_envelope = self.zgr[mask]
+        x_envelope = self.zgr[mask]
+        
+        # compute beta_f as the average slope in this envelope
+        dz = z_envelope[np.argmax(x_envelope)] - z_envelope[np.argmin(x_envelope)]
+        dx = x_envelope[np.argmax(x_envelope)] - x_envelope[np.argmin(x_envelope)]
+        beta_f = np.abs(dz / dx)
+        
+        # now the empirical formulation by Stockdon et al. (2006) can be used to determine R2%
+        self.R2 = 1.1 * (0.35 * beta_f * (H0 * L0)**0.5 + (H0 * L0 * (0.563 * beta_f**2 + 0.004))**0.5 / 2)
+        
+        return int(self.R2 + wl > self.config.wrapper.xb_threshold)
+        
     def xbeach_setup(self, timestep_id):
         """This function initializes an xbeach run, i.e., it writes all inputs to files
         """
@@ -268,15 +413,12 @@ class Simulation():
             "fnyq":1, # placeholder
         })
         
-        # load in wind and surge data
+        # load in wind and water level data
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
-        surge = self.conditions[timestep_id]["SS(m)"]  # used for output
+        surge = self.conditions[timestep_id]["WL(m)"]  # used for output
         
         # check if this is a storm timestep that should be written in its entirety
-        if (
-            self.config.xbeach.write_first_storms and 
-            all(self.storm_timing[timestep_id : timestep_id+self.config.xbeach.write_first_storms])
-        ):
+        if self.config.xbeach.write_first_storms:
             tintg = self.config.xbeach.tintg_storms  # set the output interval
             self.config.xbeach.write_first_storms -= 1  # ensure 1 less storm is written
             self.copy_this_xb_output = True  # this variable is later checked to see if the xbeach output should be copied to the results folder
@@ -470,147 +612,6 @@ class Simulation():
         
         return direction, velocity
     
-    def timesteps_with_xbeach_active(self, fp_storm):
-        """This function gets the timestep ids for which xbeach should be active.
-
-        Args:
-            fp_storm (Path): path to the csv file containing storm data.
-            from_projection (bool, optional): choose whether to use the storm projection dataset (
-                                              or something else, but that is not yet implemented). Defaults to True.
-
-        Returns:
-            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
-        """
-        # get storm conditions timestep ids
-        self.storm_timing = self._when_storms_projection(fp_storm)
-        
-        # get inter-storm timestep ids
-        self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
-        
-        # get sea-ice timestep ids
-        self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.wrapper.sea_ice_threshold)
-
-        # ran xbeach for storm and inter-storm timesteps, but never when too much sea ice
-        self.xbeach_times = self.storm_timing * self.xbeach_sea_ice + self.xbeach_inter
-        
-        # output these xbeach timestep ids
-        self._check_and_write('xbeach_times', self.xbeach_times, self.result_dir)
-
-        return self.xbeach_times
-    
-    def _when_storms_projection(self, fp_storm):
-        """This function is used to determine when storms occur, and what the conditions are. It uses either 
-        'database/ts_datasets/storms_erikson.csv' (for cmip hindcast) or 'database/ts_datasets/storms_engelstad.csv' 
-        (for era5 hindcast).
-
-        Args:
-            fp_storm (Path): path to storm dataset
-
-        Returns:
-            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
-        """
-        st = np.zeros(self.T.shape)  # array of the same shape as t (0 when no storm, 1 when storm)
-        
-        self.conditions = np.zeros(self.T.shape, dtype=object)  # also directly read wave conditions here
-        
-        with open(fp_storm) as f:
-            
-            df = pd.read_csv(f, parse_dates=['time'])
-                                    
-            mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
-            
-            df = df[mask]
-        
-        # first check which database is being used, as they vary slightly with column names and available data
-        # if 'engelstad' in fp_storm:  IMPLEMENT DATABASE SPECIFIC VARIABLES HERE
-            
-            # for i, row in df.iterrows():
-                
-            #     index = np.argwhere(self.timestamps==row.time)
-                
-            #     st[index] = 1
-                
-            #     # safe storm conditions for this timestep as well            
-            #     self.conditions[index] = {
-            #             "Hso(m)": row["Hso(m)"],
-            #             "Hs(m)": row["Hs(m)"],
-            #             "Dp(deg)": row["Dp(deg)"],
-            #             "Tp(s)": row["Tp(s)"],
-            #             "SS(m)": row["SS(m)"],
-            #                 }
-            
-        df_dropna = df.dropna(axis=0)
-                        
-        for i, row in df_dropna[df_dropna['Hs(m)'] > self.config.wrapper.wave_height_threshold].iterrows():
-            
-            index = np.argwhere(self.timestamps==row.time)
-            
-            st[index] = 1
-            
-            # safe storm conditions for this timestep as well            
-            self.conditions[index] = {
-                    "Hs(m)": row["Hs(m)"],
-                    "Dp(deg)": row["Dp(deg)"],
-                    "Tp(s)": row["Tp(s)"],
-                    "SS(m)": row["SS(m)"],
-                        }
-        
-        self.water_levels = df['SS(m)'].values
-        
-        # else:
-        #     raise NameError("The given storm path is not recognized. Ensure that either 'erikson' or 'engelstad' is present in the file name.")
-        
-        return st
-                
-    def _when_xbeach_inter(self, call_xbeach_inter):
-        """This function determines the timestamps that xbeach is called regardless of sea-ice or storms.
-
-        Args:
-            call_xbeach_inter (int): Call xbeach every 'call_xbeach_inter' timestamps, regardsless of the presence of sea ice or a storm.
-
-        Returns:
-            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
-        """
-        ct = np.zeros(self.T.shape)
-        
-        # set xbeach active at provided intervals
-        ct[::call_xbeach_inter] = 1
-        
-        # for these intervals, if not conditions are supplied from the storm projections, set conditions to '0'
-        zero_conditions = {
-                    # "Hso(m)": 0.001,
-                    # "Hs(m)": 0.001,
-                    "Hso(m)": 0.2,  # placeholder
-                    "Hs(m)": 0.2,  # placeholder
-                    # "Hso(m)": 0,
-                    # "Hs(m)": 0,
-                    "Dp(deg)": 270,                    
-                    # "Dp(deg)": 0,
-                    "Tp(s)": 10,
-                    # "Tp(s)": 0,
-                    "SS(m)": 0,
-                    "Hindcast_or_projection": 0,
-                    }
-        
-        mask = np.nonzero((ct==1) * (self.conditions==0))
-
-        self.conditions[mask] = zero_conditions
-        
-        return ct
-    
-    def _when_xbeach_no_sea_ice(self, sea_ice_threshold):
-        """This function determines when xbeach should not be ran due to sea ice, based on a threshold value)
-
-        Args:
-            sea_ice_threshold (_type_): _description_
-
-        Returns:
-            array: array of length T that for each timestep contains a 1 if xbeach can be ran and 0 if not (w.r.t. sea ice).
-        """
-        it =  (self.forcing_data.sea_ice_cover.values < sea_ice_threshold)
-                
-        return it
-        
     ################################################
     ##                                            ##
     ##            # THERMAL FUNCTIONS             ##
@@ -923,10 +924,10 @@ class Simulation():
         self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
         
         # update the water level
-        self.water_level = (self.water_levels[timestep_id] if 'engelstad' in self.config.data.storm_data_path else self._update_water_level(timestep_id))
+        self.water_level = (self._update_water_level(timestep_id))
         
-        dry_mask = (self.zgr >= self.water_level)
-        wet_mask = (self.zgr < self.water_level)
+        dry_mask = (self.zgr >= self.water_level + self.R2)
+        wet_mask = (self.zgr < self.water_level + self.R2)
         
         # determine convective transport from air (formulation from Man, 2023)
         self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=timestep_id)  # also used in output
@@ -1004,25 +1005,10 @@ class Simulation():
         
         return ghost_nodes_temperature
     
-    def _update_water_level(self, timestep_id, subgrid_timestep_id=0):
-        # check wether or not this is a storm timestep.
-        if self.xbeach_times[timestep_id] and self.config.xbeach.with_xbeach:  # If it is, use (storm surge water level + runup)
-            
-            # get storm surge
-            surge = self.conditions[timestep_id]["SS(m)"]
-            
-            # get runup
-            if not subgrid_timestep_id:
-                
-                ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))
-                self.runup = ds.runup.values.flatten()[-1]
-                ds.close()
-            
-            # get water level to check whether to use convective heat transfer from air or sea
-            water_level = surge + self.runup
-            
-        else:  # otherwise, use a water level of z=0
-            water_level = 0
+    def _update_water_level(self, timestep_id):
+
+        # get storm surge
+        water_level = self.conditions[timestep_id]["WL(m)"]
             
         return water_level
     
@@ -1180,7 +1166,7 @@ class Simulation():
                     enthalpy_submerged_sediment = self.current_sea_temp * Cl_value + (Cs_value - Cl_value) * self.config.thermal.T_melt + self.config.thermal.L_water_ice * self.config.thermal.nb_max
                 
                 # get current water level
-                self.water_level = (self.water_levels[timestep_id] if 'engelstad' in self.config.data.storm_data_path else self._update_water_level(timestep_id))
+                self.water_level = (self._update_water_level(timestep_id))
                 
                 # Interpolate enthalpy to new grid             
                 self.enthalpy_matrix = um.linear_interp_z(
@@ -1503,7 +1489,6 @@ class Simulation():
             result_ds = result_ds.assign_coords(xgr_xb=xgr_xb)
 
             result_ds['wave_height'] = (["xgr_xb"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
-            result_ds['run_up'] = ds.runup.values.flatten()  # single value
             result_ds['zb'] = (["xgr_xb"], ds.zb.values.flatten()) # 1D series of bed levels
             result_ds['zs'] = (["xgr_xb"], ds.zs.values.flatten()) # 1D series of water levels
             result_ds['wave_energy'] = (["xgr_xb"], ds.E.values.flatten())  # 1D series of wave energies (associated with xgr.txt)
@@ -1526,12 +1511,12 @@ class Simulation():
                             'radiation_stress_xx', 'radiation_stress_xy', 'radiation_stress_yy', 
                             'mean_wave_angle', 'velocity_magnitude', 'orbital_velocity']:
                 result_ds[varname] = (["xgr_xb"], np.zeros(xgr_xb.shape))
-                
-            for varname in ['run_up']:
-                result_ds[varname] = 0
         
         # water level
-        result_ds['water_level'] = (self.water_levels[timestep_id] if 'engelstad' in self.config.data.storm_data_path else self._update_water_level(timestep_id))
+        result_ds['water_level'] = (self._update_water_level(timestep_id))
+        
+        # computed 2% runup
+        result_ds['run_up2%'] = self.R2
         
         # temperature variables
         result_ds['thaw_depth'] = (["xgr"], self.thaw_depth)  # 1D series of thaw depths
@@ -1585,6 +1570,15 @@ class Simulation():
         
         # os.rename(os.path.join())
 
+        return None
+    
+    def write_xb_timesteps(self):
+        """Used at the end of simulation, once all xbeach timesteps have been determined using 
+        the sea ice threshold, intermediate xbeach timesteps, and storm conditions"""
+        
+        # output the xbeach timestep ids
+        self._check_and_write('xbeach_times', self.xbeach_times, self.result_dir)
+        
         return None
         
     # functions below are used to quickly obtain values for forcing data
