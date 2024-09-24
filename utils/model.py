@@ -1504,6 +1504,8 @@ class Simulation():
 
             result_ds['wave_height'] = (["xgr_xb"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
             result_ds['run_up'] = ds.runup.values.flatten()  # single value
+            result_ds['zb'] = (["xgr_xb"], ds.zb.values.flatten()) # 1D series of bed levels
+            result_ds['zs'] = (["xgr_xb"], ds.zs.values.flatten()) # 1D series of water levels
             result_ds['wave_energy'] = (["xgr_xb"], ds.E.values.flatten())  # 1D series of wave energies (associated with xgr.txt)
             result_ds['radiation_stress_xx'] = (["xgr_xb"], ds.Sxx.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
             result_ds['radiation_stress_xy'] = (["xgr_xb"], ds.Sxy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)

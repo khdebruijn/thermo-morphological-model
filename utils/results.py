@@ -750,8 +750,10 @@ class SimulationResults():
             thaw_line.set_data(xgr, zgr - thaw_depth)
 
             # plot water level (in plot 0 & 1)
-            wl_line_bed.set_ydata([wl, wl])
-            wl_line_temp.set_ydata([wl, wl])
+            zs = self.get_var_timestep("zs").values.flatten()
+            xgr_xb = self.get_var_timestep("xgr_xb").values.flatten()
+            wl_line_bed.set_data([xgr_xb, zs])
+            wl_line_temp.set_data([xgr_xb, zs])
             
             # plot thaw interface (in plot 1)
             thaw_line.set_data(xgr, zgr - thaw_depth)

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import sys
+import time
 
 from IPython import get_ipython
 import numpy as np
@@ -72,6 +73,7 @@ def main(runid, args, attempt_counter_max=100):
             attempt_counter += 1
         
     print(f"completed {runid}")
+    print(f"finished at {time.time()}")
     
     return None
     

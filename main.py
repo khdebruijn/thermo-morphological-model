@@ -179,9 +179,11 @@ def main(sim):
         print()
     
 
-    print(f"Total simulation time: {(time.time() - t_start) / 3600:1f} hours")
     print(textbox("SIMULATION FINISHED"))
-    
+    print(f"{repr(sim)}")
+    print(f"Simulation started at: {(t_start)}")
+    print(f"Simulation finished at: {time.time()}")
+    print(f"Total simulation time: {(time.time() - t_start) / 3600:1f} hours")
     
     return sim.xgr, sim.zgr
 
