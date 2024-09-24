@@ -1518,10 +1518,14 @@ class Simulation():
             
         else:
             
+            xgr_xb = self.xgr[np.nonzero(self.zgr <= 0)]
+            
+            result_ds = result_ds.assign_coords(xgr_xb=xgr_xb)
+            
             for varname in ['wave_height', 'wave_energy', 'zb', 'zs',
                             'radiation_stress_xx', 'radiation_stress_xy', 'radiation_stress_yy', 
                             'mean_wave_angle', 'velocity_magnitude', 'orbital_velocity']:
-                result_ds[varname] = (["xgr"], np.zeros(self.xgr.shape))
+                result_ds[varname] = (["xgr_xb"], np.zeros(xgr_xb.shape))
                 
             for varname in ['run_up']:
                 result_ds[varname] = 0

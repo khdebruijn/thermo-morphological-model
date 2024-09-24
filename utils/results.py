@@ -751,7 +751,13 @@ class SimulationResults():
 
             # plot water level (in plot 0 & 1)
             zs = self.get_var_timestep("zs", output_id)
-            xgr_xb = self.get_var_timestep("xgr_xb", output_id)
+            
+                # some older simulations don't have xgr_xb for all datasets
+            try:
+                xgr_xb = self.get_var_timestep("xgr_xb", output_id)
+            except KeyError:
+                xgr_xb = self.get_var_timestep("xgr", output_id)
+                
             wl_line_bed.set_data([xgr_xb, zs])
             wl_line_temp.set_data([xgr_xb, zs])
             
