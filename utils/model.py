@@ -163,7 +163,7 @@ class Simulation():
         
         # check whether to use an xbeach generated xgrid or to generate uniform grid using linspace
         if nx:
-            self.xgr = np.linspace(min(self.bathy_grid), max(self.bathy_grid), self.config.model.nx)
+            self.xgr = np.linspace(min(self.bathy_grid), max(self.bathy_grid), nx)
         else:
             # transform into a more suitable grid for xbeach
             self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2, ppwl=self.config.bathymetry.ppwl)
@@ -651,7 +651,7 @@ class Simulation():
         
         # set the above determined initial conditions for the xgr
         for i in range(len(self.temp_matrix)):
-            if self.zgr[i] >= self.config.thermal.wl_switch:  # assume that the initial water level is at zero
+            if self.zgr[i] >= self.config.thermal.MSL:  # assume that the initial water level is at zero
                 self.temp_matrix[i,:] = ground_temp_distr_dry[:,1]
             else:
                 self.temp_matrix[i,:] = ground_temp_distr_wet[:,1]
@@ -943,6 +943,7 @@ class Simulation():
             hc = self.config.thermal.hc_guess
         else:
             # determine hydraulic parameters for convective heat transfer computation
+            
             if self.xb_times[timestep_id] and self.config.xbeach.with_xbeach:
                 
                 data_path = os.path.join(self.cwd, "xboutput.nc")
@@ -951,7 +952,7 @@ class Simulation():
                 
                 H = ds.H.values.flatten()
 
-                wl = self.config.thermal.wl_switch + ds.runup.values.flatten()
+                wl = self._update_water_level(timestep_id)
                 
                 d = np.maximum(wl - ds.zb.values.flatten(), np.zeros(H.shape))
                 T = self.conditions[timestep_id]["Tp(s)"]
@@ -961,7 +962,7 @@ class Simulation():
             else:
                 H = np.ones(self.xgr.shape) * 0.001
                 
-                wl = self.config.thermal.wl_switch
+                wl = self._update_water_level(timestep_id)
                 
                 d = np.maximum(wl - self.zgr, 0)
                 T = 10

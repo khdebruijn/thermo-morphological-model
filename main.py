@@ -85,6 +85,7 @@ def main(sim):
     
     # generate initial grid files and save them
     xgr, zgr, ne_layer = sim.generate_initial_grid(
+        nx=sim.config.bathymetry.nx if 'nx' in sim.config.bathymetry.keys() else None,
         bathy_path=sim.config.bathymetry.depfile,
         bathy_grid_path=sim.config.bathymetry.xfile
         )
@@ -133,9 +134,12 @@ def main(sim):
             sim.write_output(timestep_id, t_start)
             
             print("sucessfully generated output")
-            
+        
         # check whether to run XBeach or not for this timestep
-        sim.xbeach_times[timestep_id] = sim.check_xbeach(timestep_id)
+        if sim.config.xbeach.with_xbeach:
+            sim.xbeach_times[timestep_id] = sim.check_xbeach(timestep_id)
+        else:
+            sim.xbeach_times[timestep_id] = 0
             
         # check if xbeach is enabled for current timestep
         if sim.xbeach_times[timestep_id] and sim.config.xbeach.with_xbeach:
