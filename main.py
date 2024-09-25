@@ -186,7 +186,7 @@ def main(sim):
             
         # calculate the current thaw depth
         sim.find_thaw_depth()
-        
+            
         print()
     
     # write xbeach timesteps

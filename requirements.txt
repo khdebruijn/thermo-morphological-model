@@ -21,3 +21,5 @@ geoviews
 cartopy
 pyproj
 moviepy
+ipykernel
+pyarrow
