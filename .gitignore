@@ -36,12 +36,10 @@ test/*.nc
 # run output (in the runs folder)
 runs/*/results/*/*.txt
 runs/*/results/*.txt
-runs/*/*.dep
 runs/*/*.png
 runs/*/*.bcf
 runs/*/*.txt
 runs/*/*.bat
-runs/*/*.grd
 runs/*/*.nc
 runs/*/*.dat
 
