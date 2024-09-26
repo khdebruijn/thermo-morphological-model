@@ -112,7 +112,7 @@ thermal:
   hc_guess : 500  # [W/m2/K], guess for the convective heat transfer coefficient from water (from Kobayashi et al, 1999)
 
   # water properties
-  wl_switch       : 0  # [m], water level relative to outputted local water level at which is switched from wet to dry (positive means higher than output water level)
+  MSL             : 0  # [m], water level relative to outputted local water level at which is switched from wet to dry (positive means higher than output water level)
   L_water_ice     : 334000 # [J/kg] latent heat of fusion water-ice
   rho_water       : 1000  # [kg/m3] water density
   rho_ice         : 971  # [kg/m3] density ice
