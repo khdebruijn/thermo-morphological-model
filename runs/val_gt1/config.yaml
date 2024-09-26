@@ -182,5 +182,5 @@ output:
     "wind_direction",
     ]
 
-  save_ground_temp_layers: [0.5, 1.0, 2.0, 2.95]  # [m] depths at which ground temperature is written seperately to csv file
+  save_ground_temp_layers: [0, 0.5, 1.0, 2.0, 2.95]  # [m] depths at which ground temperature is written seperately to csv file
   
