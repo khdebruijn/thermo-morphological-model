@@ -124,7 +124,7 @@ def main(sim):
     ##                                            ##
     ################################################
     
-    for timestep_id in range(len(sim.T)):
+    for timestep_id in np.arange(len(sim.T)):
         
         print(f"timestep {timestep_id+1}/{len(sim.T)}")
         
@@ -134,6 +134,15 @@ def main(sim):
             sim.write_output(timestep_id, t_start)
             
             print("sucessfully generated output")
+            
+        # used for validation of the temperature model
+        if 'save_ground_temp_layers' in sim.config.output.keys():
+            
+            sim.save_ground_temp_layers_in_memory(
+                timestep_id, 
+                layers=sim.config.output.save_ground_temp_layers,
+                write=(timestep_id == np.arange(len(sim.T))[-1]),
+                )
         
         # check whether to run XBeach or not for this timestep
         if sim.config.xbeach.with_xbeach:

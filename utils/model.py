@@ -1594,6 +1594,46 @@ class Simulation():
         
         return None
     
+    def save_ground_temp_layers_in_memory(self, timestep_id, layers=[], write=False):
+        """This function saves the ground temperature directly into a single dataframe, 
+        which is helpfule for validation purposes.
+
+        Args:
+            timestep_id (int): id of the current timestep
+            layers (list, optional): list of the layers to save. Defaults to [].
+            write (bool, optional): whether or not to write. Defaults to False.
+        """
+        col_names = ['time'] + [f'temp_{layer}m[K]' for layer in layers]
+        
+        # create dataframe at first timestep
+        if timestep_id == 0:
+                        
+            self.temperature_timeseries = pd.DataFrame(columns=col_names)
+        
+        values = [self.timestamps[timestep_id]]
+        
+        # loop through layers to find corresponding temperature
+        for layer in layers:
+            
+            index_x = int(self.temp_matrix.shape[0] // 2)
+            index_z = int(layer * self.config.thermal.grid_resolution // self.config.thermal.max_depth)
+            
+            values.append(self.temp_matrix[index_x, index_z])
+        
+        # add temperature to dataframe
+        self.temperature_timeseries = self.temperature_timeseries._append(
+            dict(zip(col_names, values)), ignore_index=True
+        )
+        
+        # write output at final timestep
+        if write:
+            self.temperature_timeseries.to_csv(
+                os.path.join(self.result_dir, "ground_temperature_timeseries.csv")
+            )
+            
+        return None
+        
+    
     def _check_and_write(self, varname, save_var, dirname):
         
         if varname in self.config.output.output_vars:

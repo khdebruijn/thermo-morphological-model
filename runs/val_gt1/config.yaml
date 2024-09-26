@@ -7,7 +7,7 @@ data:
 model:
   longitude         : -143.7  # longitude of the study site
   latitude          : 70.13  # latitude of the study site
-  time_start        : '01-01-2011'  # MM-DD-YY starting time (if -1 take entire dataset)
+  time_start        : '01-01-2010'  # DD-MM-YY starting time (if -1 take entire dataset)
   time_end          : '31-12-2011' # MM-DD-YY stopping time (if -1 take entire dataset)
   timestep          : 1  # size of timesteps (in hours)
   call_xbeach_inter :  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
@@ -134,7 +134,6 @@ thermal:
   depth_constant_k    : 1  # [m] depth at which k reaches its maximum value. k remains constant below this depth (Ravens, MATLAB script)
   geothermal_gradient : 0.025  # [K/m] geothermal gradient, used as the boundary condition at the bottom of each 1D model
 
-
 # output
 output:
   output_res              : 12  # temporal resolution of output variables in hours (i.e., model outputs given variable names every X hours)
@@ -182,4 +181,6 @@ output:
     "wind_velocity",
     "wind_direction",
     ]
+
+  save_ground_temp_layers: [0.5, 1.0, 2.0, 2.95]  # [m] depths at which ground temperature is written seperately to csv file
   
