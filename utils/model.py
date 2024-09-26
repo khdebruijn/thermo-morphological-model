@@ -383,8 +383,11 @@ class Simulation():
             dry_mask = np.nonzero(dry_mask)
             wet_mask = np.nonzero(wet_mask)
             
-            x1, x2 = self.xgr[wet_mask[-1]], self.xgr[dry_mask[0]]
-            z1, z2 = self.zgr[wet_mask[-1]], self.zgr[dry_mask[0]]
+            x1, z1 = self.xgr[np.min(dry_mask)], self.zgr[np.min(dry_mask)]
+            x2, z2 = self.xgr[np.min(wet_mask)], self.zgr[np.min(wet_mask)]
+            
+            # x1, x2 = self.xgr[wet_mask[-1]], self.xgr[dry_mask[0]]
+            # z1, z2 = self.zgr[wet_mask[-1]], self.zgr[dry_mask[0]]
             
             dz = z2 - z1
             dx = x2 - x1
