@@ -367,12 +367,28 @@ class Simulation():
         mask = np.nonzero((self.zgr > wl - 2*sigma) * (self.zgr < wl + 2*sigma))
         z_envelope = self.zgr[mask]
         x_envelope = self.zgr[mask]
+            
+        # if waves are too small, the envelope doesn't exist on the grid, so this method will fail
+        try:
+            # compute beta_f as the average slope in this envelope
+            dz = z_envelope[np.argmax(x_envelope)] - z_envelope[np.argmin(x_envelope)]
+            dx = x_envelope[np.argmax(x_envelope)] - x_envelope[np.argmin(x_envelope)]
         
-        # compute beta_f as the average slope in this envelope
-        dz = z_envelope[np.argmax(x_envelope)] - z_envelope[np.argmin(x_envelope)]
-        dx = x_envelope[np.argmax(x_envelope)] - x_envelope[np.argmin(x_envelope)]
+        # and in that case, the local angle of the two grid points nearest to the water level is used
+        except ValueError:
+            
+            dry_mask = np.nonzero(self.zgr > wl)
+            wet_mask = np.nonzero(np.ones(dry_mask.shape) - dry_mask)
+            
+            x1, x2 = self.xgr[wet_mask[-1]], self.xgr[dry_mask[0]]
+            z1, z2 = self.zgr[wet_mask[-1]], self.zgr[dry_mask[0]]
+            
+            dz = z2 - z1
+            dx = x2 - x1
+            
+        # compute beta_f            
         beta_f = np.abs(dz / dx)
-        
+
         # now the empirical formulation by Stockdon et al. (2006) can be used to determine R2%
         self.R2 = 1.1 * (0.35 * beta_f * (H0 * L0)**0.5 + (H0 * L0 * (0.563 * beta_f**2 + 0.004))**0.5 / 2)
         
