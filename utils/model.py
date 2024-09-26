@@ -287,10 +287,12 @@ class Simulation():
         
         # get sea-ice timestep ids
         self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.wrapper.sea_ice_threshold)
-
-        # run xbeach for storm and inter-storm timesteps, but never when too much sea ice
-        # whether or not there is actually a storm is computed during each timestep, and is based on a 2% runup threshold
-        self.xbeach_times =  self.xbeach_sea_ice + self.xbeach_inter
+        
+        # initialize xbeach storms array
+        self.xbeach_storms = np.zeros(self.xbeach_inter.shape)
+        
+        # initialize xbeach_times array
+        self.xbeach_times = np.zeros(self.xbeach_inter.shape)
 
         return self.xbeach_times
     
@@ -309,8 +311,8 @@ class Simulation():
         # set xbeach active at provided intervals
         ct[::call_xbeach_inter] = 1
         
-        # for these intervals, if not conditions are supplied from the storm projections, set conditions to '0'
-        zero_conditions = {
+        # initialize zero conditions
+        self.zero_conditions = {
                     # "Hso(m)": 0.001,
                     # "Hs(m)": 0.001,
                     "Hso(m)": 0.2,  # placeholder
@@ -324,10 +326,6 @@ class Simulation():
                     "WL(m)": 0,
                     "Hindcast_or_projection": 0,
                     }
-        
-        mask = np.nonzero((ct==1) * (self.conditions==0))
-
-        self.conditions[mask] = zero_conditions
         
         return ct
     
@@ -344,14 +342,14 @@ class Simulation():
                 
         return it
     
-    def check_xbeach(self, timestep_id):
-        """This function checks whether XBeach should be ran for the upcoming timestep.
+    def _when_xbeach_storms(self, timestep_id):
+        """This function checks whether or not there is actually a storm during the upcoming each timestep, and is based on a 2% runup threshold
 
         Args:
-            timestep_id (int): id of the current timestep
+            timestep_id (int): current timestep
 
         Returns:
-            int: whether or not to run XBeach. 1 if yes, 0 if no.
+            int: 1 for storm, 0 for no storm
         """
         # read hydrodynamic conditions for current timestep
         H = self.conditions[timestep_id]['Hs(m)']
@@ -398,7 +396,25 @@ class Simulation():
         # now the empirical formulation by Stockdon et al. (2006) can be used to determine R2%
         self.R2 = 1.1 * (0.35 * beta_f * (H0 * L0)**0.5 + (H0 * L0 * (0.563 * beta_f**2 + 0.004))**0.5 / 2)
         
+        run_xb_storm = int(self.R2 + wl > self.config.wrapper.xb_threshold)
+        
         return int(self.R2 + wl > self.config.wrapper.xb_threshold)
+    
+    def check_xbeach(self, timestep_id):
+        """This function checks whether XBeach should be ran for the upcoming timestep.
+
+        Args:
+            timestep_id (int): id of the current timestep
+
+        Returns:
+            int: whether or not to run XBeach. 1 if yes, 0 if no.
+        """
+        
+        self.xbeach_storms[timestep_id] = self._when_xbeach_storms(timestep_id)
+        
+        self.xbeach_times[timestep_id] = self.xbeach_inter[timestep_id] + self.xbeach_sea_ice[timestep_id] * self.xbeach_storms[timestep_id]
+                
+        return self.xbeach_times[timestep_id]
         
     def xbeach_setup(self, timestep_id):
         """This function initializes an xbeach run, i.e., it writes all inputs to files
@@ -420,14 +436,18 @@ class Simulation():
             dtheta=self.config.xbeach.dtheta,
             )
         
-        # check if Erikson or Engelstad data, as these datasets look a bit different.
+        # check zero conditions or normal conditions should be used
+        if self.xbeach_inter[timestep_id] and not self.xbeach_storms[timestep_id] * self.xbeach_sea_ice[timestep_id]:
+            conditions = self.zero_conditions
+        else:
+            conditions = self.conditions[timestep_id]
         
         # set the waves
         self.xb_setup.set_waves('parametric', {
             # need to give each parameter as series (in this case, with length 1)
-            "Hm0":self.conditions[timestep_id]["Hs(m)"],  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
-            "Tp":self.conditions[timestep_id]["Tp(s)"],
-            "mainang":self.conditions[timestep_id]["Dp(deg)"],  # relative to true north
+            "Hm0":conditions["Hs(m)"],  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
+            "Tp":conditions["Tp(s)"],
+            "mainang":conditions["Dp(deg)"],  # relative to true north
             "gammajsp": 1.3,  # placeholder
             "s": 10,     # placeholder
             "duration": self.dt * 3600,
@@ -437,7 +457,7 @@ class Simulation():
         
         # load in wind and water level data
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
-        surge = self.conditions[timestep_id]["WL(m)"]  # used for output
+        wl = conditions["WL(m)"]  # used for output
         
         # check if this is a storm timestep that should be written in its entirety
         if self.config.xbeach.write_first_storms:
@@ -501,7 +521,7 @@ class Simulation():
 
             # tide boundary conditions
             "tideloc": 0,
-            "zs0":surge,
+            "zs0":wl,
 
             # wave boundary conditions
             "instat": self.config.xbeach.wbctype,

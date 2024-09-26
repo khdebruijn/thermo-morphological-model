@@ -90,6 +90,14 @@ thermal:
   with_solar    : True  # include short wave solar radiation in thermal computation step
   with_longwave : True  # include longwave radiation (incoming & outgoining) in thermal computation step
   with_latent   : True  # include latent heat in thermal computation step
+
+  # model properties
+  dt              : 2  # [s] timestep used in the thermal model on the temporal subgrid
+  grid_resolution : 30  # number of points for each 1D thermal model
+  max_depth       : 3  # [m], the maximum depth of the 1D thermal model
+  T_melt          : 273.15  # [K] Melting temperature at the interface of water/air and bluff
+  grid_interpolation : "linear_interp_z"  # method for interpolating to new grid. Can be "linear_interp_with_nearest" or "linear_interp_z".
+  N_thaw_threshold: 3  # number of grid points that need to be frozen before being counted as non-erodible surface
   
   # solar flux calculator
   with_solar_flux_calculator : True  # include solar flux calculator in the computation (if False, the every surface is treated as flat); requires 'with_solar: True'
@@ -102,14 +110,6 @@ thermal:
   # guess for convective heat transfer from water
   with_convective_transport_water_guess : True  # include a guess of convective heat transfer from water in thermal computation step. If False, a more sophisticated computation is performed
   hc_guess : 500  # [W/m2/K], guess for the convective heat transfer coefficient from water (from Kobayashi et al, 1999)
-
-  # model properties
-  dt              : 2  # [s] timestep used in the thermal model on the temporal subgrid
-  grid_resolution : 30  # number of points for each 1D thermal model
-  max_depth       : 3  # [m], the maximum depth of the 1D thermal model
-  T_melt          : 273.15  # [K] Melting temperature at the interface of water/air and bluff
-  grid_interpolation : "linear_interp_z"  # method for interpolating to new grid. Can be "linear_interp_with_nearest" or "linear_interp_z".
-  N_thaw_threshold: 3  # number of grid points that need to be frozen before being counted as non-erodible surface
 
   # water properties
   MSL             : 0  # [m], water level relative to outputted local water level at which is switched from wet to dry (positive means higher than output water level)
