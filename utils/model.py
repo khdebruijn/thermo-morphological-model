@@ -875,16 +875,11 @@ class Simulation():
             
             # read data into dataframe
             df = pd.read_csv(os.path.join(self.proj_dir, self.config.data.initial_ground_temp_path), parse_dates=['time'])
-            
-            print(df)
-            print(t_start)
-            
+                        
             # select correct row
             mask = (df['time'] == t_start)
             df = df[mask]
-            
-            print(df)
-            
+                        
             # read in points
             dry_points = np.array([
                 [0.0, df['T50cm'].values[0] + 273.15],
