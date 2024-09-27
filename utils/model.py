@@ -874,7 +874,7 @@ class Simulation():
         else:
             
             # read data into dataframe
-            df = pd.read_csv(self.config.data.initial_ground_temp_path)
+            df = pd.read_csv(os.path.join(self.proj_dir, self.config.data.initial_ground_temp_path))
             
             # select correct row
             mask = (df['time'] == t_start)
