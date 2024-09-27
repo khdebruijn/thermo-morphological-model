@@ -833,7 +833,6 @@ class Simulation():
         print(self.A_matrix)
         return self.A_matrix
     
-    @classmethod
     def _generate_initial_ground_temperature_distribution(self, df, t_start, n, max_depth):
         """This method generates an initial ground temperature distribution using soil temperature in different layers (read from 'df'),
         at the first time step 't_start'. The depth between 0 and 'max_depth' is divided in 'n' grid points.
@@ -878,7 +877,7 @@ class Simulation():
             df = pd.read_csv(self.config.data.initial_ground_temp_path)
             
             # select correct row
-            mask = (df['time'] == self.t_start)
+            mask = (df['time'] == t_start)
             df = df[mask]
             
             # read in points
