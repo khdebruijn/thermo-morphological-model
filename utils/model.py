@@ -851,27 +851,48 @@ class Simulation():
         Temperature is linearly interpolated for the entire depth, and assumed constant below the center of Layer 4, as well as constant above the center 
         of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
         exchange from the lower layers.
-        """                                     
-        dry_points = np.array([
-            [0, df.soil_temperature_level_1.values[0]],
-            [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
-            [(0.28+0.07)/2, df.soil_temperature_level_2.values[0]],
-            [(1+0.28)/2, df.soil_temperature_level_3.values[0]],
-            [(2.89+1)/2, df.soil_temperature_level_4.values[0]],
-            [(2.29+max_depth)/2, df.soil_temperature_level_4.values[0]],
-        ])
-        
+        """                                    
+        if not "initial_ground_temp_path" in self.config.data.keys(): 
+            
+            dry_points = np.array([
+                [0, df.soil_temperature_level_1.values[0]],
+                [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
+                [(0.28+0.07)/2, df.soil_temperature_level_2.values[0]],
+                [(1+0.28)/2, df.soil_temperature_level_3.values[0]],
+                [(2.89+1)/2, df.soil_temperature_level_4.values[0]],
+                [max_depth, df.soil_temperature_level_4.values[0]],
+            ])
+            
+            wet_points = np.array([
+                [0, df.soil_temperature_level_1_offs.values[0]],
+                [(0.07+0)/2, df.soil_temperature_level_1_offs.values[0]],
+                [(0.28+0.07)/2, df.soil_temperature_level_2_offs.values[0]],
+                [(1+0.28)/2, df.soil_temperature_level_3_offs.values[0]],
+                [(2.89+1)/2, df.soil_temperature_level_4_offs.values[0]],
+                [max_depth, df.soil_temperature_level_4_offs.values[0]],
+            ])
+            
+        else:
+            
+            # read data into dataframe
+            df = pd.read_csv(self.config.data.initial_ground_temp_path)
+            
+            # select correct row
+            mask = (df['time'] == self.t_start)
+            df = df[mask]
+            
+            # read in points
+            dry_points = np.array([
+                [0.0, df['T50cm'].values[0] + 273.15],
+                [0.5, df['T50cm'].values[0] + 273.15],
+                [1.0, df['T100cm'].values[0] + 273.15],
+                [2.0, df['T200cm'].values[0] + 273.15],
+                [2.95, df['T295cm'].values[0] + 273.15],
+                [max_depth, df['T295cm'].values[0] + 273.15],
+            ])
+            
+            
         ground_temp_distr_dry = um.interpolate_points(dry_points[:,0], dry_points[:,1], n)
-        
-        wet_points = np.array([
-            [0, df.soil_temperature_level_1_offs.values[0]],
-            [(0.07+0)/2, df.soil_temperature_level_1_offs.values[0]],
-            [(0.28+0.07)/2, df.soil_temperature_level_2_offs.values[0]],
-            [(1+0.28)/2, df.soil_temperature_level_3_offs.values[0]],
-            [(2.89+1)/2, df.soil_temperature_level_4_offs.values[0]],
-            [(2.29+max_depth)/2, df.soil_temperature_level_4_offs.values[0]],
-        ])
-        
         ground_temp_distr_wet = um.interpolate_points(wet_points[:,0], wet_points[:,1], n)
         
         return ground_temp_distr_dry, ground_temp_distr_wet
