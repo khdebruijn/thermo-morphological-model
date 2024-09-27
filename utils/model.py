@@ -887,12 +887,12 @@ class Simulation():
             
             # read in points
             dry_points = np.array([
-                [0.0, df['T50cm'].values + 273.15],
-                [0.5, df['T50cm'].values + 273.15],
-                [1.0, df['T100cm'].values + 273.15],
-                [2.0, df['T200cm'].values + 273.15],
-                [2.95, df['T295cm'].values + 273.15],
-                [max_depth, df['T295cm'].values + 273.15],
+                [0.0, df['T50cm'].values[0] + 273.15],
+                [0.5, df['T50cm'].values[0] + 273.15],
+                [1.0, df['T100cm'].values[0] + 273.15],
+                [2.0, df['T200cm'].values[0] + 273.15],
+                [2.95, df['T295cm'].values[0] + 273.15],
+                [max_depth, df['T295cm'].values[0] + 273.15],
             ])
             
             wet_points = dry_points
