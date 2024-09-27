@@ -863,7 +863,7 @@ class Simulation():
             ])
             
             wet_points = np.array([
-                [0, df.soil_temperature_level_1_offs.values[0]],
+                [0, df.soil_temperature_level_1_offs],
                 [(0.07+0)/2, df.soil_temperature_level_1_offs.values[0]],
                 [(0.28+0.07)/2, df.soil_temperature_level_2_offs.values[0]],
                 [(1+0.28)/2, df.soil_temperature_level_3_offs.values[0]],
