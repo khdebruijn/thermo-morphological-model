@@ -1655,7 +1655,7 @@ class Simulation():
         # write output at final timestep
         if write:
             self.temperature_timeseries.to_csv(
-                os.path.join(self.result_dir, "ground_temperature_timeseries.csv")
+                os.path.join(self.result_dir, f"{self.runid}_ground_temperature_timeseries.csv")
             )
             
         return None
