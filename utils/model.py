@@ -1646,9 +1646,9 @@ class Simulation():
             
         # find heat fluxes
         values.append(self.heat_flux[index_x])
-        values.append(self.lw_flux)
+        values.append(self.lw_flux[index_x])
         values.append(self.sw_flux[index_x])
-        values.append(self.latent_flux)
+        values.append(self.latent_flux[index_x])
         values.append(self.convective_flux[index_x])
 
         # add temperature and heat fluxes to dataframe
