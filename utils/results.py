@@ -677,8 +677,8 @@ class SimulationResults():
         axs[2].set_xlim((xmin, xmax))
         axs[3].set_xlim((xmin, xmax))
 
-        axs[0].set_ylim((-10, 15))
-        axs[1].set_ylim((-10, 15))
+        axs[0].set_ylim((-15, 15))
+        axs[1].set_ylim((-15, 15))
         axs[2].set_ylim((-1, 4))
         axs[3].set_ylim((-1000, 1000))
         axs[4].set_ylim((-0.5, 1.5))
