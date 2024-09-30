@@ -579,8 +579,8 @@ class SimulationResults():
         animation_timesteps=None,
         xmin=0, 
         xmax=1500,
-        vmin=-10,  # degrees Celcius
-        vmax=10,   # degrees Celcius
+        vmin=-2,  # degrees Celcius
+        vmax=0.5,   # degrees Celcius
         cmap='plasma',
         aspect_equal=False, 
         save=True, 
