@@ -1616,31 +1616,25 @@ class Simulation():
         
         return None
     
-    def save_ground_temp_layers_in_memory(self, timestep_id, layers=[], write=False):
+    def save_ground_temp_layers_in_memory(self, timestep_id, layers=[], heat_fluxes=[], write=False):
         """This function saves the ground temperature directly into a single dataframe, 
         which is helpfule for validation purposes.
 
         Args:
             timestep_id (int): id of the current timestep
             layers (list, optional): list of the layers to save. Defaults to [].
+            heat_fluxes (list, optional): list of heat fluxes to save. Defaults to [].
             write (bool, optional): whether or not to write. Defaults to False.
         """
-        heat_fluxes = [
-            'total_heat_flux[W/m2]', 
-            'long_wave_radiation_flux[W/m2]', 
-            'solar_radiation_flux[W/m2]', 
-            'latent_heat_flux[W/m2]', 
-            'convective_heat_flux[W/m2]'
-            ]
-        
-        col_names = ['time'] + [f'temp_{layer}m[K]' for layer in layers] + heat_fluxes
+        # define colnames
+        col_names = ['time'] + ['air_temp[K]'] + [f'temp_{layer}m[K]' for layer in layers] + heat_fluxes
         
         # create dataframe at first timestep
         if timestep_id == 0:
                         
             self.temperature_timeseries = pd.DataFrame(columns=col_names)
         
-        values = [self.timestamps[timestep_id]]
+        values = [self.timestamps[timestep_id], self.current_air_temp]
         
         # loop through layers to find corresponding temperature
         for layer in layers:

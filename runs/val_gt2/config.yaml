@@ -184,4 +184,6 @@ output:
     ]
 
   save_ground_temp_layers: [0, 0.5, 1.0, 2.0, 2.95]  # [m] depths at which ground temperature is written seperately to csv file
+  heat_fluxes: ['total_heat_flux[W/m2]', 'long_wave_radiation_flux[W/m2]', 'solar_radiation_flux[W/m2]', 'latent_heat_flux[W/m2]', 'convective_heat_flux[W/m2]']    # define heat fluxes to be used in memory output
+
   

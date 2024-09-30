@@ -141,6 +141,7 @@ def main(sim):
             sim.save_ground_temp_layers_in_memory(
                 timestep_id, 
                 layers=sim.config.output.save_ground_temp_layers,
+                heat_fluxes=sim.config.output.heat_fluxes,
                 write=(timestep_id == np.arange(len(sim.T))[-1]),
                 )
         
