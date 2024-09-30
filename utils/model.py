@@ -1043,7 +1043,7 @@ class Simulation():
         # compute total convective transport
         self.convective_flux = dry_mask * convective_transport_air + wet_mask * convective_transport_water  # also used in output
         
-        if subgrid_timestep_id == 0:  # determine radiation fluxes only during first timestep, as they are constant for each subgrid timestep
+        if subgrid_timestep_id == 0:  # determine radiation fluxes only during first subgrid timestep, as they are constant for each subgrid timestep
         
             # determine radiation, assuming radiation only influences the dry domain
             self.latent_flux = dry_mask * (row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0)  # also used in output
@@ -1625,7 +1625,15 @@ class Simulation():
             layers (list, optional): list of the layers to save. Defaults to [].
             write (bool, optional): whether or not to write. Defaults to False.
         """
-        col_names = ['time'] + [f'temp_{layer}m[K]' for layer in layers]
+        heat_fluxes = [
+            'total_heat_flux[W/m2]', 
+            'long_wave_radiation_flux[W/m2]', 
+            'solar_radiation_flux[W/m2]', 
+            'latent_heat_flux[W/m2]', 
+            'convective_heat_flux[W/m2]'
+            ]
+        
+        col_names = ['time'] + [f'temp_{layer}m[K]' for layer in layers] + heat_fluxes
         
         # create dataframe at first timestep
         if timestep_id == 0:
@@ -1641,12 +1649,19 @@ class Simulation():
             index_z = int(layer * self.config.thermal.grid_resolution // self.config.thermal.max_depth)
             
             values.append(self.temp_matrix[index_x, index_z])
-        
-        # add temperature to dataframe
+            
+        # find heat fluxes
+        values.append(self.heat_flux[index_x])
+        values.append(self.lw_flux)
+        values.append(self.sw_flux[index_x])
+        values.append(self.latent_flux)
+        values.append(self.convective_flux[index_x])
+
+        # add temperature and heat fluxes to dataframe
         self.temperature_timeseries = self.temperature_timeseries._append(
             dict(zip(col_names, values)), ignore_index=True
         )
-        
+                
         # write output at final timestep
         if write:
             self.temperature_timeseries.to_csv(
