@@ -34,7 +34,7 @@ def main(runid, args, attempt_counter_max=100):
     ##  define kwargs here  ##
     ##########################
     make_animation = False
-    xmin, xmax = float(args[1], args[2])
+    xmin, xmax = float(args[1]), float(args[2])
     fps = frame_num / 120  # for a 120 second animation
     
 
