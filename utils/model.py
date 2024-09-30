@@ -162,7 +162,7 @@ class Simulation():
             self._load_grid_bathy(os.path.join(self.cwd, "x.grd"))
         
         # check whether to use an xbeach generated xgrid or to generate uniform grid using linspace
-        if nx:
+        if nx and self.config.bathymetry.with_nx:
             self.xgr = np.linspace(min(self.bathy_grid), max(self.bathy_grid), nx)
         else:
             # transform into a more suitable grid for xbeach
