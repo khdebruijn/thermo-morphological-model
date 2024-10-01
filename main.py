@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import sys
 import time
-import datetime
 
 from IPython import get_ipython
 import numpy as np

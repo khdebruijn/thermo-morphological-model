@@ -913,7 +913,10 @@ class Simulation():
         self.temp_matrix = self._temperature_from_enthalpy(frozen_mask, inbetween_mask, unfrozen_mask)
         
         # determine the actual k-matrix using the masks
-        self.k_matrix = (frozen_mask + inbetween_mask) * self.k_frozen_matrix + unfrozen_mask * self.k_unfrozen_matrix
+        self.k_matrix = \
+            frozen_mask * self.k_frozen_matrix + \
+            inbetween_mask * ((self.k_frozen_matrix + self.k_unfrozen_matrix) / 2) + \
+            unfrozen_mask * self.k_unfrozen_matrix
         
         # get the new boundary condition
         self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id, subgrid_timestep_id)
