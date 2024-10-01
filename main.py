@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import sys
 import time
+import datetime
 
 from IPython import get_ipython
 import numpy as np
@@ -9,7 +10,7 @@ import pandas as pd
 
 from utils.model import Simulation
 from utils.bathymetry import generate_schematized_bathymetry
-from utils.miscellaneous import textbox
+from utils.miscellaneous import textbox, datetime_from_timestamp
 
 
 def main(sim):
@@ -204,12 +205,11 @@ def main(sim):
 
     print(textbox("SIMULATION FINISHED"))
     print(f"{repr(sim)}")
-    print(f"Simulation started at: {(t_start)}")
-    print(f"Simulation finished at: {time.time()}")
-    print(f"Total simulation time: {(time.time() - t_start) / 3600:1f} hours")
+    print(f"Simulation started at: {datetime_from_timestamp(t_start)}")
+    print(f"Simulation finished at: {datetime_from_timestamp(time.time())}")
+    print(f"Total simulation time: {(time.time() - t_start) / 3600:.1f} hours")
     
     return sim.xgr, sim.zgr
-
 
 if __name__ == '__main__':
     
