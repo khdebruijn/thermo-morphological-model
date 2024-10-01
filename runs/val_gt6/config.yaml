@@ -28,7 +28,7 @@ bathymetry:
   grid_orientation: 88.14  # [degrees], orientation of bluff face with respect to east (ccw). The current orientation is calculated in the 'generate_bathymetry.ipynb' notebook
   ppwl            : 40  # number of points in the grid per wavelength. Default 20.
   nx              : 3   # number of points in initial grid. Set to 'None' if this should be based on ppwl.
-  with_nx         : False  # whether or not to use the number of points specified with nx
+  with_nx         : True  # whether or not to use the number of points specified with nx
 
   # schematized bathymetry parameters
   with_schematized_bathymetry : False  # whether or not to generate a schematized bathymetry upon initialization

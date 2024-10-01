@@ -124,14 +124,14 @@ thermal:
   rho_soil        : "None"   # [kg/m3] density soil, constant for frozen/unfrozen. If "None", density is calculated as "nb * rho_water + (1-nb) * rho_particle".
   rho_particle    : 2650     # [kg/m3] particle density of soil, only used if "rho_soil = None"
   nb_min          : 0.45     # [-] minimum ground ice content (Ravens et al, 2023: 0.65 - 0.45)
-  nb_max          : 0.65     # [-] maximum ground ice content (Ravens et al, 2023: 0.65 - 0.45)
+  nb_max          : 0.45     # [-] maximum ground ice content (Ravens et al, 2023: 0.65 - 0.45)
   nb_min_depth    : 1.5      # [m] end switch from max to min porosity (adapted from Ravens, thermal model)
   nb_max_depth    : 0.5      # [m] start switch from max to min porosity (adapted from Ravens, thermal model)
   c_soil_frozen   : 4600000  # [J/K/m3] volumetric heat capacity for frozen soil (Ravens et al, 2023)  ( = specific heat capacity)
   c_soil_unfrozen : 7000000  # [J/K/m3] volumetric heat capacity for unfrozen soil (Ravens et al, 2023)
-  k_soil_frozen_min   : 1.2  # [W/m/K] minimum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
+  k_soil_frozen_min   : 1.7  # [W/m/K] minimum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
   k_soil_frozen_max   : 2.7  # [W/m/K] maximum thermal conductivity for frozen soil (Ravens et al, 2023: 0.7 - 2.7)
-  k_soil_unfrozen_min : 1.1  # [W/m/K] minimum thermal conductivity for unfrozen soil (Ravens et al, 2023: 0.6 - 1.5)
+  k_soil_unfrozen_min : 1.6  # [W/m/K] minimum thermal conductivity for unfrozen soil (Ravens et al, 2023: 0.6 - 1.5)
   k_soil_unfrozen_max : 1.5  # [W/m/K] maximum thermal conductivity for unfrozen soil (Ravens et al, 2023: 0.6 - 1.5)
   depth_constant_k    : 1  # [m] depth at which k reaches its maximum value. k remains constant below this depth (Ravens, MATLAB script)
   geothermal_gradient : 0.025  # [K/m] geothermal gradient, used as the boundary condition at the bottom of each 1D model
