@@ -1068,6 +1068,15 @@ class Simulation():
         # add all heat fluxes  together (also used in output)
         self.heat_flux = self.convective_flux + self.constant_flux
         
+        # compute heat flux factors
+        if 'heat_flux_factors' in self.config.thermal.keys():
+            self.heat_flux_factors = (np.abs(self.angles / (2 * np.pi) * 360) > self.config.thermal.surface_flux_angle) * self.config.thermal.surface_flux_factor
+        else:
+            self.heat_flux_factors = np.ones(self.xgr.shape)
+        
+        # multiply with heat flux factor
+        self.heat_flux = self.heat_flux * self.heat_flux_factors
+        
         # determine temperature of the ghost nodes
         ghost_nodes_temperature = self.temp_matrix[:,0] + self.heat_flux * self.dz / self.k_matrix[:,0]
         
