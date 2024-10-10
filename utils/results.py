@@ -91,7 +91,7 @@ class SimulationResults():
     
     def get_var_timestep(self, varname, timestep_id):
                   
-        path = os.path.join(self.result_dir, str(int(timestep_id)) + ".nc")
+        path = os.path.join(self.result_dir, (10 - len(str(int(timestep_id)))) * '0' + str(int(timestep_id)) + ".nc")
         
         ds = xr.open_dataset(path)
         
