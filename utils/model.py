@@ -114,8 +114,11 @@ class Simulation():
         self.t_start = pd.to_datetime(t_start, dayfirst=True)
         self.t_end = pd.to_datetime(t_end, dayfirst=True)
         
+        # check how many times this simulation should be repeated
+        rpt = 1 if 'repeat_sim' not in self.config.model.keys() else self.config.model.repeat_sim
+        
         # this variable will be used to keep track of time
-        self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left')
+        self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left').repeat(rpt)
         
         # time indexing is easier for numerical models    
         self.T = np.arange(0, len(self.timestamps), 1) 
@@ -201,8 +204,13 @@ class Simulation():
             
     def load_forcing(self, fpath):
         """This function loads in the forcing data and makes it an attribute of the simulation instance"""
+        
+        # check whether or not forcing conditions should be repeated
+        rpt = 1 if 'repeat_sim' not in self.config.model.keys() else self.config.model.repeat_sim
+        
         # read in forcing concditions
-        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, fpath)
+        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, fpath, repeat=rpt)
+        
         return None
     
     ################################################
@@ -579,7 +587,7 @@ class Simulation():
             
             # add check too see if this is the last timestep
             writehotstart = 0
-            if timestep_id + 1 < len(self.xbeach_times) and self.xbeach_times[timestep_id + 1]:
+            if timestep_id + 1 < len(self.xbeach_times):
                 writehotstart = 1
             
             hotstart_text = [
@@ -991,7 +999,7 @@ class Simulation():
         self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
         
         # update the water level
-        self.water_level = (self._update_water_level(timestep_id))
+        self.water_level = (self._update_water_level(timestep_id, subgrid_timestep_id=subgrid_timestep_id))
         
         dry_mask = (self.zgr >= self.water_level + self.R2)
         wet_mask = (self.zgr < self.water_level + self.R2)
@@ -1009,6 +1017,9 @@ class Simulation():
         if self.config.thermal.with_convective_transport_water_guess:
             hc = self.config.thermal.hc_guess
         else:
+            
+            raise Exception("This piece of code is outdated")
+            
             # determine hydraulic parameters for convective heat transfer computation
             
             if self.xb_times[timestep_id] and self.config.xbeach.with_xbeach:
@@ -1027,12 +1038,12 @@ class Simulation():
                 ds.close()
                                 
             else:
-                H = np.ones(self.xgr.shape) * 0.001
+                H = self.conditions[timestep_id]['Hs(m)']
                 
                 wl = self._update_water_level(timestep_id)
                 
                 d = np.maximum(wl - self.zgr, 0)
-                T = 10
+                T = self.conditions[timestep_id]['Tp(s)']
                 
             # determine convective transport from water (formulation from Kobayashi, 1999)
             hc = Simulation._calculate_sensible_heat_flux_water(
@@ -1070,7 +1081,7 @@ class Simulation():
         
         # compute heat flux factors
         if 'heat_flux_factors' in self.config.thermal.keys():
-            self.heat_flux_factors = (np.abs(self.angles / (2 * np.pi) * 360) > self.config.thermal.surface_flux_angle) * self.config.thermal.surface_flux_factor
+            self.heat_flux_factors = (np.abs(self.angles / (2 * np.pi) * 360) < self.config.thermal.surface_flux_angle) * self.config.thermal.surface_flux_factor
         else:
             self.heat_flux_factors = np.ones(self.xgr.shape)
         
@@ -1082,12 +1093,32 @@ class Simulation():
         
         return ghost_nodes_temperature
     
-    def _update_water_level(self, timestep_id):
+    def _update_water_level(self, timestep_id, subgrid_timestep_id=0):
 
-        # get storm surge
-        water_level = self.conditions[timestep_id]["WL(m)"]
+
+        # get the water level
+        if self.xbeach_times[timestep_id]:
             
-        return water_level
+            # load dataset
+            ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc")).squeeze()  # get xbeach data
+            
+            # select only the final timestep
+            ds = ds.sel(globaltime=np.max(ds.globaltime.values))
+            
+            # load zs values
+            zs_values = ds.zs.values.flatten()
+            
+            # remove nan values and get maximum
+            self.water_level = np.max(zs_values[~np.isnan(zs_values)])
+            
+            # close dataset
+            ds.close()
+
+            
+        else:
+            water_level_value = self.conditions[timestep_id]["WL(m)"]
+            
+        return self.water_level
     
     def _get_bottom_boundary_temperature(self):
         """This function returns a bottom boundary condition temperature, based on the geothermal gradient. It accounts for the
@@ -1590,7 +1621,7 @@ class Simulation():
                 result_ds[varname] = (["xgr_xb"], np.zeros(xgr_xb.shape))
         
         # water level
-        result_ds['water_level'] = (self._update_water_level(timestep_id))
+        result_ds['water_level'] = self._update_water_level(timestep_id)
         
         # computed 2% runup
         result_ds['run_up2%'] = self.R2
@@ -1622,7 +1653,7 @@ class Simulation():
         result_ds['wind_velocity'] = self.wind_velocity  # single value
         result_ds['wind_direction'] = self.wind_direction  # single value (degrees, clockwise from the north)
         
-        result_ds.to_netcdf(os.path.join(self.result_dir, str(timestep_id) + ".nc"))
+        result_ds.to_netcdf(os.path.join(self.result_dir, (10 - len(str(int(timestep_id)))) * '0' + str(int(timestep_id)) + ".nc"))
         
         result_ds.close()
         
@@ -1687,12 +1718,12 @@ class Simulation():
     def dump_xb_output(self, timestep_id):
         """This method copies the XB output from the run folder (including log files, param files, etc.) to the results directory."""
         
-        destination_folder = os.path.join(self.result_dir, "xb_files/", str(timestep_id) + '/')
+        destination_folder = os.path.join(self.result_dir, "xb_files/", (10 - len(str(int(timestep_id)))) * '0' + str(int(timestep_id)) + '/')
 
         if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
             
-        shutil.copytree(self.cwd, destination_folder, ignore=shutil.ignore_patterns('config.yaml'), dirs_exist_ok=True)
+        shutil.copytree(self.cwd, destination_folder, ignore=shutil.ignore_patterns(['config.yaml', 'results/']), dirs_exist_ok=True)
         
         # os.rename(os.path.join())
 
@@ -1731,17 +1762,20 @@ class Simulation():
             raise ValueError("'level' variable should have a value of 1, 2, 3, or 4")
         return self.forcing_data[f"soil_temperature_level_{level}.csv"].values[timestep_id]
 
-    def _get_timeseries(self, tstart, tend, fpath):
+    def _get_timeseries(self, tstart, tend, fpath, repeat=1):
         """returns timeseries start from tstart and ending at tend. The filepath has to be specified.
         
         returns: pd.DataFrame of length T"""
         
+        # read forcing file
         with open(fpath) as f:
             df = pd.read_csv(f, parse_dates=['time'])
                     
+            # mask out correct time frame
             mask = (df["time"] >= tstart) * (df["time"] < tend)
             
-            df = df[mask]
+            # repeat time frame if required
+            df = pd.concat([df[mask]] * repeat, ignore_index=True)
                         
         return df
     
