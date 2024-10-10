@@ -116,7 +116,7 @@ class Simulation():
         
         # check how many times this simulation should be repeated
         rpt = 1 if 'repeat_sim' not in self.config.model.keys() else self.config.model.repeat_sim
-        print(rpt)
+
         # this variable will be used to keep track of time
         self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left').repeat(rpt)
         
