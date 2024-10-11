@@ -878,7 +878,7 @@ class Simulation():
                 return T1_era5 * X_hat_all[i][0] + T2_era5 * X_hat_all[i][1] + T3_era5 * X_hat_all[i][2] + T4_era5 * X_hat_all[i][3] + X_hat_all[i][4]
             
             # Start with loading in the X_hat
-            X_hat_all = np.loadtxt(os.path.join(self.cwd, Path(r'database\ts_datasets\X_hat_groundtemp_reconstruct.txt')))
+            X_hat_all = np.loadtxt(os.path.join(self.proj_dir, Path(r'database\ts_datasets\X_hat_groundtemp_reconstruct.txt')))
             
             era5_points = np.array([
                 df.soil_temperature_level_1.values[0] - 273.15,
