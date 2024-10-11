@@ -118,7 +118,12 @@ class Simulation():
         rpt = 1 if 'repeat_sim' not in self.config.model.keys() else self.config.model.repeat_sim
 
         # this variable will be used to keep track of time
-        self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left').repeat(rpt)
+        unrepeated_timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left')
+        
+        # repeat timestamps if necessary
+        self.timestamps = unrepeated_timestamps
+        for i in range(rpt - 1):
+            self.timestamps = self.timestamps.append(unrepeated_timestamps)
         
         # time indexing is easier for numerical models    
         self.T = np.arange(0, len(self.timestamps), 1) 
