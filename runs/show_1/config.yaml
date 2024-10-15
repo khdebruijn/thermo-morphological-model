@@ -14,7 +14,7 @@ model:
   timestep          : 1  # size of timesteps (in hours)
   call_xbeach_inter :  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
   time_zone_diff    : -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
-  repeat_sim        : 10  # [-] number of times to repeat the simulation
+  repeat_sim        : 1  # [-] number of times to repeat the simulation
 
 # wrapper parameters:
 wrapper:
