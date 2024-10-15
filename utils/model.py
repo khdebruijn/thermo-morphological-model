@@ -864,37 +864,57 @@ class Simulation():
         of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
         exchange from the lower layers.
         """                                    
-        if not "initial_ground_temp_path" in self.config.data.keys(): 
+        if "initial_ground_temp_path" not in self.config.data.keys(): 
             
-            # The temperature of the dry points can be reconstructed following the BLUE performed in database/erikson_ground_temp.ipynb
-            def reconstruct_initial_conditions_era5(era5_points, X_hat_all, level):
-                
-                T1_era5, T2_era5, T3_era5, T4_era5 = era5_points
-                
-                level_to_index = {'50': 0, '100':1, '200': 2, '295': 3}
-                
-                i = level_to_index[str(int(level))]
-                
-                return T1_era5 * X_hat_all[i][0] + T2_era5 * X_hat_all[i][1] + T3_era5 * X_hat_all[i][2] + T4_era5 * X_hat_all[i][3] + X_hat_all[i][4]
+            if "init_multi_linear_approx" in self.config.data.keys() and self.config.data.init_multi_linear_approx:
             
-            # Start with loading in the X_hat
-            X_hat_all = np.loadtxt(os.path.join(self.proj_dir, Path(r'database\ts_datasets\X_hat_groundtemp_reconstruct.txt')))
+                # The temperature of the dry points can be reconstructed following the BLUE performed in database/erikson_ground_temp.ipynb
+                def reconstruct_initial_conditions_era5(era5_points, X_hat_all, level):
+                    
+                    T1_era5, T2_era5, T3_era5, T4_era5 = era5_points
+                    
+                    level_to_index = {'50': 0, '100':1, '200': 2, '295': 3}
+                    
+                    i = level_to_index[str(int(level))]
+                    
+                    reconstructed_ic = \
+                        X_hat_all[i][0] * T1_era5 + \
+                        X_hat_all[i][1] * T2_era5 + \
+                        X_hat_all[i][2] * T3_era5 + \
+                        X_hat_all[i][3] * T4_era5 + \
+                        X_hat_all[i][4] + 273.15
+                    
+                    return reconstructed_ic
+                
+                # Start with loading in the X_hat
+                X_hat_all = np.loadtxt(os.path.join(self.proj_dir, Path(r'database\ts_datasets\X_hat_groundtemp_reconstruct.txt')))
+                
+                era5_points = np.array([
+                    df.soil_temperature_level_1.values[0] - 273.15,
+                    df.soil_temperature_level_2.values[0] - 273.15,
+                    df.soil_temperature_level_3.values[0] - 273.15,
+                    df.soil_temperature_level_4.values[0] - 273.15
+                ])
+                
+                dry_points = np.array([
+                    [0.0, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 50)],
+                    [0.5, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 50)],
+                    [1.0, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 100)],
+                    [2.0, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 200)],
+                    [2.95, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 295)],
+                    [max_depth, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 295)],
+                ])
             
-            era5_points = np.array([
-                df.soil_temperature_level_1.values[0] - 273.15,
-                df.soil_temperature_level_2.values[0] - 273.15,
-                df.soil_temperature_level_3.values[0] - 273.15,
-                df.soil_temperature_level_4.values[0] - 273.15
-            ])
-            
-            dry_points = np.array([
-                [0.0, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 50)],
-                [0.5, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 50)],
-                [1.0, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 100)],
-                [2.0, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 200)],
-                [2.95, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 295)],
-                [max_depth, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 295)],
-            ])
+            else:
+                
+                dry_points = np.array([
+                    [0, df.soil_temperature_level_1.values[0]],
+                    [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
+                    [(0.28+0.07)/2, df.soil_temperature_level_2.values[0]],
+                    [(1+0.28)/2, df.soil_temperature_level_3.values[0]],
+                    [(2.89+1)/2, df.soil_temperature_level_4.values[0]],
+                    [max_depth, df.soil_temperature_level_4.values[0]],
+                ])
             
             wet_points = np.array([
                 [0, df.soil_temperature_level_1_offs.values[0]],
