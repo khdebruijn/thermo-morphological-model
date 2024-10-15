@@ -3,6 +3,7 @@ data:
   storm_data_path   : 'database/ts_datasets/storms_engelstad.csv'  # path to storm dataset
   forcing_data_path : 'database/ts_datasets/era5.csv'  # path to forcing data
   # initial_ground_temp_path :  "database/ts_datasets/ground_temperature_erikson.csv"  # path to initial ground temperature
+  init_multi_linear_approx : True  # when starting with era5 initial conditions for soil temperature, 'init_multi_linear_approx' can be set to 'True' to use multi-linear regression to make initial conditions more like erikson's measured data 
 
 # model settings
 model:
