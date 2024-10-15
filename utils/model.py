@@ -1781,7 +1781,7 @@ class Simulation():
         if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
             
-        shutil.copytree(self.cwd, destination_folder, ignore=shutil.ignore_patterns(['config.yaml', 'results/']), dirs_exist_ok=True)
+        shutil.copytree(self.cwd, destination_folder, ignore=shutil.ignore_patterns('config.yaml', 'results/'), dirs_exist_ok=True)
         
         # os.rename(os.path.join())
 
