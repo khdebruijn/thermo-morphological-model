@@ -870,6 +870,17 @@ class Simulation():
             
                 # The temperature of the dry points can be reconstructed following the BLUE performed in database/erikson_ground_temp.ipynb
                 def reconstruct_initial_conditions_era5(era5_points, X_hat_all, level):
+                    """Takes ERA5 temperature data at the four defined levels and uses previously determined coefficients (from multi-linear 
+                    regression, see notebook 'erikson_ground_tmep.ipynb') to compute better initial conditions from ERA5.
+
+                    Args:
+                        era5_points (array): array of length 4 with temperatures from ERA5 data (in Celcius!)
+                        X_hat_all (array): array of length 5 with coefficients
+                        level (int): current level to compute the reconstructed temperature for
+
+                    Returns:
+                        float: reconstructed temperature for the specified depth (in K)
+                    """
                     
                     T1_era5, T2_era5, T3_era5, T4_era5 = era5_points
                     
@@ -882,7 +893,8 @@ class Simulation():
                         X_hat_all[i][1] * T2_era5 + \
                         X_hat_all[i][2] * T3_era5 + \
                         X_hat_all[i][3] * T4_era5 + \
-                        X_hat_all[i][4] + 273.15
+                        X_hat_all[i][4] + \
+                        273.15  # Celcius to Kelvin
                     
                     return reconstructed_ic
                 
