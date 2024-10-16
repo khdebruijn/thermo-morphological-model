@@ -411,7 +411,7 @@ class Simulation():
         
         run_xb_storm = int(self.R2 + wl > self.config.wrapper.xb_threshold)
         
-        return int(self.R2 + wl > self.config.wrapper.xb_threshold)
+        return run_xb_storm
     
     def check_xbeach(self, timestep_id):
         """This function checks whether XBeach should be ran for the upcoming timestep.
@@ -468,6 +468,10 @@ class Simulation():
             "fnyq":1, # placeholder
         })
         
+        # turn of wave model if there is no storm
+        if not self.xbeach_storms[timestep_id]:
+            self.xb_setup.wbctype = 'off'
+        
         # load in wind and water level data
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
         wl = conditions["WL(m)"]  # used for output
@@ -485,7 +489,7 @@ class Simulation():
         # (including: grid/bathymetry, waves input, flow, tide and surge,
         # water level, wind input, sediment input, avalanching, vegetation, 
         # drifters ipnut, output selection)
-        self.xb_setup.set_params({
+        params = {
             # grid parameters
             # - already specified with xb_setup.set_grid(...)
             
@@ -526,12 +530,15 @@ class Simulation():
             
             # physical processes
             "avalanching": 1,  # Turn on avalanching
-            "flow": 1,  # Turn on flow calculation
             "morphology": 1,  # Turn on morphology
             "sedtrans": 1,  # Turn on sediment transport
             "wind": 1 if self.config.xbeach.with_wind else 0,  # Include wind in flow solver
             "struct": 1 if self.config.xbeach.with_ne_layer else 0,  # required for working with ne_layer
-
+            
+            "flow": 1 if self.xbeach_storms[timestep_id] else 0,  # Turn on flow calculation (off if no storm)
+            "lwave": 1 if self.xbeach_storms[timestep_id] else 0,  # Turn on short wave forcing on nlsw equations and boundary conditions (off if no storm)
+            "swave": 1 if self.xbeach_storms[timestep_id] else 0,  # Turn on short waves (off if no storm)
+            
             # tide boundary conditions
             "tideloc": 0,
             "zs0":wl,
@@ -570,7 +577,9 @@ class Simulation():
                 "vmag",  # Velocity magnitude in cell centre (1D array)
                 "urms",  # Orbital velocity (1D array)
                 ]
-        })
+        }
+        
+        self.xb_setup.set_params()
         
         # block printing while writing the output (the xbeach toolbox by default prints that it can't plot parametric conditions)
         block_print()
@@ -1730,11 +1739,6 @@ class Simulation():
         # define colnames
         col_names = ['time'] + ['air_temp[K]'] + [f'temp_{layer}m[K]' for layer in layers] + heat_fluxes
         
-        # create dataframe at first timestep
-        if timestep_id == 0:
-                        
-            self.temperature_timeseries = pd.DataFrame(columns=col_names)
-        
         values = [self.timestamps[timestep_id], self.current_air_temp]
         
         # loop through layers to find corresponding temperature
@@ -1752,10 +1756,17 @@ class Simulation():
         values.append(self.latent_flux[index_x])
         values.append(self.convective_flux[index_x])
 
-        # add temperature and heat fluxes to dataframe
-        self.temperature_timeseries = self.temperature_timeseries._append(
-            dict(zip(col_names, values)), ignore_index=True
-        )
+        # create dataframe at first timestep
+        if timestep_id == 0:
+                        
+            self.temperature_timeseries = pd.DataFrame(dict(zip(col_names, values)), columns=col_names)
+            
+        else:
+            
+            # add temperature and heat fluxes to dataframe
+            self.temperature_timeseries = self.temperature_timeseries._append(
+                dict(zip(col_names, values)), ignore_index=True
+            )
                 
         # write output at final timestep
         if write:
