@@ -294,7 +294,9 @@ class Simulation():
             
             index = np.argwhere(self.timestamps==row.time)
             
-            if row.isnull().values.any():
+            print(index)
+            
+            if not row.isnull().values.any():
             
                 # safe storm conditions for this timestep as well            
                 self.conditions[index] = {
