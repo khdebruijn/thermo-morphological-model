@@ -295,9 +295,7 @@ class Simulation():
             index = np.argwhere(self.timestamps==row.time)
                         
             if not row.isnull().values.any():
-                
-                print(index)
-            
+                            
                 # safe storm conditions for this timestep as well            
                 self.conditions[index] = {
                         "Hs(m)": row["Hs(m)"],
@@ -308,7 +306,7 @@ class Simulation():
                 
             else:
                 conds = self.zero_conditions
-                conds['Wl(m)'] = row['WL(m)']
+                conds['WL(m)'] = row['WL(m)']
                 
                 self.conditions[index] = conds
                 
