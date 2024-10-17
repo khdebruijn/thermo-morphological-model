@@ -310,7 +310,7 @@ class Simulation():
                 
                 self.conditions[index] = conds
                 
-        self.water_levels = df['WL(m)'].values
+        self.water_levels = np.tile(df['WL(m)'].values, self.config.model.repeat_sim)
         
         return self.conditions
     
