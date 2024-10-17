@@ -306,7 +306,7 @@ class Simulation():
                 
             else:
                 self.conditions[index] = self.zero_conditions
-                self.conditions["WL(m)"] = row['WL(m)']
+                self.conditions[index]["WL(m)"] = row['WL(m)']
                 
         self.water_levels = df['WL(m)'].values
         
