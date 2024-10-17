@@ -4,10 +4,6 @@
 :: python main_results.py show_1 all
 
 python main.py val13_xb
-python main.py val_gt16
-python main.py val_gt17
-python main.py val_gt18
-
 python main_results.py val13_xb all
 
 
