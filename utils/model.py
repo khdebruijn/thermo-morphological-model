@@ -293,10 +293,10 @@ class Simulation():
         for i, row in df.iterrows():
             
             index = np.argwhere(self.timestamps==row.time)
-            
-            print(index)
-            
+                        
             if not row.isnull().values.any():
+                
+                print(index)
             
                 # safe storm conditions for this timestep as well            
                 self.conditions[index] = {
@@ -311,7 +311,6 @@ class Simulation():
                 conds['Wl(m)'] = row['WL(m)']
                 
                 self.conditions[index] = conds
-                # self.conditions[index]["WL(m)"] = row['WL(m)']
                 
         self.water_levels = df['WL(m)'].values
         
@@ -1197,7 +1196,7 @@ class Simulation():
 
             
         else:
-            self.water_level = self.water_levels[timestep_id]["WL(m)"]
+            self.water_level = self.water_levels[timestep_id]
             
         return self.water_level
     
