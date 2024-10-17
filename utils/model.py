@@ -259,9 +259,26 @@ class Simulation():
         Returns:
             array: array of length T that for each timestep contains hydrodynamic forcing
         """
-                
+        # Initialize conditions array
         self.conditions = np.zeros(self.T.shape, dtype=object)  # also directly read wave conditions here
         
+        # Initialize zero conditions
+        self.zero_conditions = {
+                    # "Hso(m)": 0.001,
+                    # "Hs(m)": 0.001,
+                    "Hso(m)": 0.2,  # placeholder
+                    "Hs(m)": 0.2,  # placeholder
+                    # "Hso(m)": 0,
+                    # "Hs(m)": 0,
+                    "Dp(deg)": 270,                    
+                    # "Dp(deg)": 0,
+                    "Tp(s)": 10,
+                    # "Tp(s)": 0,
+                    # "WL(m)": 0,
+                    "Hindcast_or_projection": 0,
+                    }
+        
+        # read file and mask out correct timespan
         with open(fp_storm) as f:
             
             df = pd.read_csv(f, parse_dates=['time'])
@@ -269,21 +286,28 @@ class Simulation():
             mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
             
             df = df[mask]
-            
-        df_dropna = df.dropna(axis=0)
+
+        # Loop through complete data to save conditions            
+        # df_dropna = df.dropna(axis=0)
                         
-        for i, row in df_dropna.iterrows():
+        for i, row in df.iterrows():
             
             index = np.argwhere(self.timestamps==row.time)
-                        
-            # safe storm conditions for this timestep as well            
-            self.conditions[index] = {
-                    "Hs(m)": row["Hs(m)"],
-                    "Dp(deg)": row["Dp(deg)"],
-                    "Tp(s)": row["Tp(s)"],
-                    "WL(m)": row["WL(m)"],
-                        }
-        
+            
+            if row.isnull().values.any():
+            
+                # safe storm conditions for this timestep as well            
+                self.conditions[index] = {
+                        "Hs(m)": row["Hs(m)"],
+                        "Dp(deg)": row["Dp(deg)"],
+                        "Tp(s)": row["Tp(s)"],
+                        "WL(m)": row["WL(m)"],
+                            }
+                
+            else:
+                self.conditions[index] = self.zero_conditions
+                self.conditions["WL(m)"] = row['WL(m)']
+                
         self.water_levels = df['WL(m)'].values
         
         return self.conditions
@@ -323,22 +347,6 @@ class Simulation():
         
         # set xbeach active at provided intervals
         ct[::call_xbeach_inter] = 1
-        
-        # initialize zero conditions
-        self.zero_conditions = {
-                    # "Hso(m)": 0.001,
-                    # "Hs(m)": 0.001,
-                    "Hso(m)": 0.2,  # placeholder
-                    "Hs(m)": 0.2,  # placeholder
-                    # "Hso(m)": 0,
-                    # "Hs(m)": 0,
-                    "Dp(deg)": 270,                    
-                    # "Dp(deg)": 0,
-                    "Tp(s)": 10,
-                    # "Tp(s)": 0,
-                    "WL(m)": 0,
-                    "Hindcast_or_projection": 0,
-                    }
         
         return ct
     
@@ -452,6 +460,7 @@ class Simulation():
         # check zero conditions or normal conditions should be used
         if self.xbeach_inter[timestep_id] and not self.xbeach_storms[timestep_id] * self.xbeach_sea_ice[timestep_id]:
             conditions = self.zero_conditions
+            conditions['WL(m)'] = self.water_levels[timestep_id]
         else:
             conditions = self.conditions[timestep_id]
         
@@ -474,7 +483,7 @@ class Simulation():
         
         # load in wind and water level data
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
-        wl = conditions["WL(m)"]  # used for output
+        wl = self.water_levels[timestep_id]  # used for output
         
         # check if this is a storm timestep that should be written in its entirety
         if self.config.xbeach.write_first_storms:
@@ -579,7 +588,7 @@ class Simulation():
                 ]
         }
         
-        self.xb_setup.set_params()
+        self.xb_setup.set_params(params)
         
         # block printing while writing the output (the xbeach toolbox by default prints that it can't plot parametric conditions)
         block_print()
@@ -1183,7 +1192,7 @@ class Simulation():
 
             
         else:
-            water_level_value = self.conditions[timestep_id]["WL(m)"]
+            self.water_level = self.water_levels[timestep_id]["WL(m)"]
             
         return self.water_level
     
