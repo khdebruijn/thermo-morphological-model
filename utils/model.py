@@ -1772,7 +1772,7 @@ class Simulation():
         # create dataframe at first timestep
         if timestep_id == 0:
                         
-            self.temperature_timeseries = pd.DataFrame(dict(zip(col_names, values)), columns=col_names)
+            self.temperature_timeseries = pd.DataFrame(dict(zip(col_names, values)), index=[0])
             
         else:
             
