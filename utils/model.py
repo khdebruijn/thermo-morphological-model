@@ -398,14 +398,14 @@ class Simulation():
         # and in that case, the local angle of the two grid points nearest to the water level is used
         except ValueError:
             
-            dry_mask = (self.zgr > wl)
-            wet_mask = np.ones(dry_mask.shape) - dry_mask
+            dry_mask = np.nonzero(self.zgr > wl)
+            wet_mask = np.nonzero(np.ones(dry_mask.shape) - dry_mask)
             
-            dry_mask = np.nonzero(dry_mask)
-            wet_mask = np.nonzero(wet_mask)
+            first_dry_id = np.min(dry_mask)
+            last_wet_id = np.max(wet_mask)
             
-            x1, z1 = self.xgr[np.min(dry_mask)], self.zgr[np.min(dry_mask)]
-            x2, z2 = self.xgr[np.min(wet_mask)], self.zgr[np.min(wet_mask)]
+            x1, z1 = self.xgr[first_dry_id], self.zgr[first_dry_id]
+            x2, z2 = self.xgr[last_wet_id], self.zgr[last_wet_id]
             
             # x1, x2 = self.xgr[wet_mask[-1]], self.xgr[dry_mask[0]]
             # z1, z2 = self.zgr[wet_mask[-1]], self.zgr[dry_mask[0]]
