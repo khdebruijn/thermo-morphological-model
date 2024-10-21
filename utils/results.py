@@ -34,7 +34,7 @@ class SimulationResults():
         self.timestamps = np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestamps.txt"))
         self.timestep_ids = np.int32(np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestep_ids.txt")))
         
-        ds = xr.open_dataset(os.path.join(self.result_dir, "0.nc"))
+        ds = xr.open_dataset(os.path.join(self.result_dir, "0000000000.nc"))
         self.var_list = list(ds.coords) + list(ds.keys())
         ds.close()
                 
