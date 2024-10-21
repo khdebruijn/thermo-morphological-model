@@ -579,8 +579,8 @@ class SimulationResults():
         animation_timesteps=None,
         xmin=0, 
         xmax=1500,
-        vmin=-2,  # degrees Celcius
-        vmax=0.5,   # degrees Celcius
+        vmin=-10,  # degrees Celcius
+        vmax=10,   # degrees Celcius
         cmap='plasma',
         aspect_equal=False, 
         save=True, 
@@ -678,7 +678,7 @@ class SimulationResults():
         axs[3].set_xlim((xmin, xmax))
 
         axs[0].set_ylim((-10, 20))
-        axs[1].set_ylim((12, 15.1))
+        axs[1].set_ylim((-10, 20))
         axs[2].set_ylim((-1, 4))
         axs[3].set_ylim((-1000, 1000))
         axs[4].set_ylim((-0.5, 1.5))
