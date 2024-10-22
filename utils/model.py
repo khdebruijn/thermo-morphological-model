@@ -472,6 +472,7 @@ class Simulation():
             "Hm0":conditions["Hs(m)"],  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
             "Tp":conditions["Tp(s)"],
             # "mainang":conditions["Dp(deg)"],  # relative to true north
+            'mainang': 270,
             "gammajsp": 1.3,  # placeholder
             "s": 10,     # placeholder
             "duration": self.dt * 3600,
