@@ -1,0 +1,29 @@
+:: to execute this batch file, cd to project directory and type "runs\runs.bat"
+
+python main.py cal_gt1
+python main.py cal_gt2
+python main.py cal_gt3
+python main.py cal_gt4
+python main.py cal_gt5
+python main.py cal_gt6
+python main.py cal_gt7
+python main.py cal_gt8
+python main.py cal_gt9
+python main.py cal_gt10
+python main.py cal_gt11
+python main.py cal_gt12
+python main.py cal_gt13
+python main.py cal_gt14
+python main.py cal_gt15
+python main.py cal_gt16
+python main.py cal_gt17
+python main.py cal_gt18
+python main.py cal_gt19
+python main.py cal_gt20
+python main.py cal_gt21
+python main.py cal_gt22
+python main.py cal_gt23
+python main.py cal_gt24
+python main.py cal_gt25
+python main.py cal_gt26
+python main.py cal_gt27
