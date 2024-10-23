@@ -99,7 +99,7 @@ thermal:
   surface_flux_angle  : 90  # [degrees] the threshold angle above which the surface_flux_factor is not applied
 
   # model properties
-  dt              : 2  # [s] timestep used in the thermal model on the temporal subgrid
+  dt              : 36  # [s] timestep used in the thermal model on the temporal subgrid
   grid_resolution : 150  # number of points for each 1D thermal model
   max_depth       : 15  # [m], the maximum depth of the 1D thermal model
   T_melt          : 273.15  # [K] Melting temperature at the interface of water/air and bluff
