@@ -61,9 +61,10 @@ xbeach:
   with_ne_layer : True  # if True include 'struct' (and thereby ne_layer) in XBeach computation
 
   # grid settings
-  thetamin  : -90  # minimum angle
-  thetamax  :  90  # maximum angle
-  dtheta    : 180  # bin width
+  thetamin  : 0  # minimum angle
+  thetamax  : 360  # maximum angle
+  dtheta    : 360  # bin width
+  thetanaut : 1 # for coordinate system
 
   # hydrodynamics settings
   wbctype : 'jons'   # type of wave boundary condition

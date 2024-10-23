@@ -460,6 +460,7 @@ class Simulation():
             thetamin=self.config.xbeach.thetamin,
             thetamax=self.config.xbeach.thetamax,
             dtheta=self.config.xbeach.dtheta,
+            thethanaut=self.config.xbeach.thetanaut,
             )
         
         # check zero conditions or normal conditions should be used
@@ -475,9 +476,9 @@ class Simulation():
             "Hm0":conditions["Hs(m)"],  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
             "Tp":conditions["Tp(s)"],
             # "mainang":conditions["Dp(deg)"],  # relative to true north
-            'mainang': 270,
-            "gammajsp": 1.3,  # placeholder
-            "s": 10,     # placeholder
+            'mainang': 270,  # default value for 1D XBeach
+            "gammajsp": 3.3,  # value recommended by Kees
+            "s": 1000,  # value recommended by Kees
             "duration": self.dt * 3600,
             "dtbc": 60, # placeholder
             "fnyq":1, # placeholder
