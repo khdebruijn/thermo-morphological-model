@@ -74,7 +74,7 @@ xbeach:
   # sediment properties
   dryslp      : 0.6  # [dz/dx] Critical avalanching slope above water (dz/dx and dz/dy) (placeholder)
   wetslp      : 0.06  # [dz/dx] Critical avalanching slope below water (dz/dx and dz/dy) (placeholder)
-  D50         : 0.00190  # [m] mean grain size, value from erikson data (at waterline, a few km westward of the transect) 
+  D50         : 0.000036  # [m] mean grain size, value from Nando (personal communication)
   rho_solid   : 2650  # [kg/m3] density of sediment particles
   bedfriccoef : 0.02  # [-] bed friction coefficient (placeholder)
 
