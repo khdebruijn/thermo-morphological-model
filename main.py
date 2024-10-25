@@ -95,6 +95,12 @@ def main(sim):
     sim.initialize_xbeach_module()
     print("succesfully initialized xbeach module")
     
+    # initialize first xbeach timestep
+    if sim.config.xbeach.with_xbeach:
+        sim.xbeach_times[0] = sim.check_xbeach(0)
+    else:
+        sim.xbeach_times[0] = 0
+    
     # initialize thermal model
     sim.initialize_thermal_module()
     print("succesfully initialized thermal module")
@@ -181,6 +187,12 @@ def main(sim):
             if sim.copy_this_xb_output:
                 sim.copy_xb_output_to_result_dir(fp_xbeach_output="xboutput.nc")
                 print("succesfully generated high resolution storm output")
+                
+            # check if xbeach should be ran for the next timestep
+            if sim.config.xbeach.with_xbeach:
+                sim.xbeach_times[timestep_id + 1] = sim.check_xbeach(timestep_id + 1)
+            else:
+                sim.xbeach_times[timestep_id + 1] = 0
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid(timestep_id, fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)

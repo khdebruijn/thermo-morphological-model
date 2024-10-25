@@ -1314,9 +1314,9 @@ class Simulation():
         
         # only update the grid of there actually was a change in bed level
         if not all(cum_sedero == 0):
-        
+                        
             # generate a new xgrid and zgrid (but only if the next timestep does not require a hotstart, which requires the same xgrid)
-            if timestep_id + 1 < len(self.xbeach_times) and not self.xbeach_times[timestep_id + 1]:
+            if timestep_id + 1 < len(self.xbeach_times) and not self.check_xbeach(timestep_id + 1):
                                 
                 self.xgr_new, self.zgr_new = xgrid(self.xgr, bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
                 self.zgr_new = np.interp(self.xgr_new, self.xgr, bathy_current)
@@ -1329,6 +1329,9 @@ class Simulation():
             else:
                 self.xgr_new = self.xgr
                 self.zgr_new = bathy_current
+            
+            self.xgr_new = self.xgr
+            self.zgr_new = bathy_current
 
             # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
             self.abs_xgr_new, self.abs_zgr_new = um.generate_perpendicular_grids(
