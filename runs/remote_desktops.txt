@@ -1,0 +1,29 @@
+There is the wcf node which I can access through VMware. Then there are also 5 other computational wcp nodes. The steps to access these are:
+
+•	Select ‘Remote Desktop Connection’
+•	Click 'show options'
+•	Type in the wcp number in the ‘Computer” window (see screenshot below). Numbers are:
+		> v-wcp4689
+		> v-wcp5007
+		> v-wcp4401
+		> v-wcp5008
+		> v-wcp5006
+•	Username is 'DIRECTORY\bruij_kn'
+•	Login under your normal Deltares username and password
+
+
+------------------------------------------------------
+Setup remote desktops
+	> Download github desktop (https://desktop.github.com/download/), no need to login
+	> Download mamba (Miniforge3-Windows-x86_64) (https://github.com/conda-forge/miniforge#mambaforge)
+	> Clone repository (https://github.com/khdebruijn/thermo-morphological-model.git)
+	> cd in mamba to ( C:\Users\bruij_kn\Documents\GitHub\thermo-morphological-model )
+	> create environment ( mamba create -n thesis ), and activate it ( mamba activate thesis )
+	> install pip ( mamba install pip ) ( y )
+	> install packages ( pip install -r requirements.txt )
+	> copy ts_datasets ( https://filesender.surf.nl/?s=translate_email&token=cbfcbea5-7783-46bd-86b8-41ea8ef36d54 )
+	
+	> (That's it?)
+	
+
+	> activate validation simulations with XB (after validation run)
