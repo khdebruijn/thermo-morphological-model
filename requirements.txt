@@ -22,4 +22,3 @@ cartopy
 pyproj
 moviepy
 ipykernel
-pyarrow
