@@ -460,7 +460,7 @@ class Simulation():
             thetamin=self.config.xbeach.thetamin,
             thetamax=self.config.xbeach.thetamax,
             dtheta=self.config.xbeach.dtheta,
-            thethanaut=self.config.xbeach.thetanaut,
+            thetanaut=self.config.xbeach.thetanaut,
             )
         
         # check zero conditions or normal conditions should be used
