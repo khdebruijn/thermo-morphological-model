@@ -1182,7 +1182,7 @@ class Simulation():
 
 
         # get the water level
-        if self.xbeach_times[timestep_id]:
+        if self.xbeach_times[timestep_id-1]:
             
             # load dataset
             ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc")).squeeze()  # get xbeach data
