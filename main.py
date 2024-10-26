@@ -188,7 +188,7 @@ def main(sim):
                 sim.copy_xb_output_to_result_dir(fp_xbeach_output="xboutput.nc")
                 print("succesfully generated high resolution storm output")
                 
-            # check if xbeach should be ran for the next timestep
+            # check if xbeach should be ran for the next timestep (if so, the x-grid doesn't update since the same grid is necessary for the hotstart feature)
             if sim.config.xbeach.with_xbeach:
                 sim.xbeach_times[timestep_id + 1] = sim.check_xbeach(timestep_id + 1)
             else:
