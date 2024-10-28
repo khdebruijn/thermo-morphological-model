@@ -15,7 +15,7 @@ model:
   call_xbeach_inter :  168  #  xbeach is called during inter-storm periods every X (wrapper) timesteps (default: 168, i.e. 1 week)
   time_zone_diff    : -8  # [hours] relative difference in hours with respect to UTC. For Alaska equals -8.
   repeat_sim        : 1  # [-] number of times to repeat the simulation
-  spin_up_time      : 1  # [years] spin up time of the thermal module, during which no morphological update is performed (NOT USED YET)
+  spin_up_time      : 1  # [years] spin up time of the thermal module, during which no morphological update is performed (NOT USED YET, TO BE IMPLEMENTED)
 
 # wrapper parameters:
 wrapper:
