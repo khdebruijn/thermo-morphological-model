@@ -1461,8 +1461,8 @@ class Simulation():
         # get correct row in solar flux map (so row corresponding to current day of the year)
         row = self.solar_flux_map[id_t, :]
         
-        # transform angles to ids (first convert to degrees)
-        ids_angle = np.int32((self.angles % (2 * np.pi) / (2 * np.pi) * 360 - self.config.thermal.angle_min) / self.config.thermal.delta_angle)
+        # transform angles to ids (first convert to degrees)        
+        ids_angle = np.int32((self.angles / (2 * np.pi) * 360 - self.config.thermal.angle_min) / self.config.thermal.delta_angle)
         
         # use ids to get correct factors in correct order from the row of solar fluxes
         self.factors = row[ids_angle]
