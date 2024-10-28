@@ -394,6 +394,10 @@ class Simulation():
             # compute beta_f as the average slope in this envelope
             dz = z_envelope[np.argmax(x_envelope)] - z_envelope[np.argmin(x_envelope)]
             dx = x_envelope[np.argmax(x_envelope)] - x_envelope[np.argmin(x_envelope)]
+            
+            # if there's only one point in the envelope then dx will be 0, so go ahead with the except block as well
+            if dx == 0:
+                raise ValueError
         
         # and in that case, the local angle of the two grid points nearest to the water level is used
         except ValueError:
@@ -1409,7 +1413,9 @@ class Simulation():
     def _update_angles(self):
         """This function geneartes an array of local angles (in radians) for the grid, based on the central differences method.
         """
-        self.angles = np.gradient(self.zgr, self.xgr)
+        gradients = np.gradient(self.zgr, self.xgr)
+        
+        self.angles = np.arctan(gradients)
         
         return self.angles
     
@@ -1456,7 +1462,7 @@ class Simulation():
         row = self.solar_flux_map[id_t, :]
         
         # transform angles to ids (first convert to degrees)
-        ids_angle = np.int32((self.angles / (2*np.pi) * 360 - self.config.thermal.angle_min) / self.config.thermal.delta_angle)
+        ids_angle = np.int32((self.angles % (2 * np.pi) / (2 * np.pi) * 360 - self.config.thermal.angle_min) / self.config.thermal.delta_angle)
         
         # use ids to get correct factors in correct order from the row of solar fluxes
         self.factors = row[ids_angle]
