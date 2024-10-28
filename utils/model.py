@@ -327,6 +327,10 @@ class Simulation():
         # get sea-ice timestep ids
         self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.wrapper.sea_ice_threshold)
         
+        # xbeach is not ran during spin_up
+        # self.no_xb_spinup = np.zeros(self.T.shape)
+        # self.no_xb_spinup[len(self.T) / self.config.model.repeat_sim]
+        
         # initialize xbeach storms array
         self.xbeach_storms = np.zeros(self.xbeach_inter.shape)
         
