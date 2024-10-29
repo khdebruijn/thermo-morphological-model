@@ -391,7 +391,7 @@ class Simulation():
         sigma = H / 4
         mask = np.nonzero((self.zgr > wl - 2*sigma) * (self.zgr < wl + 2*sigma))
         z_envelope = self.zgr[mask]
-        x_envelope = self.zgr[mask]
+        x_envelope = self.xgr[mask]
             
         # if waves are too small, the envelope doesn't exist on the grid, so this method will fail
         try:
