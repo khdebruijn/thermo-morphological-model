@@ -617,31 +617,70 @@ class Simulation():
         # re-enable print
         enable_print()
         
-        # the hotstart can not be added using the python toolbox, so it is manually added to the params.txt file here
-        hotstart_in_toolbox = False
-        if not hotstart_in_toolbox:
-            with open('params.txt', 'r') as f:
-                text = f.readlines()
+        # the hotstart can not be added using the python toolbox, so it is manually added to the params.txt file here, along with empty BC for empty xbeach runs
+        with open('params.txt', 'r') as f:
+            text = f.readlines()
+        
+        # add check too see if this is the last timestep
+        writehotstart = 0
+        if timestep_id + 1 < len(self.xbeach_times):
+            writehotstart = 1
+        
+        # text to add to params.txt for hotstart functionality
+        hotstart_text = [
+            "%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)\n\n",
+            f"writehotstart  = {writehotstart}\n",
+            f"hotstart       = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
+            f"hotstartfileno = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
+            "\n"
+            ]
+        
+        # text to add to params.txt for empty xbeach run
+        wbc_ts1_text = [
+            "lwave = 0\n",
+            "swave = 0\n",
+            "flow = 0\n",
+        ]
+        
+        # text to write in empty boundary condition file './bc/gen.ezs'
+        bc_text = [
+            r"%% t (s) eta LF(m)  E (J/m2)\n",
+            f"0  {wl}  0",
+            f"3600  {wl}  0",
+        ]
+        
+        new_input_text = []
             
-            # add check too see if this is the last timestep
-            writehotstart = 0
-            if timestep_id + 1 < len(self.xbeach_times):
-                writehotstart = 1
+        # loop through lines of input text    
+        for i, line in enumerate(text):
             
-            hotstart_text = [
-                "%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)\n\n",
-                f"writehotstart  = {writehotstart}\n",
-                f"hotstart       = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
-                f"hotstartfileno = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
-                "\n"
-                ]
+            # check if there is a storm this time step
+            if not self.xbeach_storms[timestep_id]:
                 
-            for i, line in enumerate(text):
-                if r"%% Output variables" in line:
-                    text = text[:i] + hotstart_text + text[i:]
+                # if there is no storm, an empty bc file is created (./bc/gen.ezs), and flow, swave, and lwave are set to zero in params.txt
+                if not os.path.exists(os.path.join(self.cwd, 'bc/', 'gen.ezs')):
+                    
+                    os.makedirs(os.path.join(self.cwd, 'bc/'))
+                    
+                    with open(os.path.join(self.cwd, 'bc/', 'gen.ezs'), 'w') as f:
+                        
+                        f.write(bc_text)
                 
-            with open('params.txt', 'w') as f:
-                f.writelines(text)
+                if r"wbctype" in line:
+                    line = "wbctype = ts_1\n"
+                
+                if r"swave" in line:
+                    line = wbc_ts1_text
+            
+            # also add hotstart to params.txt
+            if r"%% Output variables" in line:
+                text = text[:i] + hotstart_text + text[i:]
+                
+            new_input_text += line
+        
+        # and write the new text to params.txt
+        with open('params.txt', 'w') as f:
+            f.writelines(new_input_text)
         
         return None
     
