@@ -152,7 +152,7 @@ def main(sim):
                 )
         
         # check whether to run XBeach or not for this timestep
-        if sim.config.xbeach.with_xbeach:
+        if sim.config.xbeach.with_xbeach and not all(sim.thaw_depth == 0):
             sim.xbeach_times[timestep_id] = sim.check_xbeach(timestep_id)
         else:
             sim.xbeach_times[timestep_id] = 0
