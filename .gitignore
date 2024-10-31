@@ -48,6 +48,7 @@ runs/*/*.txt
 runs/*/*.bat
 runs/*/*.nc
 runs/*/*.dat
+runs/*/*/*gen.ezs
 
 # .env file
 .env
