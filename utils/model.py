@@ -242,7 +242,9 @@ class Simulation():
         
         self.water_level = 0
         self.xb_check = 0
-        self.R2 = 0
+        
+        self.beta_f = np.zeros(self.T.shape)
+        self.R2 = np.zeros(self.T.shape)
         
         self.storm_write_counter = 0
         
@@ -388,7 +390,7 @@ class Simulation():
         L0 = 9.81 * T**2 / (2 * np.pi)
         
         # determine the +- 2*sigma envelope (for the stockdon, 2006 formulation)
-        sigma = H / 4
+        sigma = H0 / 4
         mask = np.nonzero((self.zgr > wl - 2*sigma) * (self.zgr < wl + 2*sigma))
         z_envelope = self.zgr[mask]
         x_envelope = self.xgr[mask]
@@ -402,6 +404,8 @@ class Simulation():
             # if there's only one point in the envelope then dx will be 0, so go ahead with the except block as well
             if dx == 0:
                 raise ValueError
+            
+            # print('normal computation')
         
         # and in that case, the local angle of the two grid points nearest to the water level is used
         except ValueError:
@@ -424,13 +428,25 @@ class Simulation():
             dz = z2 - z1
             dx = x2 - x1
             
+            # print('alternate computation')
+            
         # compute beta_f            
-        beta_f = np.abs(dz / dx)
+        self.beta_f[timestep_id] = np.abs(dz / dx)
 
         # now the empirical formulation by Stockdon et al. (2006) can be used to determine R2%
-        self.R2 = 1.1 * (0.35 * beta_f * (H0 * L0)**0.5 + (H0 * L0 * (0.563 * beta_f**2 + 0.004))**0.5 / 2)
+        self.R2[timestep_id] = 1.1 * (0.35 * self.beta_f[timestep_id] * (H0 * L0)**0.5 + (H0 * L0 * (0.563 * self.beta_f[timestep_id]**2 + 0.004))**0.5 / 2)
         
-        run_xb_storm = int(self.R2 + wl > self.config.wrapper.xb_threshold)
+        run_xb_storm = int(self.R2[timestep_id] + wl > self.config.wrapper.xb_threshold)
+        
+        # print(wl)
+        # print(z_envelope)
+        # print(x_envelope)
+        
+        # print(x1, x2)
+        # print(z1, z2)
+        
+        # print(self.beta_f[timestep_id])
+        # print(self.R2[timestep_id])
         
         return run_xb_storm
     
@@ -644,13 +660,13 @@ class Simulation():
         
         # text to write in empty boundary condition file './bc/gen.ezs'
         bc_text = [
-            r"%% t (s) eta LF(m)  E (J/m2)\n",
-            f"0  {wl}  0",
-            f"3600  {wl}  0",
+            f"%% t (s) eta LF(m)  E (J/m2)\n",
+            f"0  {wl}  0\n",
+            f"3600  {wl}  0\n",
         ]
         
         new_input_text = []
-            
+
         # loop through lines of input text    
         for i, line in enumerate(text):
             
@@ -662,9 +678,9 @@ class Simulation():
                     
                     os.makedirs(os.path.join(self.cwd, 'bc/'))
                     
-                    with open(os.path.join(self.cwd, 'bc/', 'gen.ezs'), 'w') as f:
-                        
-                        f.write(bc_text)
+                with open(os.path.join(self.cwd, 'bc/', 'gen.ezs'), 'w') as f:
+                    
+                    f.writelines(bc_text)
                 
                 if r"wbctype" in line:
                     line = "wbctype = ts_1\n"
@@ -674,7 +690,10 @@ class Simulation():
             
             # also add hotstart to params.txt
             if r"%% Output variables" in line:
-                text = text[:i] + hotstart_text + text[i:]
+                new_input_text += hotstart_text
+                
+            if type(line) != list:
+                line = list(line)
                 
             new_input_text += line
         
@@ -1133,8 +1152,8 @@ class Simulation():
         # update the water level
         self.water_level = (self._update_water_level(timestep_id, subgrid_timestep_id=subgrid_timestep_id))
         
-        dry_mask = (self.zgr >= self.water_level + self.R2)
-        wet_mask = (self.zgr < self.water_level + self.R2)
+        dry_mask = (self.zgr >= self.water_level + self.R2[timestep_id])
+        wet_mask = (self.zgr < self.water_level + self.R2[timestep_id])
         
         # determine convective transport from air (formulation from Man, 2023)
         self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=timestep_id)  # also used in output
@@ -1761,7 +1780,8 @@ class Simulation():
         result_ds['water_level'] = self._update_water_level(timestep_id)
         
         # computed 2% runup
-        result_ds['run_up2%'] = self.R2
+        result_ds['beta_f'] = self.beta_f[timestep_id]
+        result_ds['run_up2%'] = self.R2[timestep_id]
         
         # temperature variables
         result_ds['thaw_depth'] = (["xgr"], self.thaw_depth)  # 1D series of thaw depths
