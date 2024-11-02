@@ -268,13 +268,13 @@ class Simulation():
         self.zero_conditions = {
                     # "Hso(m)": 0.001,
                     # "Hs(m)": 0.001,
-                    "Hso(m)": 0.2,  # placeholder
-                    "Hs(m)": 0.2,  # placeholder
+                    "Hso(m)": 0.05,  # placeholder
+                    "Hs(m)": 0.05,  # placeholder
                     # "Hso(m)": 0,
                     # "Hs(m)": 0,
                     "Dp(deg)": 270,                    
                     # "Dp(deg)": 0,
-                    "Tp(s)": 10,
+                    "Tp(s)": 2,
                     # "Tp(s)": 0,
                     # "WL(m)": 0,
                     "Hindcast_or_projection": 0,
@@ -646,8 +646,8 @@ class Simulation():
         hotstart_text = [
             "%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)\n\n",
             f"writehotstart  = {writehotstart}\n",
-            f"hotstart       = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
-            f"hotstartfileno = {1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0}\n",
+            f"hotstart       = {1 if (self.xbeach_storms[timestep_id - 1] and timestep_id != 0) else 0}\n",
+            f"hotstartfileno = {1 if (self.xbeach_storms[timestep_id - 1] and timestep_id != 0) else 0}\n",
             "\n"
             ]
         
