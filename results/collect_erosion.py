@@ -17,7 +17,7 @@ runid = sys.argv[1]
 
 run_output_dir = Path(f"p:/11210070-usgscoop-202324-arcticxb/runs/{runid}/")
 
-output_ids = np.int32(np.loadtxt(os.path.join(run_output_dir, "timetsep_output_ids.txt")))
+output_ids = np.int32(np.loadtxt(os.path.join(run_output_dir, "timestep_output_ids.txt")))
 
 t_list = []
 x_shore_line_list = []
