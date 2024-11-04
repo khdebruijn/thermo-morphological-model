@@ -499,7 +499,7 @@ class Simulation():
             # need to give each parameter as series (in this case, with length 1)
             # note that the built-in 'round' function is used because xbeach can't read long decimal floats, so round ensures the toolbox doesn't miss e.g. 'e10'
             "Hm0":round(conditions["Hs(m)"], 4),  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
-            "Tp":round(conditions["Tp(s)"], 4)
+            "Tp":round(conditions["Tp(s)"], 4),
             # "mainang":conditions["Dp(deg)"],  # relative to true north
             'mainang': 270,  # default value for 1D XBeach
             "gammajsp": 3.3,  # value recommended by Kees
