@@ -6,12 +6,11 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 
-
-parent = os.path.join(Path(os.getcwd()).parent)
-
-sys.path.append(parent)
-
 from utils.bathymetry import calculate_bluff_edge_toe_position, calculate_shoreline_position
+
+# parent = os.path.join(Path(os.getcwd()).parent)
+
+# sys.path.append(parent)
 
 runid = sys.argv[1]
 
