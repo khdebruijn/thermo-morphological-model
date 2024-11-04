@@ -24,8 +24,10 @@ t_list = []
 x_shore_line_list = []
 x_bluff_edge_list = []
 
+i = 0
+
 for fname in fnames:
-    
+
     if fname[0] == '0' and '.nc' in fname:
         
         ds = xr.load_dataset(os.path.join(run_output_dir, fname))
@@ -41,6 +43,9 @@ for fname in fnames:
         t_list.append(t)
         x_shore_line_list.append(x_shore_line)
         x_bluff_edge_list.append(x_bluff_edge)
+
+    i += 1
+    print(f'{i}/{len(fnames)}')
 
 df = pd.DataFrame(data={
     'time':t_list, 
