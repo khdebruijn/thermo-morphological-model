@@ -35,6 +35,8 @@ for output_id in output_ids:
     
     xgr = ds.xgr.values
     zgr = ds.zgr.values
+
+    ds.close()
     
     x_shore_line = calculate_shoreline_position(xgr, zgr)
     x_bluff_edge, __, __ = calculate_bluff_edge_toe_position(xgr, zgr)
