@@ -779,7 +779,7 @@ class SimulationResults():
             convective_heat_flux_line.set_data(xgr, convective_heat_flux)
             
             # update temperature labels (in plot 1)
-            L0.get_texts()[0].set_text(f"water level: {zs:.2f} m")
+            # L0.get_texts()[0].set_text(f"water level: {zs:.2f} m")
             L0.get_texts()[3].set_text(f"2m temperature: {air_temp - 273.15:.1f} degrees C")
             L0.get_texts()[4].set_text(f"Sea surface temperature: {sea_temp - 273.15:.1f} degrees C")
             
