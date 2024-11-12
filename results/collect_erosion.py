@@ -98,7 +98,8 @@ df = pd.DataFrame(data={
 reference_id = df['time'] == per['start_time']
 reference_offset = df[reference_id].x_bluff_edge.values
 
-df['relative_erosion_bluff_edge'] = df['x_bluff_edge'] - reference_offset + per['x_bluff_edge_start']
+df['relative_erosion_bluff_edge'] = df['x_bluff_edge'] - reference_offset 
+df['relative_x_bluff_edge'] = df['relative_erosion_bluff_edge'] + per['x_bluff_edge_start']
 
 save_path = f'./results/erosion_rates/{runid}.csv'
 
