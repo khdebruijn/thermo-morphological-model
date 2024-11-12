@@ -31,14 +31,14 @@ for output_id in output_ids:
             
     ds = xr.load_dataset(os.path.join(run_output_dir, fname))
     
-    t = ds.timestamp
+    t = ds.timestamp.values
     
     xgr = ds.xgr.values
     zgr = ds.zgr.values
 
     ds.close()
     
-    x_shore_line = calculate_shoreline_position(xgr, zgr)
+    x_shore_line = calculate_shoreline_position(xgr, zgr)[0]
     x_bluff_edge, __, __ = calculate_bluff_edge_toe_position(xgr, zgr)
     
     t_list.append(t)
