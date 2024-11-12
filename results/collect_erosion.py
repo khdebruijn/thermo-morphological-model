@@ -95,7 +95,7 @@ df = pd.DataFrame(data={
     'x_bluff_edge':x_bluff_edge_list,
     })
 
-reference_id = df['time'] == per['start_date']
+reference_id = df['time'] == per['start_time']
 reference_offset = df[reference_id].x_bluff_edge.values
 
 df['relative_erosion_bluff_edge'] = df['x_bluff_edge'] - reference_offset + per['x_bluff_edge_start']
