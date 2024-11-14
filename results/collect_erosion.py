@@ -33,8 +33,8 @@ per1 = {
 }
 
 per2 = {
-    "start_time": pd.to_datetime("2012-07-11"), # these dates are relevant for the bluff edge only
-    "end_time": pd.to_datetime("2015-07-05"),
+    "start_time_be": pd.to_datetime("2012-07-11"), # these dates are relevant for the bluff edge only
+    "end_time_be": pd.to_datetime("2015-07-05"),
     # "start_time_sl": pd.to_datetime(),
     # "end_time_sl": pd.to_datetime(),
     "x_shore_line_start": -1,   # i.e., distance to baseline at start
@@ -44,8 +44,8 @@ per2 = {
 }
 
 per3 = {
-    "start_time": pd.to_datetime("2016-08-27"), # these dates are relevant for the bluff edge only
-    "end_time": pd.to_datetime("2018-07-30"),
+    "start_time_be": pd.to_datetime("2016-08-27"), # these dates are relevant for the bluff edge only
+    "end_time_be": pd.to_datetime("2018-07-30"),
     # "start_time_sl": pd.to_datetime(),
     # "end_time_sl": pd.to_datetime(),
     "x_shore_line_start": -1,   # i.e., distance to baseline at start
