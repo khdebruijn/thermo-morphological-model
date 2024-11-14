@@ -1,5 +1,5 @@
 :: run to generate erosion files for each run
-python results\collect_erosion.py val_per1_2
+@REM python results\collect_erosion.py val_per1_2
 @REM python results\collect_erosion.py val_per1_3
 @REM python results\collect_erosion.py val_per1_4
 @REM python results\collect_erosion.py val_per1_5
@@ -21,11 +21,11 @@ python results\collect_erosion.py val_per1_2
 @REM python results\collect_erosion.py val_per1_21
 @REM python results\collect_erosion.py val_per1_22
 
-@REM python results\collect_erosion.py val_per2_3
+python results\collect_erosion.py val_per2_3
 @REM python results\collect_erosion.py val_per2_4
 @REM python results\collect_erosion.py val_per2_5
 @REM python results\collect_erosion.py val_per2_6
-@REM python results\collect_erosion.py val_per2_7
+python results\collect_erosion.py val_per2_7
 @REM python results\collect_erosion.py val_per2_8
-@REM python results\collect_erosion.py val_per2_9
+python results\collect_erosion.py val_per2_9
 @REM python results\collect_erosion.py val_per2_10
