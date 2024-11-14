@@ -22,8 +22,10 @@ output_ids = np.int32(np.loadtxt(os.path.join(run_output_dir, "timestep_output_i
 
 # reference variables
 per1 = {
-    "start_time": pd.to_datetime("2009-08-02"), # these dates are relevant for the bluff edge only
-    "end_time": pd.to_datetime("2011-07-15"),
+    "start_time_be": pd.to_datetime("2009-08-02"), # these dates are relevant for the bluff edge only
+    "end_time_be": pd.to_datetime("2011-07-15"),
+    # "start_time_sl": pd.to_datetime(),
+    # "end_time_sl": pd.to_datetime(),
     "x_shore_line_start": -1,   # i.e., distance to baseline at start
     "x_bluff_edge_start": 162.01508156899843,   # i.e., distance to baseline at start
     "x_shore_line_end": -1,   # i.e., distance to baseline at end
@@ -33,6 +35,8 @@ per1 = {
 per2 = {
     "start_time": pd.to_datetime("2012-07-11"), # these dates are relevant for the bluff edge only
     "end_time": pd.to_datetime("2015-07-05"),
+    # "start_time_sl": pd.to_datetime(),
+    # "end_time_sl": pd.to_datetime(),
     "x_shore_line_start": -1,   # i.e., distance to baseline at start
     "x_bluff_edge_start": 164.52084174135774,   # i.e., distance to baseline at start
     "x_shore_line_end": -1,   # i.e., distance to baseline at end
@@ -42,6 +46,8 @@ per2 = {
 per3 = {
     "start_time": pd.to_datetime("2016-08-27"), # these dates are relevant for the bluff edge only
     "end_time": pd.to_datetime("2018-07-30"),
+    # "start_time_sl": pd.to_datetime(),
+    # "end_time_sl": pd.to_datetime(),
     "x_shore_line_start": -1,   # i.e., distance to baseline at start
     "x_bluff_edge_start": 187.25161246050337,   # i.e., distance to baseline at start
     "x_shore_line_end": -1,   # i.e., distance to baseline at end
@@ -95,11 +101,20 @@ df = pd.DataFrame(data={
     'x_bluff_edge':x_bluff_edge_list,
     })
 
-reference_id = df['time'] == per['start_time']
-reference_offset = df[reference_id].x_bluff_edge.values
+reference_id_be = df['time'] == per['start_time_be']
+reference_offset_be = df[reference_id_be].x_bluff_edge.values
 
-df['relative_erosion_bluff_edge'] = df['x_bluff_edge'] - reference_offset 
+df['relative_erosion_bluff_edge'] = df['x_bluff_edge'] - reference_offset_be 
 df['relative_x_bluff_edge'] = df['relative_erosion_bluff_edge'] + per['x_bluff_edge_start']
+
+df['relative_erosion_shore_line'] = df['x_shore_line'] - reference_offset_be
+df['relative_x_shore_line'] = df['relative_erosion_shore_line'] + per['x_bluff_edge_start']
+
+# reference_id_sl = df['time'] == per['start_time_sl']
+# reference_offset_sl = df[reference_id_sl].x_shore_line.values
+
+# df['relative_erosion_shre_line'] = df['x_shore_line'] - reference_offset_sl
+# df['relative_x_shore_line'] = df['relative_erosion_shre_line'] + per['x_bluff_edge_start']
 
 save_path = f'./results/erosion_rates/{runid}.csv'
 
