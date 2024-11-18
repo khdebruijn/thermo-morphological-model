@@ -26,12 +26,12 @@
 @REM python results\collect_erosion.py val_per2_5
 @REM python results\collect_erosion.py val_per2_6
 @REM python results\collect_erosion.py val_per2_7
-@REM python results\collect_erosion.py val_per2_8
+python results\collect_erosion.py val_per2_8
 @REM python results\collect_erosion.py val_per2_9
-@REM python results\collect_erosion.py val_per2_10
+python results\collect_erosion.py val_per2_10
 @REM python results\collect_erosion.py val_per2_11
 @REM python results\collect_erosion.py val_per2_12
 @REM python results\collect_erosion.py val_per2_13
 @REM python results\collect_erosion.py val_per2_14
-python results\collect_erosion.py val_per2_15
-python results\collect_erosion.py val_per2_16
+@REM python results\collect_erosion.py val_per2_15
+@REM python results\collect_erosion.py val_per2_16
