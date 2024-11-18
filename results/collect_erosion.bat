@@ -1,5 +1,7 @@
 :: run to generate erosion files for each run
-python results\collect_erosion.py val_per1_2
+
+:: period 1 runs
+@REM python results\collect_erosion.py val_per1_2
 @REM python results\collect_erosion.py val_per1_3
 @REM python results\collect_erosion.py val_per1_4
 @REM python results\collect_erosion.py val_per1_5
@@ -21,6 +23,9 @@ python results\collect_erosion.py val_per1_2
 @REM python results\collect_erosion.py val_per1_21
 @REM python results\collect_erosion.py val_per1_22
 
+:: period 2 runs
+python results\collect_erosion.py val_per2_1
+python results\collect_erosion.py val_per2_2
 @REM python results\collect_erosion.py val_per2_3
 @REM python results\collect_erosion.py val_per2_4
 @REM python results\collect_erosion.py val_per2_5
@@ -36,4 +41,11 @@ python results\collect_erosion.py val_per1_2
 @REM python results\collect_erosion.py val_per2_15
 @REM python results\collect_erosion.py val_per2_16
 
-python results\collect_erosion.py val_per3_2
+:: period 3 runs
+@REM python results\collect_erosion.py val_per3_2
+
+:: validation runs
+python results\collect_erosion.py val_per1_best
+python results\collect_erosion.py val_per1_fast
+python results\collect_erosion.py val_per3_best
+python results\collect_erosion.py val_per3_fast
