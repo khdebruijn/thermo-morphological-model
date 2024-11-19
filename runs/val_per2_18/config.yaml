@@ -102,8 +102,8 @@ thermal:
 
   # model properties
   dt              : 36  # [s] timestep used in the thermal model on the temporal subgrid
-  grid_resolution : 1500  # number of points for each 1D thermal model
-  max_depth       : 15  # [m], the maximum depth of the 1D thermal model
+  grid_resolution : 500  # number of points for each 1D thermal model
+  max_depth       : 5  # [m], the maximum depth of the 1D thermal model
   T_melt          : 273.15  # [K] Melting temperature at the interface of water/air and bluff
   grid_interpolation : "linear_interp_z"  # method for interpolating to new grid. Can be "linear_interp_with_nearest" or "linear_interp_z".
   N_thaw_threshold: 20  # number of grid points that need to be frozen before being counted as non-erodible surface
