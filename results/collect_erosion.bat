@@ -45,7 +45,7 @@ python results\collect_erosion.py val_per2_2
 @REM python results\collect_erosion.py val_per3_2
 
 :: validation runs
-python results\collect_erosion.py val_per1_best
-python results\collect_erosion.py val_per1_fast
-python results\collect_erosion.py val_per3_best
-python results\collect_erosion.py val_per3_fast
+@REM python results\collect_erosion.py val_per1_best
+@REM python results\collect_erosion.py val_per1_fast
+@REM python results\collect_erosion.py val_per3_best
+@REM python results\collect_erosion.py val_per3_fast
