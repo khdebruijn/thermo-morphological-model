@@ -40,9 +40,9 @@
 @REM python results\collect_erosion.py val_per2_14
 @REM python results\collect_erosion.py val_per2_15
 @REM python results\collect_erosion.py val_per2_16
-python results\collect_erosion.py val_per2_17
-python results\collect_erosion.py val_per2_18
-python results\collect_erosion.py val_per2_19
+@REM python results\collect_erosion.py val_per2_17
+@REM python results\collect_erosion.py val_per2_18
+@REM python results\collect_erosion.py val_per2_19
 
 :: period 3 runs
 @REM python results\collect_erosion.py val_per3_2
@@ -52,3 +52,5 @@ python results\collect_erosion.py val_per2_19
 @REM python results\collect_erosion.py val_per1_fast
 @REM python results\collect_erosion.py val_per3_best
 @REM python results\collect_erosion.py val_per3_fast
+
+:: sensitivity runs
