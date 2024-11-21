@@ -24,8 +24,8 @@
 @REM python results\collect_erosion.py val_per1_22
 
 :: period 2 runs
-python results\collect_erosion.py val_per2_1
-python results\collect_erosion.py val_per2_2
+@REM python results\collect_erosion.py val_per2_1
+@REM python results\collect_erosion.py val_per2_2
 @REM python results\collect_erosion.py val_per2_3
 @REM python results\collect_erosion.py val_per2_4
 @REM python results\collect_erosion.py val_per2_5
@@ -40,6 +40,9 @@ python results\collect_erosion.py val_per2_2
 @REM python results\collect_erosion.py val_per2_14
 @REM python results\collect_erosion.py val_per2_15
 @REM python results\collect_erosion.py val_per2_16
+python results\collect_erosion.py val_per2_17
+python results\collect_erosion.py val_per2_18
+python results\collect_erosion.py val_per2_19
 
 :: period 3 runs
 @REM python results\collect_erosion.py val_per3_2
