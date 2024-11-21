@@ -8,5 +8,10 @@
 @REM python main_results.py val_per2_18 all 1300 1400
 @REM python main_results.py val_per2_19 all 1300 1400
 
-python main.py val_per2_18
-python main_results.py val_per2_18 all 1300 1400
+python main.py val_per1_no-therm
+python main.py val_per2_no-therm
+python main.py val_per3_no-therm
+
+python main_results.py val_per1_no-therm all 1300 1400
+python main_results.py val_per2_no-therm all 1300 1400
+python main_results.py val_per3_no-therm all 1300 1400
