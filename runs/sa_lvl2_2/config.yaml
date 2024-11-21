@@ -77,7 +77,7 @@ xbeach:
   wetslp      : 0.1  # [dz/dx] Critical avalanching slope below water (dz/dx and dz/dy) (placeholder)
   D50         : 0.000036  # [m] mean grain size, value from Nando (personal communication)
   rho_solid   : 2650  # [kg/m3] density of sediment particles
-  bedfriccoef : 0.016  # [-] bed friction coefficient (placeholder)
+  bedfriccoef : 0.02  # [-] bed friction coefficient (placeholder)
 
   # morphological parameters
   lsgrad : 0.0  # [1/m] Factor to include longshore transport gradient in 1d simulations; dsy/dy=lsgrad*sy; dimension 1/length scale of longshore gradients
@@ -192,4 +192,5 @@ output:
 
   save_ground_temp_layers: [0, 0.5, 1.0, 2.0, 2.95]  # [m] depths at which ground temperature is written seperately to csv file
   heat_fluxes: ['total_heat_flux[W/m2]', 'long_wave_radiation_flux[W/m2]', 'solar_radiation_flux[W/m2]', 'latent_heat_flux[W/m2]', 'convective_heat_flux[W/m2]']    # define heat fluxes to be used in memory output
+
   
