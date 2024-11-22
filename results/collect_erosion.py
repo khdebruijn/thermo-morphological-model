@@ -54,6 +54,18 @@ per3 = {
     "x_bluff_edge_end": 195.1759190877606,   # i.e., distance to baseline at end
 }
 
+per_sa = {
+    "start_time_be": pd.to_datetime("2018-01-01"), # these dates are relevant for the bluff edge only
+    "end_time_be": pd.to_datetime("2019-01-01"),
+    # "start_time_sl": pd.to_datetime(),
+    # "end_time_sl": pd.to_datetime(),
+    "x_shore_line_start": -1,   # i.e., distance to baseline at start
+    "x_bluff_edge_start": -1,   # i.e., distance to baseline at start
+    "x_shore_line_end": -1,   # i.e., distance to baseline at end
+    "x_bluff_edge_end": -1,   # i.e., distance to baseline at end
+}
+
+
 # get relevant period information
 if 'per1' in runid:
     per = per1
@@ -61,6 +73,8 @@ elif 'per2' in runid:
     per = per2
 elif 'per3' in runid:
     per = per3
+elif 'sa' in runid:
+    per = per_sa
 
 # initialize output lists
 t_list = []
