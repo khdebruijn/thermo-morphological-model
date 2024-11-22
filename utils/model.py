@@ -216,6 +216,18 @@ class Simulation():
         # read in forcing concditions
         self.forcing_data = self._get_timeseries(self.t_start, self.t_end, fpath, repeat=rpt)
         
+        # add terms or factors for thermodynamic part of sensitivity analysis
+        self.forcing_data["mean_surface_latent_heat_flux"] = self.forcing_data['mean_surface_latent_heat_flux'] * \
+            (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_latent_heat_flux)
+        self.forcing_data["mean_surface_net_long_wave_radiation_flux"] = self.forcing_data['mean_surface_net_long_wave_radiation_flux'] * \
+            (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_longwave_heat_flux) 
+        self.forcing_data["mean_surface_net_short_wave_radiation_flux"] = self.forcing_data['mean_surface_net_short_wave_radiation_flux'] * \
+            (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_shortwave_heat_flux)
+        self.forcing_data["sea_surface_temperature"] = self.forcing_data['sea_surface_temperature'] + \
+            (0 if "sensitivity" not in self.config.keys() else self.config.sensitivity.term_sea_temperature)
+        self.forcing_data["2m_temperature"] = self.forcing_data['2m_temperature'] + \
+            (0 if "sensitivity" not in self.config.keys() else self.config.sensitivity.term_2m_air_temperature)
+        
         return None
     
     ################################################
@@ -288,10 +300,15 @@ class Simulation():
             mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
             
             df = df[mask]
-
+        
+        # add terms or factors for hydrodynamic part of sensitivity analysis
+        df['WL(m)'] = df['WL(m)'] + (0 if "sensitivity" not in self.config.keys() else self.config.sensitivity.term_water_level)
+        df['Hs(m)'] = df['Hs(m)'] * (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_wave_height)
+        df['Tp(s)'] = df['Tp(s)'] * (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_wave_period)
+        
         # Loop through complete data to save conditions            
         # df_dropna = df.dropna(axis=0)
-                        
+        
         for i, row in df.iterrows():
             
             index = np.argwhere(self.timestamps==row.time)
@@ -1208,6 +1225,9 @@ class Simulation():
             
         # compute total convective transport
         self.convective_flux = dry_mask * convective_transport_air + wet_mask * convective_transport_water  # also used in output
+        
+        # multiply convective heat flux with factor for sensitivity analysis
+        self.convective_flux = self.convective_flux * (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_wave_height)
         
         if subgrid_timestep_id == 0:  # determine radiation fluxes only during first subgrid timestep, as they are constant for each subgrid timestep
         
