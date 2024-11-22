@@ -48,10 +48,10 @@
 @REM python results\collect_erosion.py val_per3_2
 
 :: validation runs
-@REM python results\collect_erosion.py val_per1_best
+python results\collect_erosion.py val_per1_best
 @REM python results\collect_erosion.py val_per1_fast
 @REM python results\collect_erosion.py val_per3_best
-@REM python results\collect_erosion.py val_per3_fast
+python results\collect_erosion.py val_per3_fast
 
 :: sensitivity runs
 python results\collect_erosion.py sa_lvl1_1
@@ -139,6 +139,12 @@ python results\collect_erosion.py sa_lvl2_13
 python results\collect_erosion.py sa_lvl2_14
 python results\collect_erosion.py sa_lvl2_15
 python results\collect_erosion.py sa_lvl2_16
+python results\collect_erosion.py sa_lvl2_17
+python results\collect_erosion.py sa_lvl2_18
 
 python results\collect_erosion.py sa_lvl3_1
 python results\collect_erosion.py sa_lvl3_2
+
+python results\collect_erosion.py val_per1_no-therm
+python results\collect_erosion.py val_per2_no-therm
+python results\collect_erosion.py val_per3_no-therm

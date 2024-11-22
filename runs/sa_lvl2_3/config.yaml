@@ -193,4 +193,17 @@ output:
   save_ground_temp_layers: [0, 0.5, 1.0, 2.0, 2.95]  # [m] depths at which ground temperature is written seperately to csv file
   heat_fluxes: ['total_heat_flux[W/m2]', 'long_wave_radiation_flux[W/m2]', 'solar_radiation_flux[W/m2]', 'latent_heat_flux[W/m2]', 'convective_heat_flux[W/m2]']    # define heat fluxes to be used in memory output
 
-  
+# used for sensitivity analysis of the hydrodynamic and thermodynamic drivers
+sensitivity:
+  # hydrodynamics
+  term_water_level    : 0  # [m] term added to the water level for the entire simulation
+  factor_wave_height  : 0.9  # [-] factor multiplied with the wave height for the entire simulation
+  factor_wave_period  : 1  # [-] factor multiplied with the wave height for the entire simulation
+
+  # thermodynamics
+  factor_latent_heat_flux     : 1  # [-] factor multiplied with the latent heat flux for the entire simulation
+  factor_convective_heat_flux : 1  # [-] factor multiplied with the convective heat flux (both submerged and above water) for the entire simulation
+  factor_longwave_heat_flux   : 1  # [-] factor multiplied with the longwave heat flux for the entire simulation
+  factor_shortwave_heat_flux  : 1  # [-] factor multiplied with the shortwave heat flux for the entire simulation
+  term_sea_temperature        : 0  # [K] term added to the sea temperature for the entire simulation
+  term_2m_air_temperature     : 0  # [K] term added to the 2m air temperature for the entire simulation
