@@ -55,7 +55,7 @@ per3 = {
 }
 
 per_sa = {
-    "start_time_be": pd.to_datetime("2018-01-01"), # these dates are relevant for the bluff edge only
+    "start_time_be": pd.to_datetime("2017-01-01"), # these dates are relevant for the bluff edge only
     "end_time_be": pd.to_datetime("2019-01-01"),
     # "start_time_sl": pd.to_datetime(),
     # "end_time_sl": pd.to_datetime(),
