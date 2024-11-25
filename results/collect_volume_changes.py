@@ -56,9 +56,9 @@ for runid in runids:
         V_start = 0
         V_end = 0
         
-        V_start_list.append(V_start)
-        V_end_list.append(V_end)
-    
+    V_start_list.append(V_start)
+    V_end_list.append(V_end)
+
     print(f'Completed {i}/{len(runids)}')
     
     i += 1
