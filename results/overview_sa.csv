@@ -42,8 +42,8 @@ Shortwave heat flux**,2,thermodynamics,11,12,1,-,+-10%,*0.9,*1.1,01/01/2017,01/0
 Sea temperature*,2,thermodynamics,13,14,0,-,+-2,-2,+2,01/01/2017,01/01/2018,sa_lvl2_13,sa_lvl2_14
 2m air temperature*,2,thermodynamics,15,16,0,-,+-2,-2,+2,01/01/2017,01/01/2018,sa_lvl2_15,sa_lvl2_16
 Latent heat flux,2,thermodynamics,17,18,1,-,+-10%,*0.9,*1.1,01/01/2017,01/01/2018,sa_lvl2_17,sa_lvl2_18
-Thermal module,3,None,1,1,1,-,-1,0,0,01/01/2017,01/01/2018,sa_lvl3_1,sa_lvl3_1
-Solar flux calcuator,3,None,2,2,1,-,-1,0,0,01/01/2017,01/01/2018,sa_lvl3_2,sa_lvl3_2
+Thermal module,3,thermal-module,1,1,1,-,-1,0,0,01/01/2017,01/01/2018,sa_lvl3_1,sa_lvl3_1
+Solar flux calcuator,3,thermal-module,2,2,1,-,-1,0,0,01/01/2017,01/01/2018,sa_lvl3_2,sa_lvl3_2
 ,,,,,,,,,,,,,
 ,,,,,,,,,,,,,
 ,,,,,,,,,,,,,
