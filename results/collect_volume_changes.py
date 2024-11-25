@@ -22,37 +22,42 @@ V_end_list = []
 i = 1
 
 for runid in runids:
+    try: 
+        run_output_dir = Path(f"p:/11210070-usgscoop-202324-arcticxb/runs/{runid}/")
 
-    run_output_dir = Path(f"p:/11210070-usgscoop-202324-arcticxb/runs/{runid}/")
+        output_ids = np.int32(np.loadtxt(os.path.join(run_output_dir, "timestep_output_ids.txt")))
 
-    output_ids = np.int32(np.loadtxt(os.path.join(run_output_dir, "timestep_output_ids.txt")))
+        # reference variables
+        max_distance_from_top = 5  # m
 
-    # reference variables
-    max_distance_from_top = 5  # m
-
-    # read data at start
-    output_id_start = output_ids[0]
-    fname_start = (10 - len(str(int(output_id_start)))) * '0' + str(int(output_id_start)) + ".nc"
-    ds_start = xr.load_dataset(os.path.join(run_output_dir, fname_start))
-    x_start = ds_start.xgr.values
-    z_start = ds_start.zgr.values
-    ds_start.close()
-    
-    output_id_end = output_ids[-1]
-    fname_end = (10 - len(str(int(output_id_end)))) * '0' + str(int(output_id_end)) + ".nc"
-    ds_end = xr.load_dataset(os.path.join(run_output_dir, fname_end))
-    x_end = ds_end.xgr.values
-    z_end = ds_end.zgr.values
-    ds_end.close()
-    
-    z_mask_start = (z_start > np.max(z_start) - max_distance_from_top)
-    z_mask_end = (z_end > np.max(z_end) - max_distance_from_top)
-    
-    V_start = trapezoid(z_mask_start * z_start, x_start)
-    V_end = trapezoid(z_mask_end * z_end, x_end)
-
-    V_start_list.append(V_start)
-    V_end_list.append(V_end)
+        # read data at start
+        output_id_start = output_ids[0]
+        fname_start = (10 - len(str(int(output_id_start)))) * '0' + str(int(output_id_start)) + ".nc"
+        ds_start = xr.load_dataset(os.path.join(run_output_dir, fname_start))
+        x_start = ds_start.xgr.values
+        z_start = ds_start.zgr.values
+        ds_start.close()
+        
+        output_id_end = output_ids[-1]
+        fname_end = (10 - len(str(int(output_id_end)))) * '0' + str(int(output_id_end)) + ".nc"
+        ds_end = xr.load_dataset(os.path.join(run_output_dir, fname_end))
+        x_end = ds_end.xgr.values
+        z_end = ds_end.zgr.values
+        ds_end.close()
+        
+        z_mask_start = (z_start > np.max(z_start) - max_distance_from_top)
+        z_mask_end = (z_end > np.max(z_end) - max_distance_from_top)
+        
+        V_start = trapezoid(z_mask_start * z_start, x_start)
+        V_end = trapezoid(z_mask_end * z_end, x_end)
+        
+    except FileNotFoundError:
+        
+        V_start = 0
+        V_end = 0
+        
+        V_start_list.append(V_start)
+        V_end_list.append(V_end)
     
     print(f'Completed {i}/{len(runids)}')
     
