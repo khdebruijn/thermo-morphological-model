@@ -56,6 +56,8 @@ for runid in runids:
         V_start = 0
         V_end = 0
         
+        print(f'failed for {runid}')
+        
     V_start_list.append(V_start)
     V_end_list.append(V_end)
 
