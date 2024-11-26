@@ -1227,7 +1227,7 @@ class Simulation():
         self.convective_flux = dry_mask * convective_transport_air + wet_mask * convective_transport_water  # also used in output
         
         # multiply convective heat flux with factor for sensitivity analysis
-        self.convective_flux = self.convective_flux * (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_wave_height)
+        self.convective_flux = self.convective_flux * (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_convective_heat_flux)
         
         if subgrid_timestep_id == 0:  # determine radiation fluxes only during first subgrid timestep, as they are constant for each subgrid timestep
         
