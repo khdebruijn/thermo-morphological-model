@@ -126,12 +126,12 @@
 @REM python results\collect_erosion.py sa_lvl1_67
 @REM python results\collect_erosion.py sa_lvl1_68
 
-python results\collect_erosion.py sa_lvl2_1
-python results\collect_erosion.py sa_lvl2_2
-python results\collect_erosion.py sa_lvl2_3
-python results\collect_erosion.py sa_lvl2_4
-python results\collect_erosion.py sa_lvl2_5
-python results\collect_erosion.py sa_lvl2_6
+@REM python results\collect_erosion.py sa_lvl2_1
+@REM python results\collect_erosion.py sa_lvl2_2
+@REM python results\collect_erosion.py sa_lvl2_3
+@REM python results\collect_erosion.py sa_lvl2_4
+@REM python results\collect_erosion.py sa_lvl2_5
+@REM python results\collect_erosion.py sa_lvl2_6
 @REM python results\collect_erosion.py sa_lvl2_7
 @REM python results\collect_erosion.py sa_lvl2_8
 @REM python results\collect_erosion.py sa_lvl2_9
@@ -145,9 +145,9 @@ python results\collect_erosion.py sa_lvl2_6
 @REM python results\collect_erosion.py sa_lvl2_17
 @REM python results\collect_erosion.py sa_lvl2_18
 
-python results\collect_erosion.py sa_lvl3_1
+@REM python results\collect_erosion.py sa_lvl3_1
 @REM python results\collect_erosion.py sa_lvl3_2
 
-@REM python results\collect_erosion.py val_per1_no-therm
-@REM python results\collect_erosion.py val_per2_no-therm
-@REM python results\collect_erosion.py val_per3_no-therm
+python results\collect_erosion.py val_per1_no-therm
+python results\collect_erosion.py val_per2_no-therm
+python results\collect_erosion.py val_per3_no-therm
