@@ -29,6 +29,9 @@ for runid in runids:
 
         # reference variables
         max_distance_from_top = 5  # m
+        
+        # generate new grid with N values
+        N = 10**5
 
         # read data at start
         output_id_start = output_ids[0]
@@ -36,7 +39,15 @@ for runid in runids:
         ds_start = xr.load_dataset(os.path.join(run_output_dir, fname_start))
         x_start = ds_start.xgr.values
         z_start = ds_start.zgr.values
+        
         ds_start.close()
+
+        x_start_interp = np.linspace(x_start[0], x_start[-1], N)
+        z_start_interp = np.interp(x_start_interp, x_start, z_start)
+        
+        z_mask_start = (z_start_interp > np.max(z_start) - max_distance_from_top)
+        V_start = trapezoid(z_mask_start * (z_start_interp - max_distance_from_top), x_start_interp)
+
         
         output_id_end = output_ids[-1]
         fname_end = (10 - len(str(int(output_id_end)))) * '0' + str(int(output_id_end)) + ".nc"
@@ -45,11 +56,15 @@ for runid in runids:
         z_end = ds_end.zgr.values
         ds_end.close()
         
-        z_mask_start = (z_start > np.max(z_start) - max_distance_from_top)
-        z_mask_end = (z_end > np.max(z_end) - max_distance_from_top)
+        x_end_interp = np.linspace(x_end[0], x_end[-1], N)
+        z_end_interp = np.interp(x_end_interp, x_end, z_end)
         
-        V_start = trapezoid(z_mask_start * z_start, x_start)
-        V_end = trapezoid(z_mask_end * z_end, x_end)
+        z_mask_end = (z_end_interp > np.max(z_start) - max_distance_from_top)
+        V_end = trapezoid(z_mask_end * (z_end_interp - max_distance_from_top), z_end_interp)
+        
+        # z_mask_end = (z_end > np.max(z_end) - max_distance_from_top)
+        
+        # V_end = trapezoid(z_mask_end * z_end, x_end)
         
     except FileNotFoundError:
         
