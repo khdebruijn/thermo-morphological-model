@@ -16,7 +16,7 @@ grid resolution xbeach,1,model,27,28,40,ppwl,+-10%,36,44,01/01/2017,01/01/2018,s
 grid resolution thermal module,1,model,29,30,150,nodes,+-10%,135,165,01/01/2017,01/01/2018,sa_lvl1_29,sa_lvl1_30
 max depth thermal module,1,model,31,32,15,m,+-10%,13.5,16.5,01/01/2017,01/01/2018,sa_lvl1_31,sa_lvl1_32
 thaw threshold,1,model,33,34,3,nodes,+-33%,2,4,01/01/2017,01/01/2018,sa_lvl1_33,sa_lvl1_34
-intermittent Xbeach activations,1,model,35,36,168,h,+-10%,151.2,184.8,01/01/2017,01/01/2018,sa_lvl1_35,sa_lvl1_36
+inter-storm Xbeach activations,1,model,35,36,168,h,+-10%,151.2,184.8,01/01/2017,01/01/2018,sa_lvl1_35,sa_lvl1_36
 critical dry slope,1,physical,37,38,1,-,+-20%,0.8,1.2,01/01/2017,01/01/2018,sa_lvl1_37,sa_lvl1_38
 critical wet slope,1,physical,39,40,0.1,-,+-20%,0.08,0.12,01/01/2017,01/01/2018,sa_lvl1_39,sa_lvl1_40
 D50,1,physical,41,42,0.000036,m,+-20%,0.0000288,0.0000432,01/01/2017,01/01/2018,sa_lvl1_41,sa_lvl1_42
@@ -30,7 +30,7 @@ thermal conductivity (frozen soil),1,physical,55,56,2.7,W/m/K,+-20%,2.16,3.24,01
 thermal conductivity (unfrozen soil),1,physical,57,58,0.6,W/m/K,+-20%,0.48,0.72,01/01/2017,01/01/2018,sa_lvl1_57,sa_lvl1_58
 latent heat of fusion,1,physical,59,60,334000,J/kg,+-20%,267200,400800,01/01/2017,01/01/2018,sa_lvl1_59,sa_lvl1_60
 water density,1,physical,61,62,1000,kg/m3,+-20%,800,1200,01/01/2017,01/01/2018,sa_lvl1_61,sa_lvl1_62
-metling temperature water,1,physical,63,64,273.15,K,+-1%,270.4185,275.8815,01/01/2017,01/01/2018,sa_lvl1_63,sa_lvl1_64
+melting temperature water,1,physical,63,64,273.15,K,+-1%,270.4185,275.8815,01/01/2017,01/01/2018,sa_lvl1_63,sa_lvl1_64
 geothermal gradient,1,physical,65,66,0.025,K/m,+-20%,0.02,0.03,01/01/2017,01/01/2018,sa_lvl1_65,sa_lvl1_66
 latitude,1,physical,67,68,70.13,degrees,+-5%,66.6235,73.6365,01/01/2017,01/01/2018,sa_lvl1_67,sa_lvl1_68
 water level,2,hydrodynamics,1,2,0,-,+-0.1,-0.1,+0.1,01/01/2017,01/01/2018,sa_lvl2_1,sa_lvl2_2
