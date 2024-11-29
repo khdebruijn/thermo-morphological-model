@@ -60,7 +60,7 @@ for runid in runids:
         z_end_interp = np.interp(x_end_interp, x_end, z_end)
         
         z_mask_end = (z_end_interp > np.max(z_start) - max_distance_from_top)
-        V_end = trapezoid(z_mask_end * (z_end_interp - max_distance_from_top), z_end_interp)
+        V_end = trapezoid(z_mask_end * (z_end_interp - max_distance_from_top), x_end_interp)
         
         # z_mask_end = (z_end > np.max(z_end) - max_distance_from_top)
         
