@@ -19,13 +19,6 @@ python main.py sa_lvl1_36
 python main.py sa_lvl1_37
 python main.py sa_lvl1_38
 python main.py sa_lvl1_39
-python main.py sa_lvl1_40
-python main.py sa_lvl1_41
-python main.py sa_lvl1_42
-python main.py sa_lvl1_43
-python main.py sa_lvl1_44
-python main.py sa_lvl1_45
-python main.py sa_lvl1_46
 
 python main.py sa_lvl2_7
 python main.py sa_lvl2_8

@@ -1,17 +1,25 @@
 :: to execute this batch file, cd to project directory and type "runs\runs.bat"
 
-@REM python main.py val_per2_17
-@REM python main.py val_per2_18
-@REM python main.py val_per2_19
+python main.py sa_lvl1_17
+python main.py sa_lvl1_18
+python main.py sa_lvl1_19
+python main.py sa_lvl1_20
+python main.py sa_lvl1_21
+python main.py sa_lvl1_22
+python main.py sa_lvl1_23
 
-@REM python main_results.py val_per2_17 all 1300 1400
-@REM python main_results.py val_per2_18 all 1300 1400
-@REM python main_results.py val_per2_19 all 1300 1400
+python main.py sa_lvl1_40
+python main.py sa_lvl1_41
+python main.py sa_lvl1_42
+python main.py sa_lvl1_43
+python main.py sa_lvl1_44
+python main.py sa_lvl1_45
+python main.py sa_lvl1_46
 
-python main.py val_per1_no-therm
-python main.py val_per2_no-therm
-python main.py val_per3_no-therm
-
-python main_results.py val_per1_no-therm all 1300 1400
-python main_results.py val_per2_no-therm all 1300 1400
-python main_results.py val_per3_no-therm all 1300 1400
+python main.py sa_lvl1_64
+python main.py sa_lvl1_65
+python main.py sa_lvl1_66
+python main.py sa_lvl1_67
+python main.py sa_lvl1_68
+python main.py sa_lvl1_69
+python main.py sa_lvl1_70
