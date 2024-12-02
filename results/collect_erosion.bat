@@ -152,6 +152,6 @@
 @REM python results\collect_erosion.py val_per2_no-therm
 @REM python results\collect_erosion.py val_per3_no-therm
 
-python results\collect_erosion.py val_per1_base
-python results\collect_erosion.py val_per2_base
-python results\collect_erosion.py val_per3_base
+@REM python results\collect_erosion.py val_per1_base
+@REM python results\collect_erosion.py val_per2_base
+@REM python results\collect_erosion.py val_per3_base
