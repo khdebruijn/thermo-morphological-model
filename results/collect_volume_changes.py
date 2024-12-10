@@ -46,7 +46,11 @@ for runid in runids:
         z_start_interp = np.interp(x_start_interp, x_start, z_start)
         
         z_mask_start = (z_start_interp > np.max(z_start) - max_distance_from_top)
-        V_start = trapezoid(z_mask_start * (z_start_interp - max_distance_from_top), x_start_interp)
+        
+        V_start_from_top = trapezoid(z_mask_start * z_start_interp, x_start_interp)
+        V_start_from_threshold = trapezoid(z_mask_start * np.ones(z_start_interp.shape) * (np.max(z_start) - max_distance_from_top), x_start_interp)
+        
+        V_start = V_start_from_top - V_start_from_threshold
 
         
         output_id_end = output_ids[-1]
@@ -60,7 +64,11 @@ for runid in runids:
         z_end_interp = np.interp(x_end_interp, x_end, z_end)
         
         z_mask_end = (z_end_interp > np.max(z_start) - max_distance_from_top)
-        V_end = trapezoid(z_mask_end * (z_end_interp - max_distance_from_top), x_end_interp)
+        
+        V_end_from_top = trapezoid(z_mask_end * z_end_interp, x_end_interp)
+        V_end_from_threshold = trapezoid(z_mask_end * np.ones(z_end_interp.shape) * (np.max(z_start) - max_distance_from_top), x_end_interp)
+        
+        V_end = V_end_from_top - V_end_from_threshold
         
         # z_mask_end = (z_end > np.max(z_end) - max_distance_from_top)
         
