@@ -19,7 +19,7 @@ Thaw threshold,1,model,33,34,3,nodes,+-33%,2,4,01/01/2017,01/01/2018,sa_lvl1_33,
 Inter-storm XBeach activatinos,1,model,35,36,168,h,+-10%,151.2,184.8,01/01/2017,01/01/2018,sa_lvl1_35,sa_lvl1_36
 Critical dry slope,1,physical,37,38,1,-,+-20%,0.8,1.2,01/01/2017,01/01/2018,sa_lvl1_37,sa_lvl1_38
 Critical wet slope,1,physical,39,40,0.1,-,+-20%,0.08,0.12,01/01/2017,01/01/2018,sa_lvl1_39,sa_lvl1_40
-D50,1,physical,41,42,0.000036,m,+-20%,0.0000288,0.0000432,01/01/2017,01/01/2018,sa_lvl1_41,sa_lvl1_42
+D50,1,physical,41,42,0.036,mm,+-20%,0.0288,0.0432,01/01/2017,01/01/2018,sa_lvl1_41,sa_lvl1_42
 Bed friction coefficient,1,physical,43,44,0.02,-,+-20%,0.016,0.024,01/01/2017,01/01/2018,sa_lvl1_43,sa_lvl1_44
 Longshore transport gradient,1,physical,45,46,0,1/m,+-0.01,-0.01,0.01,01/01/2017,01/01/2018,sa_lvl1_45,sa_lvl1_46
 Particle density sediment,1,physical,47,48,2650,kg/m3,+-20%,2120,3180,01/01/2017,01/01/2018,sa_lvl1_47,sa_lvl1_48
