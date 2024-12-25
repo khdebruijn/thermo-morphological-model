@@ -114,8 +114,16 @@ class Simulation():
         self.t_start = pd.to_datetime(t_start, dayfirst=True)
         self.t_end = pd.to_datetime(t_end, dayfirst=True)
         
+        # check how many times this simulation should be repeated
+        rpt = 1 if 'repeat_sim' not in self.config.model.keys() else self.config.model.repeat_sim
+
         # this variable will be used to keep track of time
-        self.timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left')
+        unrepeated_timestamps = pd.date_range(start=self.t_start, end=self.t_end, freq=f'{self.dt}h', inclusive='left')
+        
+        # repeat timestamps if necessary
+        self.timestamps = unrepeated_timestamps
+        for i in range(rpt - 1):
+            self.timestamps = self.timestamps.append(unrepeated_timestamps)
         
         # time indexing is easier for numerical models    
         self.T = np.arange(0, len(self.timestamps), 1) 
@@ -162,8 +170,8 @@ class Simulation():
             self._load_grid_bathy(os.path.join(self.cwd, "x.grd"))
         
         # check whether to use an xbeach generated xgrid or to generate uniform grid using linspace
-        if nx:
-            self.xgr = np.linspace(min(self.bathy_grid), max(self.bathy_grid), self.config.model.nx)
+        if nx and self.config.bathymetry.with_nx:
+            self.xgr = np.linspace(min(self.bathy_grid), max(self.bathy_grid), nx)
         else:
             # transform into a more suitable grid for xbeach
             self.xgr, self.zgr = xgrid(self.bathy_grid, self.bathy_initial, dxmin=2, ppwl=self.config.bathymetry.ppwl)
@@ -201,8 +209,25 @@ class Simulation():
             
     def load_forcing(self, fpath):
         """This function loads in the forcing data and makes it an attribute of the simulation instance"""
+        
+        # check whether or not forcing conditions should be repeated
+        rpt = 1 if 'repeat_sim' not in self.config.model.keys() else self.config.model.repeat_sim
+        
         # read in forcing concditions
-        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, fpath)
+        self.forcing_data = self._get_timeseries(self.t_start, self.t_end, fpath, repeat=rpt)
+        
+        # add terms or factors for thermodynamic part of sensitivity analysis
+        self.forcing_data["mean_surface_latent_heat_flux"] = self.forcing_data['mean_surface_latent_heat_flux'] * \
+            (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_latent_heat_flux)
+        self.forcing_data["mean_surface_net_long_wave_radiation_flux"] = self.forcing_data['mean_surface_net_long_wave_radiation_flux'] * \
+            (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_longwave_heat_flux) 
+        self.forcing_data["mean_surface_net_short_wave_radiation_flux"] = self.forcing_data['mean_surface_net_short_wave_radiation_flux'] * \
+            (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_shortwave_heat_flux)
+        self.forcing_data["sea_surface_temperature"] = self.forcing_data['sea_surface_temperature'] + \
+            (0 if "sensitivity" not in self.config.keys() else self.config.sensitivity.term_sea_temperature)
+        self.forcing_data["2m_temperature"] = self.forcing_data['2m_temperature'] + \
+            (0 if "sensitivity" not in self.config.keys() else self.config.sensitivity.term_2m_air_temperature)
+        
         return None
     
     ################################################
@@ -228,11 +253,236 @@ class Simulation():
         self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=0)
         
         self.water_level = 0
+        self.xb_check = 0
+        
+        self.beta_f = np.zeros(self.T.shape)
+        self.R2 = np.zeros(self.T.shape)
         
         self.storm_write_counter = 0
         
         return None
     
+    def initialize_hydro_forcing(self, fp_storm):
+        """This function is used to initialize hydrodynamic forcing conditions, and what the conditions are. It uses either 
+        'database/ts_datasets/storms_erikson.csv' (for cmip hindcast) or 'database/ts_datasets/storms_engelstad.csv' 
+        (for era5 hindcast).
+
+        Args:
+            fp_storm (Path): path to storm dataset
+
+        Returns:
+            array: array of length T that for each timestep contains hydrodynamic forcing
+        """
+        # Initialize conditions array
+        self.conditions = np.zeros(self.T.shape, dtype=object)  # also directly read wave conditions here
+        
+        # Initialize zero conditions
+        self.zero_conditions = {
+                    # "Hso(m)": 0.001,
+                    # "Hs(m)": 0.001,
+                    "Hso(m)": 0.05,  # placeholder
+                    "Hs(m)": 0.05,  # placeholder
+                    # "Hso(m)": 0,
+                    # "Hs(m)": 0,
+                    "Dp(deg)": 270,                    
+                    # "Dp(deg)": 0,
+                    "Tp(s)": 2,
+                    # "Tp(s)": 0,
+                    # "WL(m)": 0,
+                    "Hindcast_or_projection": 0,
+                    }
+        
+        # read file and mask out correct timespan
+        with open(fp_storm) as f:
+            
+            df = pd.read_csv(f, parse_dates=['time'])
+                                    
+            mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
+            
+            df = df[mask]
+        
+        # add terms or factors for hydrodynamic part of sensitivity analysis
+        df['WL(m)'] = df['WL(m)'] + (0 if "sensitivity" not in self.config.keys() else self.config.sensitivity.term_water_level)
+        df['Hs(m)'] = df['Hs(m)'] * (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_wave_height)
+        df['Tp(s)'] = df['Tp(s)'] * (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_wave_period)
+        
+        # Loop through complete data to save conditions            
+        # df_dropna = df.dropna(axis=0)
+        
+        for i, row in df.iterrows():
+            
+            index = np.argwhere(self.timestamps==row.time)
+                        
+            if not row.isnull().values.any():
+                            
+                # safe storm conditions for this timestep as well            
+                self.conditions[index] = {
+                        "Hs(m)": row["Hs(m)"],
+                        "Dp(deg)": row["Dp(deg)"],
+                        "Tp(s)": row["Tp(s)"],
+                        "WL(m)": row["WL(m)"],
+                            }
+                
+            else:
+                conds = self.zero_conditions
+                conds['WL(m)'] = row['WL(m)']
+                
+                self.conditions[index] = conds
+                
+        self.water_levels = np.tile(df['WL(m)'].values, self.config.model.repeat_sim)
+        
+        return self.conditions
+    
+    def timesteps_with_xbeach_active(self):
+        """This function gets the timestep ids for which xbeach should be active, without looking at 2% runup threshold yet.
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
+        
+        # get inter-storm timestep ids
+        self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
+        
+        # get sea-ice timestep ids
+        self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.wrapper.sea_ice_threshold)
+        
+        # xbeach is not ran during spin_up
+        # self.no_xb_spinup = np.zeros(self.T.shape)
+        # self.no_xb_spinup[len(self.T) / self.config.model.repeat_sim]
+        
+        # initialize xbeach storms array
+        self.xbeach_storms = np.zeros(self.xbeach_inter.shape)
+        
+        # initialize xbeach_times array
+        self.xbeach_times = np.zeros(self.xbeach_inter.shape)
+
+        return self.xbeach_times
+    
+    
+    def _when_xbeach_inter(self, call_xbeach_inter):
+        """This function determines the timestamps that xbeach is called regardless of sea-ice or storms.
+
+        Args:
+            call_xbeach_inter (int): Call xbeach every 'call_xbeach_inter' timestamps, regardsless of the presence of sea ice or a storm.
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
+        """
+        ct = np.zeros(self.T.shape)
+        
+        # set xbeach active at provided intervals
+        ct[::call_xbeach_inter] = 1
+        
+        return ct
+    
+    def _when_xbeach_no_sea_ice(self, sea_ice_threshold):
+        """This function determines when xbeach should not be ran due to sea ice, based on a threshold value)
+
+        Args:
+            sea_ice_threshold (float): _description_
+
+        Returns:
+            array: array of length T that for each timestep contains a 1 if xbeach can be ran and 0 if not (w.r.t. sea ice).
+        """
+        it =  (self.forcing_data.sea_ice_cover.values < sea_ice_threshold)
+                
+        return it
+    
+    def _when_xbeach_storms(self, timestep_id):
+        """This function checks whether or not there is actually a storm during the upcoming each timestep, and is based on a 2% runup threshold
+
+        Args:
+            timestep_id (int): current timestep
+
+        Returns:
+            int: 1 for storm, 0 for no storm
+        """
+        # read hydrodynamic conditions for current timestep
+        H = self.conditions[timestep_id]['Hs(m)']
+        T = self.conditions[timestep_id]['Tp(s)']
+        wl = self.conditions[timestep_id]['WL(m)']
+        
+        # assume these are the deep water conditions
+        H0 = H
+        L0 = 9.81 * T**2 / (2 * np.pi)
+        
+        # determine the +- 2*sigma envelope (for the stockdon, 2006 formulation)
+        sigma = H0 / 4
+        mask = np.nonzero((self.zgr > wl - 2*sigma) * (self.zgr < wl + 2*sigma))
+        z_envelope = self.zgr[mask]
+        x_envelope = self.xgr[mask]
+            
+        # if waves are too small, the envelope doesn't exist on the grid, so this method will fail
+        try:
+            # compute beta_f as the average slope in this envelope
+            dz = z_envelope[np.argmax(x_envelope)] - z_envelope[np.argmin(x_envelope)]
+            dx = x_envelope[np.argmax(x_envelope)] - x_envelope[np.argmin(x_envelope)]
+            
+            # if there's only one point in the envelope then dx will be 0, so go ahead with the except block as well
+            if dx == 0:
+                raise ValueError
+            
+            # print('normal computation')
+        
+        # and in that case, the local angle of the two grid points nearest to the water level is used
+        except ValueError:
+            
+            dry_mask = self.zgr > wl
+            dry_indices = np.nonzero(dry_mask)
+            
+            wet_mask = np.ones(dry_mask.shape) - dry_mask
+            wet_indices = np.nonzero(wet_mask)
+            
+            first_dry_id = np.min(dry_indices)
+            last_wet_id = np.max(wet_indices)
+            
+            x1, z1 = self.xgr[first_dry_id], self.zgr[first_dry_id]
+            x2, z2 = self.xgr[last_wet_id], self.zgr[last_wet_id]
+            
+            # x1, x2 = self.xgr[wet_mask[-1]], self.xgr[dry_mask[0]]
+            # z1, z2 = self.zgr[wet_mask[-1]], self.zgr[dry_mask[0]]
+            
+            dz = z2 - z1
+            dx = x2 - x1
+            
+            # print('alternate computation')
+            
+        # compute beta_f            
+        self.beta_f[timestep_id] = np.abs(dz / dx)
+
+        # now the empirical formulation by Stockdon et al. (2006) can be used to determine R2%
+        self.R2[timestep_id] = 1.1 * (0.35 * self.beta_f[timestep_id] * (H0 * L0)**0.5 + (H0 * L0 * (0.563 * self.beta_f[timestep_id]**2 + 0.004))**0.5 / 2)
+        
+        run_xb_storm = int(self.R2[timestep_id] + wl > self.config.wrapper.xb_threshold)
+        
+        # print(wl)
+        # print(z_envelope)
+        # print(x_envelope)
+        
+        # print(x1, x2)
+        # print(z1, z2)
+        
+        # print(self.beta_f[timestep_id])
+        # print(self.R2[timestep_id])
+        
+        return run_xb_storm
+    
+    def check_xbeach(self, timestep_id):
+        """This function checks whether XBeach should be ran for the upcoming timestep.
+
+        Args:
+            timestep_id (int): id of the current timestep
+
+        Returns:
+            int: whether or not to run XBeach. 1 if yes, 0 if no.
+        """
+        
+        self.xbeach_storms[timestep_id] = self._when_xbeach_storms(timestep_id)
+        
+        self.xbeach_times[timestep_id] = self.xbeach_inter[timestep_id] + self.xbeach_sea_ice[timestep_id] * self.xbeach_storms[timestep_id]
+                
+        return self.xbeach_times[timestep_id]
+        
     def xbeach_setup(self, timestep_id):
         """This function initializes an xbeach run, i.e., it writes all inputs to files
         """
@@ -247,34 +497,45 @@ class Simulation():
             posdwn=-1,
             xori=0,
             yori=0,
-            alfa=self.config.bathymetry.grid_orientation - 180,  # counter-clockwise from the east
+            # alfa=self.config.bathymetry.grid_orientation - 180,  # counter-clockwise from the east
             thetamin=self.config.xbeach.thetamin,
             thetamax=self.config.xbeach.thetamax,
             dtheta=self.config.xbeach.dtheta,
+            thetanaut=self.config.xbeach.thetanaut,
             )
+        
+        # check zero conditions or normal conditions should be used
+        if self.xbeach_inter[timestep_id] and not self.xbeach_storms[timestep_id] * self.xbeach_sea_ice[timestep_id]:
+            conditions = self.zero_conditions
+            conditions['WL(m)'] = self.water_levels[timestep_id]
+        else:
+            conditions = self.conditions[timestep_id]
         
         # set the waves
         self.xb_setup.set_waves('parametric', {
             # need to give each parameter as series (in this case, with length 1)
-            "Hm0":self.conditions[timestep_id]["Hs(m)"],  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
-            "Tp":self.conditions[timestep_id]["Tp(s)"],
-            "mainang":self.conditions[timestep_id]["Dp(deg)"],  # relative to true north
-            "gammajsp": 1.3,  # placeholder
-            "s": 10,     # placeholder
+            # note that the built-in 'round' function is used because xbeach can't read long decimal floats, so round ensures the toolbox doesn't miss e.g. 'e10'
+            "Hm0":round(conditions["Hs(m)"], 4),  # file contains 'Hso(m)' (offshore wave height, in deep water) and 'Hs(m)' (nearhsore wave height, at 10m isobath)
+            "Tp":round(conditions["Tp(s)"], 4),
+            # "mainang":conditions["Dp(deg)"],  # relative to true north
+            'mainang': 270,  # default value for 1D XBeach
+            "gammajsp": 3.3,  # value recommended by Kees
+            "s": 1000,  # value recommended by Kees
             "duration": self.dt * 3600,
             "dtbc": 60, # placeholder
             "fnyq":1, # placeholder
         })
         
-        # load in wind and surge data
+        # turn of wave model if there is no storm
+        if not self.xbeach_storms[timestep_id]:
+            self.xb_setup.wbctype = 'off'
+        
+        # load in wind and water level data
         wind_direction, wind_velocity = self._get_wind_conditions(timestep_id)
-        surge = self.conditions[timestep_id]["SS(m)"]  # used for output
+        wl = self.water_levels[timestep_id]  # used for output
         
         # check if this is a storm timestep that should be written in its entirety
-        if (
-            self.config.xbeach.write_first_storms and 
-            all(self.storm_timing[timestep_id : timestep_id+self.config.xbeach.write_first_storms])
-        ):
+        if self.config.xbeach.write_first_storms:
             tintg = self.config.xbeach.tintg_storms  # set the output interval
             self.config.xbeach.write_first_storms -= 1  # ensure 1 less storm is written
             self.copy_this_xb_output = True  # this variable is later checked to see if the xbeach output should be copied to the results folder
@@ -286,7 +547,7 @@ class Simulation():
         # (including: grid/bathymetry, waves input, flow, tide and surge,
         # water level, wind input, sediment input, avalanching, vegetation, 
         # drifters ipnut, output selection)
-        self.xb_setup.set_params({
+        params = {
             # grid parameters
             # - already specified with xb_setup.set_grid(...)
             
@@ -324,19 +585,21 @@ class Simulation():
             
             # physical constant
             "rho": self.config.xbeach.rho_sea_water,
-            "vicmol": self.config.xbeach.visc_kin,
             
             # physical processes
             "avalanching": 1,  # Turn on avalanching
-            "flow": 1,  # Turn on flow calculation
             "morphology": 1,  # Turn on morphology
             "sedtrans": 1,  # Turn on sediment transport
             "wind": 1 if self.config.xbeach.with_wind else 0,  # Include wind in flow solver
             "struct": 1 if self.config.xbeach.with_ne_layer else 0,  # required for working with ne_layer
-
+            
+            "flow": 1 if self.xbeach_storms[timestep_id] else 0,  # Turn on flow calculation (off if no storm)
+            "lwave": 1 if self.xbeach_storms[timestep_id] else 0,  # Turn on short wave forcing on nlsw equations and boundary conditions (off if no storm)
+            "swave": 1 if self.xbeach_storms[timestep_id] else 0,  # Turn on short waves (off if no storm)
+            
             # tide boundary conditions
             "tideloc": 0,
-            "zs0":surge,
+            "zs0":round(wl, 4),
 
             # wave boundary conditions
             "instat": self.config.xbeach.wbctype,
@@ -350,7 +613,7 @@ class Simulation():
             # hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)
             # "writehotstart": 1 if self.xbeach_times[timestep_id + 1] else 0,  # Write hotstart during simulation
             # "hotstart": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,  # Initialize simulation with hotstart
-            # "hotstartfileno": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,  # Number of hotstart file which should be applied as initialization
+            # "hotstartfileno": 1 if (self.xbeach_times[timestep_id - 1] and timestep_id != 0) else 0,  # Initialize simulation with hotstart
             
             # output variables
             "outputformat":"netcdf",
@@ -372,7 +635,9 @@ class Simulation():
                 "vmag",  # Velocity magnitude in cell centre (1D array)
                 "urms",  # Orbital velocity (1D array)
                 ]
-        })
+        }
+        
+        self.xb_setup.set_params(params)
         
         # block printing while writing the output (the xbeach toolbox by default prints that it can't plot parametric conditions)
         block_print()
@@ -385,6 +650,74 @@ class Simulation():
         
         # re-enable print
         enable_print()
+        
+        # the hotstart can not be added using the python toolbox, so it is manually added to the params.txt file here, along with empty BC for empty xbeach runs
+        with open('params.txt', 'r') as f:
+            text = f.readlines()
+        
+        # add check too see if this is the last timestep
+        writehotstart = 0
+        if timestep_id + 1 < len(self.xbeach_times):
+            writehotstart = 1
+        
+        # text to add to params.txt for hotstart functionality
+        hotstart_text = [
+            "%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)\n\n",
+            f"writehotstart  = {writehotstart}\n",
+            f"hotstart       = {1 if (self.xbeach_times[timestep_id - 1] and self.xbeach_storms[timestep_id - 1] and timestep_id != 0) else 0}\n",
+            f"hotstartfileno = {1 if (self.xbeach_times[timestep_id - 1] and self.xbeach_storms[timestep_id - 1] and timestep_id != 0) else 0}\n",
+            "\n"
+            ]
+        
+        # text to add to params.txt for empty xbeach run
+        wbc_ts1_text = [
+            "lwave = 0\n",
+            "swave = 0\n",
+            "flow = 0\n",
+        ]
+        
+        # text to write in empty boundary condition file './bc/gen.ezs'
+        bc_text = [
+            f"%% t (s) eta LF(m)  E (J/m2)\n",
+            f"0  {wl}  0\n",
+            f"3600  {wl}  0\n",
+        ]
+        
+        new_input_text = []
+
+        # loop through lines of input text    
+        for i, line in enumerate(text):
+            
+            # check if there is a storm this time step
+            if not self.xbeach_storms[timestep_id]:
+                
+                # if there is no storm, an empty bc file is created (./bc/gen.ezs), and flow, swave, and lwave are set to zero in params.txt
+                if not os.path.exists(os.path.join(self.cwd, 'bc/', 'gen.ezs')):
+                    
+                    os.makedirs(os.path.join(self.cwd, 'bc/'))
+                    
+                with open(os.path.join(self.cwd, 'bc/', 'gen.ezs'), 'w') as f:
+                    
+                    f.writelines(bc_text)
+                
+                if r"wbctype" in line:
+                    line = "wbctype = ts_1\n"
+                
+                if r"swave" in line:
+                    line = wbc_ts1_text
+            
+            # also add hotstart to params.txt
+            if r"%% Output variables" in line:
+                new_input_text += hotstart_text
+                
+            if type(line) != list:
+                line = list(line)
+                
+            new_input_text += line
+        
+        # and write the new text to params.txt
+        with open('params.txt', 'w') as f:
+            f.writelines(new_input_text)
         
         return None
     
@@ -443,122 +776,6 @@ class Simulation():
         
         return direction, velocity
     
-    def timesteps_with_xbeach_active(self, fp_storm):
-        """This function gets the timestep ids for which xbeach should be active.
-
-        Args:
-            fp_storm (Path): path to the csv file containing storm data.
-            from_projection (bool, optional): choose whether to use the storm projection dataset (
-                                              or something else, but that is not yet implemented). Defaults to True.
-
-        Returns:
-            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
-        """
-        # get storm conditions timestep ids
-        self.storm_timing = self._when_storms_projection(fp_storm)
-        
-        # get inter-storm timestep ids
-        self.xbeach_inter = self._when_xbeach_inter(self.config.model.call_xbeach_inter)
-        
-        # get sea-ice timestep ids
-        self.xbeach_sea_ice = self._when_xbeach_no_sea_ice(self.config.wrapper.sea_ice_threshold)
-
-        # ran xbeach for storm and inter-storm timesteps, but never when too much sea ice
-        self.xbeach_times = self.storm_timing * self.xbeach_sea_ice + self.xbeach_inter
-        
-        # output these xbeach timestep ids
-        self._check_and_write('xbeach_times', self.xbeach_times, self.result_dir)
-
-        return self.xbeach_times
-    
-    def _when_storms_projection(self, fp_storm):
-        """This function is used to determine when storms occur (using raw_datasets/erikson/Hindcast_1981_2/BTI_WavesAndStormSurges_1981-2100.csv)
-
-        Args:
-            fp_storm (Path): path to storm dataset
-
-        Returns:
-            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
-        """
-        st = np.zeros(self.T.shape)  # array of the same shape as t (0 when no storm, 1 when storm)
-        
-        self.conditions = np.zeros(self.T.shape, dtype=object)  # also directly read wave conditions here
-        
-        with open(fp_storm) as f:
-            
-            df = pd.read_csv(f, parse_dates=['time'])
-                        
-            mask = (df['time'] >= self.t_start) * (df['time'] <= self.t_end)
-            
-            df = df[mask]
-                    
-        for i, row in df.iterrows():
-            
-            index = np.argwhere(self.timestamps==row.time)
-            
-            st[index] = 1
-            
-            # safe storm conditions for this timestep as well
-            self.conditions[index] = {
-                       "Hso(m)": row["Hso(m)"],
-                       "Hs(m)": row["Hs(m)"],
-                       "Dp(deg)": row["Dp(deg)"],
-                       "Tp(s)": row["Tp(s)"],
-                       "SS(m)": row["SS(m)"],
-                       "Hindcast_or_projection": row["Hindcast_or_projection"]
-                        }
-        
-        return st
-                
-    def _when_xbeach_inter(self, call_xbeach_inter):
-        """This function determines the timestamps that xbeach is called regardless of sea-ice or storms.
-
-        Args:
-            call_xbeach_inter (int): Call xbeach every 'call_xbeach_inter' timestamps, regardsless of the presence of sea ice or a storm.
-
-        Returns:
-            array: array of length T that for each timestep contains a 1 if xbeach should be ran and 0 if not.
-        """
-        ct = np.zeros(self.T.shape)
-        
-        # set xbeach active at provided intervals
-        ct[::call_xbeach_inter] = 1
-        
-        # for these intervals, if not conditions are supplied from the storm projections, set conditions to '0'
-        zero_conditions = {
-                    # "Hso(m)": 0.001,
-                    # "Hs(m)": 0.001,
-                    "Hso(m)": 0.2,  # placeholder
-                    "Hs(m)": 0.2,  # placeholder
-                    # "Hso(m)": 0,
-                    # "Hs(m)": 0,
-                    "Dp(deg)": 270,                    
-                    # "Dp(deg)": 0,
-                    "Tp(s)": 10,
-                    # "Tp(s)": 0,
-                    "SS(m)": 0,
-                    "Hindcast_or_projection": 0,
-                    }
-        
-        mask = np.nonzero((ct==1) * (self.conditions==0))
-
-        self.conditions[mask] = zero_conditions
-        
-        return ct
-    
-    def _when_xbeach_no_sea_ice(self, sea_ice_threshold):
-        """This function determines when xbeach should not be ran due to sea ice, based on a threshold value)
-
-        Args:
-            sea_ice_threshold (_type_): _description_
-
-        Returns:
-            array: array of length T that for each timestep contains a 1 if xbeach can be ran and 0 if not (w.r.t. sea ice).
-        """
-        it =  (self.forcing_data.sea_ice_cover.values < sea_ice_threshold)
-                
-        return it
-        
     ################################################
     ##                                            ##
     ##            # THERMAL FUNCTIONS             ##
@@ -598,7 +815,7 @@ class Simulation():
         
         # set the above determined initial conditions for the xgr
         for i in range(len(self.temp_matrix)):
-            if self.zgr[i] >= self.config.thermal.wl_switch:  # assume that the initial water level is at zero
+            if self.zgr[i] >= self.config.thermal.MSL:  # assume that the initial water level is at zero
                 self.temp_matrix[i,:] = ground_temp_distr_dry[:,1]
             else:
                 self.temp_matrix[i,:] = ground_temp_distr_wet[:,1]
@@ -630,8 +847,9 @@ class Simulation():
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
         
         if np.max(self.cfl_matrix >= self.config.wrapper.CFL_thermal):
-            raise ValueError(f"CFL should be smaller than {self.config.wrapper.CFL_thermal}, currently {np.max(self.cfl_matrix):.4f}")
+            # raise ValueError(f"CFL should be smaller than {self.config.wrapper.CFL_thermal}, currently {np.max(self.cfl_matrix):.4f}")
             # print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+            pass
         
         # get the 'A' matrix, which is used to make the numerical scheme faster. It is based on second order central differences for internal points
         # at the border points, the grid is extended with an identical point (i.e. mirrored), in order to calculate the second derivative
@@ -738,7 +956,6 @@ class Simulation():
         print(self.A_matrix)
         return self.A_matrix
     
-    @classmethod
     def _generate_initial_ground_temperature_distribution(self, df, t_start, n, max_depth):
         """This method generates an initial ground temperature distribution using soil temperature in different layers (read from 'df'),
         at the first time step 't_start'. The depth between 0 and 'max_depth' is divided in 'n' grid points.
@@ -756,27 +973,103 @@ class Simulation():
         Temperature is linearly interpolated for the entire depth, and assumed constant below the center of Layer 4, as well as constant above the center 
         of layer 1. We differentiate between wet and dry initial conditions, assuming sea level at z=0. A maximum depth of 3m is assumed, with no heat 
         exchange from the lower layers.
-        """                                     
-        dry_points = np.array([
-            [0, df.soil_temperature_level_1.values[0]],
-            [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
-            [(0.28+0.07)/2, df.soil_temperature_level_2.values[0]],
-            [(1+0.28)/2, df.soil_temperature_level_3.values[0]],
-            [(2.89+1)/2, df.soil_temperature_level_4.values[0]],
-            [(2.29+max_depth)/2, df.soil_temperature_level_4.values[0]],
-        ])
-        
+        """                                    
+        if "initial_ground_temp_path" not in self.config.data.keys(): 
+            
+            if "init_multi_linear_approx" in self.config.data.keys() and self.config.data.init_multi_linear_approx:
+            
+                # The temperature of the dry points can be reconstructed following the BLUE performed in database/erikson_ground_temp.ipynb
+                def reconstruct_initial_conditions_era5(era5_points, X_hat_all, level):
+                    """Takes ERA5 temperature data at the four defined levels and uses previously determined coefficients (from multi-linear 
+                    regression, see notebook 'erikson_ground_tmep.ipynb') to compute better initial conditions from ERA5.
+
+                    Args:
+                        era5_points (array): array of length 4 with temperatures from ERA5 data (in Celcius!)
+                        X_hat_all (array): array of length 5 with coefficients
+                        level (int): current level to compute the reconstructed temperature for
+
+                    Returns:
+                        float: reconstructed temperature for the specified depth (in K)
+                    """
+                    
+                    T1_era5, T2_era5, T3_era5, T4_era5 = era5_points
+                    
+                    level_to_index = {'50': 0, '100':1, '200': 2, '295': 3}
+                    
+                    i = level_to_index[str(int(level))]
+                    
+                    reconstructed_ic = \
+                        X_hat_all[i][0] * T1_era5 + \
+                        X_hat_all[i][1] * T2_era5 + \
+                        X_hat_all[i][2] * T3_era5 + \
+                        X_hat_all[i][3] * T4_era5 + \
+                        X_hat_all[i][4] + \
+                        273.15  # Celcius to Kelvin
+                    
+                    return reconstructed_ic
+                
+                # Start with loading in the X_hat
+                X_hat_all = np.loadtxt(os.path.join(self.proj_dir, Path(r'database\ts_datasets\X_hat_groundtemp_reconstruct.txt')))
+                
+                era5_points = np.array([
+                    df.soil_temperature_level_1.values[0] - 273.15,
+                    df.soil_temperature_level_2.values[0] - 273.15,
+                    df.soil_temperature_level_3.values[0] - 273.15,
+                    df.soil_temperature_level_4.values[0] - 273.15
+                ])
+                
+                dry_points = np.array([
+                    [0.0, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 50)],
+                    [0.5, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 50)],
+                    [1.0, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 100)],
+                    [2.0, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 200)],
+                    [2.95, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 295)],
+                    [max_depth, reconstruct_initial_conditions_era5(era5_points, X_hat_all, 295)],
+                ])
+            
+            else:
+                
+                dry_points = np.array([
+                    [0, df.soil_temperature_level_1.values[0]],
+                    [(0.07+0)/2, df.soil_temperature_level_1.values[0]],
+                    [(0.28+0.07)/2, df.soil_temperature_level_2.values[0]],
+                    [(1+0.28)/2, df.soil_temperature_level_3.values[0]],
+                    [(2.89+1)/2, df.soil_temperature_level_4.values[0]],
+                    [max_depth, df.soil_temperature_level_4.values[0]],
+                ])
+            
+            wet_points = np.array([
+                [0, df.soil_temperature_level_1_offs.values[0]],
+                [(0.07+0)/2, df.soil_temperature_level_1_offs.values[0]],
+                [(0.28+0.07)/2, df.soil_temperature_level_2_offs.values[0]],
+                [(1+0.28)/2, df.soil_temperature_level_3_offs.values[0]],
+                [(2.89+1)/2, df.soil_temperature_level_4_offs.values[0]],
+                [max_depth, df.soil_temperature_level_4_offs.values[0]],
+            ])
+            
+        else:
+            
+            # read data into dataframe
+            df = pd.read_csv(os.path.join(self.proj_dir, self.config.data.initial_ground_temp_path), parse_dates=['time'])
+                        
+            # select correct row
+            mask = (df['time'] == t_start)
+            df = df[mask]
+                        
+            # read in points
+            dry_points = np.array([
+                [0.0, df['T50cm'].values[0] + 273.15],
+                [0.5, df['T50cm'].values[0] + 273.15],
+                [1.0, df['T100cm'].values[0] + 273.15],
+                [2.0, df['T200cm'].values[0] + 273.15],
+                [2.95, df['T295cm'].values[0] + 273.15],
+                [max_depth, df['T295cm'].values[0] + 273.15],
+            ])
+            
+            wet_points = dry_points
+            
+            
         ground_temp_distr_dry = um.interpolate_points(dry_points[:,0], dry_points[:,1], n)
-        
-        wet_points = np.array([
-            [0, df.soil_temperature_level_1_offs.values[0]],
-            [(0.07+0)/2, df.soil_temperature_level_1_offs.values[0]],
-            [(0.28+0.07)/2, df.soil_temperature_level_2_offs.values[0]],
-            [(1+0.28)/2, df.soil_temperature_level_3_offs.values[0]],
-            [(2.89+1)/2, df.soil_temperature_level_4_offs.values[0]],
-            [(2.29+max_depth)/2, df.soil_temperature_level_4_offs.values[0]],
-        ])
-        
         ground_temp_distr_wet = um.interpolate_points(wet_points[:,0], wet_points[:,1], n)
         
         return ground_temp_distr_dry, ground_temp_distr_wet
@@ -796,7 +1089,10 @@ class Simulation():
         self.temp_matrix = self._temperature_from_enthalpy(frozen_mask, inbetween_mask, unfrozen_mask)
         
         # determine the actual k-matrix using the masks
-        self.k_matrix = (frozen_mask + inbetween_mask) * self.k_frozen_matrix + unfrozen_mask * self.k_unfrozen_matrix
+        self.k_matrix = \
+            frozen_mask * self.k_frozen_matrix + \
+            inbetween_mask * ((self.k_frozen_matrix + self.k_unfrozen_matrix) / 2) + \
+            unfrozen_mask * self.k_unfrozen_matrix
         
         # get the new boundary condition
         self.ghost_nodes_temperature = self._get_ghost_node_boundary_condition(timestep_id, subgrid_timestep_id)
@@ -813,8 +1109,9 @@ class Simulation():
         self.cfl_matrix = self.k_matrix / self.soil_density_matrix * self.config.thermal.dt / self.dz**2
         
         if np.max(self.cfl_matrix >= self.config.wrapper.CFL_thermal):
-            raise ValueError(f"CFL should be smaller than {self.config.wrapper.CFL_thermal}, currently {np.max(self.cfl_matrix):.4f}")
+            # raise ValueError(f"CFL should be smaller than {self.config.wrapper.CFL_thermal}, currently {np.max(self.cfl_matrix):.4f}")
             # print(f"CFL should be smaller than 0.5, currently {np.max(self.cfl_matrix):.4f}")
+            pass
             
         # get the new enthalpy matrix
         self.enthalpy_matrix = self.enthalpy_matrix + \
@@ -871,10 +1168,10 @@ class Simulation():
         self.current_sea_ice = row["sea_ice_cover"]  # not used in this function, but loaded in preperation for output
         
         # update the water level
-        self.water_level = self._update_water_level(timestep_id, subgrid_timestep_id)
+        self.water_level = (self._update_water_level(timestep_id, subgrid_timestep_id=subgrid_timestep_id))
         
-        dry_mask = (self.zgr >= self.water_level)
-        wet_mask = (self.zgr < self.water_level)
+        dry_mask = (self.zgr >= self.water_level + self.R2[timestep_id])
+        wet_mask = (self.zgr < self.water_level + self.R2[timestep_id])
         
         # determine convective transport from air (formulation from Man, 2023)
         self.wind_direction, self.wind_velocity = self._get_wind_conditions(timestep_id=timestep_id)  # also used in output
@@ -889,7 +1186,11 @@ class Simulation():
         if self.config.thermal.with_convective_transport_water_guess:
             hc = self.config.thermal.hc_guess
         else:
+            
+            raise Exception("This piece of code is outdated")
+            
             # determine hydraulic parameters for convective heat transfer computation
+            
             if self.xb_times[timestep_id] and self.config.xbeach.with_xbeach:
                 
                 data_path = os.path.join(self.cwd, "xboutput.nc")
@@ -898,7 +1199,7 @@ class Simulation():
                 
                 H = ds.H.values.flatten()
 
-                wl = self.config.thermal.wl_switch + ds.runup.values.flatten()
+                wl = self._update_water_level(timestep_id)
                 
                 d = np.maximum(wl - ds.zb.values.flatten(), np.zeros(H.shape))
                 T = self.conditions[timestep_id]["Tp(s)"]
@@ -906,12 +1207,12 @@ class Simulation():
                 ds.close()
                                 
             else:
-                H = np.ones(self.xgr.shape) * 0.001
+                H = self.conditions[timestep_id]['Hs(m)']
                 
-                wl = self.config.thermal.wl_switch
+                wl = self._update_water_level(timestep_id)
                 
                 d = np.maximum(wl - self.zgr, 0)
-                T = 10
+                T = self.conditions[timestep_id]['Tp(s)']
                 
             # determine convective transport from water (formulation from Kobayashi, 1999)
             hc = Simulation._calculate_sensible_heat_flux_water(
@@ -925,7 +1226,10 @@ class Simulation():
         # compute total convective transport
         self.convective_flux = dry_mask * convective_transport_air + wet_mask * convective_transport_water  # also used in output
         
-        if subgrid_timestep_id == 0:  # determine radiation fluxes only during first timestep, as they are constant for each subgrid timestep
+        # multiply convective heat flux with factor for sensitivity analysis
+        self.convective_flux = self.convective_flux * (1 if "sensitivity" not in self.config.keys() else self.config.sensitivity.factor_convective_heat_flux)
+        
+        if subgrid_timestep_id == 0:  # determine radiation fluxes only during first subgrid timestep, as they are constant for each subgrid timestep
         
             # determine radiation, assuming radiation only influences the dry domain
             self.latent_flux = dry_mask * (row["mean_surface_latent_heat_flux"] if self.config.thermal.with_latent else 0)  # also used in output
@@ -947,32 +1251,46 @@ class Simulation():
         # add all heat fluxes  together (also used in output)
         self.heat_flux = self.convective_flux + self.constant_flux
         
+        # compute heat flux factors
+        if 'heat_flux_factors' in self.config.thermal.keys():
+            self.heat_flux_factors = (np.abs(self.angles / (2 * np.pi) * 360) < self.config.thermal.surface_flux_angle) * self.config.thermal.surface_flux_factor
+        else:
+            self.heat_flux_factors = np.ones(self.xgr.shape)
+        
+        # multiply with heat flux factor
+        self.heat_flux = self.heat_flux * self.heat_flux_factors
+        
         # determine temperature of the ghost nodes
         ghost_nodes_temperature = self.temp_matrix[:,0] + self.heat_flux * self.dz / self.k_matrix[:,0]
         
         return ghost_nodes_temperature
     
     def _update_water_level(self, timestep_id, subgrid_timestep_id=0):
-        # check wether or not this is a storm timestep.
-        if self.xbeach_times[timestep_id] and self.config.xbeach.with_xbeach:  # If it is, use (storm surge water level + runup)
+
+
+        # get the water level
+        if self.xbeach_times[timestep_id-1]:
             
-            # get storm surge
-            surge = self.conditions[timestep_id]["SS(m)"]
+            # load dataset
+            ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc")).squeeze()  # get xbeach data
             
-            # get runup
-            if not subgrid_timestep_id:
-                
-                ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc"))
-                self.runup = ds.runup.values.flatten()[-1]
-                ds.close()
+            # select only the final timestep
+            ds = ds.sel(globaltime=np.max(ds.globaltime.values))
             
-            # get water level to check whether to use convective heat transfer from air or sea
-            water_level = surge + self.runup
+            # load zs values
+            zs_values = ds.zs.values.flatten()
             
-        else:  # otherwise, use a water level of z=0
-            water_level = 0
+            # remove nan values and get maximum
+            self.water_level = np.max(zs_values[~np.isnan(zs_values)])
             
-        return water_level
+            # close dataset
+            ds.close()
+
+            
+        else:
+            self.water_level = self.water_levels[timestep_id]
+            
+        return self.water_level
     
     def _get_bottom_boundary_temperature(self):
         """This function returns a bottom boundary condition temperature, based on the geothermal gradient. It accounts for the
@@ -1083,10 +1401,10 @@ class Simulation():
         
         # only update the grid of there actually was a change in bed level
         if not all(cum_sedero == 0):
-        
+                        
             # generate a new xgrid and zgrid (but only if the next timestep does not require a hotstart, which requires the same xgrid)
-            if not self.xbeach_times[timestep_id + 1]:
-                
+            if timestep_id + 1 < len(self.xbeach_times) and not self.check_xbeach(timestep_id + 1):
+                                
                 self.xgr_new, self.zgr_new = xgrid(self.xgr, bathy_current, dxmin=2, ppwl=self.config.bathymetry.ppwl)
                 self.zgr_new = np.interp(self.xgr_new, self.xgr, bathy_current)
                 
@@ -1098,6 +1416,9 @@ class Simulation():
             else:
                 self.xgr_new = self.xgr
                 self.zgr_new = bathy_current
+            
+            self.xgr_new = self.xgr
+            self.zgr_new = bathy_current
 
             # generate perpendicular grids for next timestep (to cast temperature and enthalpy)
             self.abs_xgr_new, self.abs_zgr_new = um.generate_perpendicular_grids(
@@ -1128,7 +1449,7 @@ class Simulation():
                     enthalpy_submerged_sediment = self.current_sea_temp * Cl_value + (Cs_value - Cl_value) * self.config.thermal.T_melt + self.config.thermal.L_water_ice * self.config.thermal.nb_max
                 
                 # get current water level
-                self.water_level = self._update_water_level(timestep_id)
+                self.water_level = (self._update_water_level(timestep_id))
                 
                 # Interpolate enthalpy to new grid             
                 self.enthalpy_matrix = um.linear_interp_z(
@@ -1175,7 +1496,9 @@ class Simulation():
     def _update_angles(self):
         """This function geneartes an array of local angles (in radians) for the grid, based on the central differences method.
         """
-        self.angles = np.gradient(self.zgr, self.xgr)
+        gradients = np.gradient(self.zgr, self.xgr)
+        
+        self.angles = np.arctan(gradients)
         
         return self.angles
     
@@ -1221,8 +1544,8 @@ class Simulation():
         # get correct row in solar flux map (so row corresponding to current day of the year)
         row = self.solar_flux_map[id_t, :]
         
-        # transform angles to ids (first convert to degrees)
-        ids_angle = np.int32((self.angles / (2*np.pi) * 360 - self.config.thermal.angle_min) / self.config.thermal.delta_angle)
+        # transform angles to ids (first convert to degrees)        
+        ids_angle = np.int32((self.angles / (2 * np.pi) * 360 - self.config.thermal.angle_min) / self.config.thermal.delta_angle)
         
         # use ids to get correct factors in correct order from the row of solar fluxes
         self.factors = row[ids_angle]
@@ -1438,8 +1761,8 @@ class Simulation():
         result_ds["zgr"] = (["xgr"], self.zgr)  # 1D series of z-values
         result_ds["angles"] = (["xgr"], self.angles)  # 1D series of angles (in radians)
         
-        # hydrodynamic variables (note: obtained from previous xbeach timestep, so not necessarily accurate with other output data)
-        if timestep_id and os.path.exists(os.path.join(self.cwd, "xboutput.nc")) and self.xbeach_times[timestep_id]:  # check if an xbeach output file exists (it shouldn't at the first timestep)
+        # hydrodynamic variables (note: obtained from xbeach output from previous timestep, so not necessarily accurate with other output data)
+        if timestep_id and os.path.exists(os.path.join(self.cwd, "xboutput.nc")) and self.xbeach_times[timestep_id-1]:  # check if an xbeach output file exists (it shouldn't at the first timestep)
             
             ds = xr.load_dataset(os.path.join(self.cwd, "xboutput.nc")).squeeze()  # get xbeach data
             ds = ds.sel(globaltime=np.max(ds.globaltime.values))  # select only the final timestep
@@ -1451,8 +1774,8 @@ class Simulation():
             result_ds = result_ds.assign_coords(xgr_xb=xgr_xb)
 
             result_ds['wave_height'] = (["xgr_xb"], ds.H.values.flatten())  # 1D series of wave heights (associated with xgr.txt)
-            result_ds['run_up'] = ds.runup.values.flatten()  # single value
-            result_ds['water_level'] = self.water_level  # single value
+            result_ds['zb'] = (["xgr_xb"], ds.zb.values.flatten()) # 1D series of bed levels
+            result_ds['zs'] = (["xgr_xb"], ds.zs.values.flatten()) # 1D series of water levels
             result_ds['wave_energy'] = (["xgr_xb"], ds.E.values.flatten())  # 1D series of wave energies (associated with xgr.txt)
             result_ds['radiation_stress_xx'] = (["xgr_xb"], ds.Sxx.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
             result_ds['radiation_stress_xy'] = (["xgr_xb"], ds.Sxy.values.flatten())  # 1D series of radiation stresses (associated with xgr.txt)
@@ -1465,13 +1788,21 @@ class Simulation():
             
         else:
             
-            for varname in ['wave_height', 'wave_energy', 
+            xgr_xb = self.xgr[np.nonzero(self.zgr <= 0)]
+            
+            result_ds = result_ds.assign_coords(xgr_xb=xgr_xb)
+            
+            for varname in ['wave_height', 'wave_energy', 'zb', 'zs',
                             'radiation_stress_xx', 'radiation_stress_xy', 'radiation_stress_yy', 
                             'mean_wave_angle', 'velocity_magnitude', 'orbital_velocity']:
-                result_ds[varname] = (["xgr"], np.zeros(self.xgr.shape))
-                
-            for varname in ['run_up', 'water_level']:
-                result_ds[varname] = 0
+                result_ds[varname] = (["xgr_xb"], np.zeros(xgr_xb.shape))
+        
+        # water level
+        result_ds['water_level'] = self._update_water_level(timestep_id)
+        
+        # computed 2% runup
+        result_ds['beta_f'] = self.beta_f[timestep_id]
+        result_ds['run_up2%'] = self.R2[timestep_id]
         
         # temperature variables
         result_ds['thaw_depth'] = (["xgr"], self.thaw_depth)  # 1D series of thaw depths
@@ -1500,16 +1831,90 @@ class Simulation():
         result_ds['wind_velocity'] = self.wind_velocity  # single value
         result_ds['wind_direction'] = self.wind_direction  # single value (degrees, clockwise from the north)
         
-        result_ds.to_netcdf(os.path.join(self.result_dir, str(timestep_id) + ".nc"))
+        result_ds.to_netcdf(os.path.join(self.result_dir, (10 - len(str(int(timestep_id)))) * '0' + str(int(timestep_id)) + ".nc"))
         
         result_ds.close()
         
         return None
     
+    def save_ground_temp_layers_in_memory(self, timestep_id, layers=[], heat_fluxes=[], write=False):
+        """This function saves the ground temperature directly into a single dataframe, 
+        which is helpfule for validation purposes.
+
+        Args:
+            timestep_id (int): id of the current timestep
+            layers (list, optional): list of the layers to save. Defaults to [].
+            heat_fluxes (list, optional): list of heat fluxes to save. Defaults to [].
+            write (bool, optional): whether or not to write. Defaults to False.
+        """
+        # define colnames
+        col_names = ['time'] + ['air_temp[K]'] + [f'temp_{layer}m[K]' for layer in layers] + heat_fluxes
+        
+        values = [self.timestamps[timestep_id], self.current_air_temp]
+        
+        # loop through layers to find corresponding temperature
+        for layer in layers:
+            
+            index_x = int(self.temp_matrix.shape[0] // 2)
+            index_z = int(layer * self.config.thermal.grid_resolution // self.config.thermal.max_depth)
+            
+            values.append(self.temp_matrix[index_x, index_z])
+            
+        # find heat fluxes
+        values.append(self.heat_flux[index_x])
+        values.append(self.lw_flux[index_x])
+        values.append(self.sw_flux[index_x])
+        values.append(self.latent_flux[index_x])
+        values.append(self.convective_flux[index_x])
+
+        # create dataframe at first timestep
+        if timestep_id == 0:
+                        
+            self.temperature_timeseries = pd.DataFrame(dict(zip(col_names, values)), index=[0])
+            
+        else:
+            
+            # add temperature and heat fluxes to dataframe
+            self.temperature_timeseries = self.temperature_timeseries._append(
+                dict(zip(col_names, values)), ignore_index=True
+            )
+                
+        # write output at final timestep
+        if write:
+            self.temperature_timeseries.to_csv(
+                os.path.join(self.result_dir, f"{self.runid}_ground_temperature_timeseries.csv")
+            )
+            
+        return None
+        
+    
     def _check_and_write(self, varname, save_var, dirname):
         
         if varname in self.config.output.output_vars:
             np.savetxt(os.path.join(dirname, f"{varname}" + ".txt"), save_var)
+        
+        return None
+    
+    def dump_xb_output(self, timestep_id):
+        """This method copies the XB output from the run folder (including log files, param files, etc.) to the results directory."""
+        
+        destination_folder = os.path.join(self.result_dir, "xb_files/", (10 - len(str(int(timestep_id)))) * '0' + str(int(timestep_id)) + '/')
+
+        if not os.path.exists(destination_folder):
+            os.makedirs(destination_folder)
+            
+        shutil.copytree(self.cwd, destination_folder, ignore=shutil.ignore_patterns('config.yaml', 'results/'), dirs_exist_ok=True)
+        
+        # os.rename(os.path.join())
+
+        return None
+    
+    def write_xb_timesteps(self):
+        """Used at the end of simulation, once all xbeach timesteps have been determined using 
+        the sea ice threshold, intermediate xbeach timesteps, and storm conditions"""
+        
+        # output the xbeach timestep ids
+        self._check_and_write('xbeach_times', self.xbeach_times, self.result_dir)
         
         return None
         
@@ -1537,17 +1942,20 @@ class Simulation():
             raise ValueError("'level' variable should have a value of 1, 2, 3, or 4")
         return self.forcing_data[f"soil_temperature_level_{level}.csv"].values[timestep_id]
 
-    def _get_timeseries(self, tstart, tend, fpath):
+    def _get_timeseries(self, tstart, tend, fpath, repeat=1):
         """returns timeseries start from tstart and ending at tend. The filepath has to be specified.
         
         returns: pd.DataFrame of length T"""
         
+        # read forcing file
         with open(fpath) as f:
             df = pd.read_csv(f, parse_dates=['time'])
                     
+            # mask out correct time frame
             mask = (df["time"] >= tstart) * (df["time"] < tend)
             
-            df = df[mask]
+            # repeat time frame if required
+            df = pd.concat([df[mask]] * repeat, ignore_index=True)
                         
         return df
     

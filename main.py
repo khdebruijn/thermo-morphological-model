@@ -9,7 +9,7 @@ import pandas as pd
 
 from utils.model import Simulation
 from utils.bathymetry import generate_schematized_bathymetry
-from utils.miscellaneous import textbox
+from utils.miscellaneous import textbox, datetime_from_timestamp
 
 
 def main(sim):
@@ -40,10 +40,14 @@ def main(sim):
     )
     print("succesfully loaded forcing")
     
-    # this variable is used to determine if xbeach should be ran for each timestep
-    xb_times = sim.timesteps_with_xbeach_active(
+    # load hydrodynamic forcing
+    sim.initialize_hydro_forcing(
         os.path.join(sim.proj_dir, sim.config.data.storm_data_path),
         )
+    print("succesfully loaded hydrodynamic forcing")
+    
+    # this variable is used to determine if xbeach should be ran for each timestep (not looking at 2% runup yet)
+    xb_times = sim.timesteps_with_xbeach_active()
     print("succesfully generated xbeach times")
     
     # generate schematized bathymetry
@@ -81,6 +85,7 @@ def main(sim):
     
     # generate initial grid files and save them
     xgr, zgr, ne_layer = sim.generate_initial_grid(
+        nx=sim.config.bathymetry.nx if 'nx' in sim.config.bathymetry.keys() else None,
         bathy_path=sim.config.bathymetry.depfile,
         bathy_grid_path=sim.config.bathymetry.xfile
         )
@@ -89,6 +94,12 @@ def main(sim):
     # initialize xbeach module
     sim.initialize_xbeach_module()
     print("succesfully initialized xbeach module")
+    
+    # initialize first xbeach timestep
+    if sim.config.xbeach.with_xbeach:
+        sim.xbeach_times[0] = sim.check_xbeach(0)
+    else:
+        sim.xbeach_times[0] = 0
     
     # initialize thermal model
     sim.initialize_thermal_module()
@@ -119,7 +130,7 @@ def main(sim):
     ##                                            ##
     ################################################
     
-    for timestep_id in range(len(sim.T)):
+    for timestep_id in np.arange(len(sim.T)):
         
         print(f"timestep {timestep_id+1}/{len(sim.T)}")
         
@@ -130,8 +141,24 @@ def main(sim):
             
             print("sucessfully generated output")
             
+        # used for validation of the temperature model
+        if 'save_ground_temp_layers' in sim.config.output.keys():
+            
+            sim.save_ground_temp_layers_in_memory(
+                timestep_id, 
+                layers=sim.config.output.save_ground_temp_layers,
+                heat_fluxes=sim.config.output.heat_fluxes,
+                write=(timestep_id == np.arange(len(sim.T))[-1]),
+                )
+        
+        # check whether to run XBeach or not for this timestep
+        if sim.config.xbeach.with_xbeach and not all(sim.thaw_depth == 0):
+            sim.xbeach_times[timestep_id] = sim.check_xbeach(timestep_id)
+        else:
+            sim.xbeach_times[timestep_id] = 0
+            
         # check if xbeach is enabled for current timestep
-        if xb_times[timestep_id] and sim.config.xbeach.with_xbeach:
+        if sim.xbeach_times[timestep_id] and sim.config.xbeach.with_xbeach:
             
             # export current thaw depth to a file
             sim.write_ne_layer()
@@ -149,7 +176,7 @@ def main(sim):
             
             try:
                 if run_succesful:
-                    print(f"succesfully ran xbeach timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
+                    print(f"succesfully ran xbeach for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
                 else:
                     print(f"failed to run xbeach for timestep {sim.timestamps[timestep_id]} to {sim.timestamps[timestep_id+1]}")
             except IndexError:
@@ -160,9 +187,19 @@ def main(sim):
             if sim.copy_this_xb_output:
                 sim.copy_xb_output_to_result_dir(fp_xbeach_output="xboutput.nc")
                 print("succesfully generated high resolution storm output")
+                
+            # check if xbeach should be ran for the next timestep (if so, the x-grid doesn't update since the same grid is necessary for the hotstart feature)
+            if sim.config.xbeach.with_xbeach and timestep_id + 1 < len(sim.T):
+                sim.xbeach_times[timestep_id + 1] = sim.check_xbeach(timestep_id + 1)
+            else:
+                sim.xbeach_times[timestep_id + 1] = 0
                         
             # copy updated morphology to thermal module, and update the thermal grid with the new morphology
             sim.update_grid(timestep_id, fp_xbeach_output="xboutput.nc")  # this thing right here is pretty slow (TO BE CHANGED)
+            
+            # copy all xb output to the results folder 
+            # # (this is necessary as the xb output in the run folder will be overwritten after the next xb iteration)
+            sim.dump_xb_output(timestep_id)
         
         # loop through thermal subgrid timestep
         for subgrid_timestep_id in np.arange(0, config.model.timestep * 3600, config.thermal.dt):
@@ -171,16 +208,19 @@ def main(sim):
             
         # calculate the current thaw depth
         sim.find_thaw_depth()
-        
+            
         print()
     
+    # write xbeach timesteps
+    sim.write_xb_timesteps()
 
-    print(f"Total simulation time: {(time.time() - t_start) / 3600:1f} hours")
     print(textbox("SIMULATION FINISHED"))
-    
+    print(f"{repr(sim)}")
+    print(f"Simulation started at: {datetime_from_timestamp(t_start)}")
+    print(f"Simulation finished at: {datetime_from_timestamp(time.time())}")
+    print(f"Total simulation time: {(time.time() - t_start) / 3600:.1f} hours")
     
     return sim.xgr, sim.zgr
-
 
 if __name__ == '__main__':
     

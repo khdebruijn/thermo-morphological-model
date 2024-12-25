@@ -34,7 +34,7 @@ class SimulationResults():
         self.timestamps = np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestamps.txt"))
         self.timestep_ids = np.int32(np.loadtxt(os.path.join(runs_folder, str(self.runid) + "/", "timestep_ids.txt")))
         
-        ds = xr.open_dataset(os.path.join(self.result_dir, "0.nc"))
+        ds = xr.open_dataset(os.path.join(self.result_dir, "0000000000.nc"))
         self.var_list = list(ds.coords) + list(ds.keys())
         ds.close()
                 
@@ -91,7 +91,7 @@ class SimulationResults():
     
     def get_var_timestep(self, varname, timestep_id):
                   
-        path = os.path.join(self.result_dir, str(int(timestep_id)) + ".nc")
+        path = os.path.join(self.result_dir, (10 - len(str(int(timestep_id)))) * '0' + str(int(timestep_id)) + ".nc")
         
         ds = xr.open_dataset(path)
         
@@ -677,8 +677,8 @@ class SimulationResults():
         axs[2].set_xlim((xmin, xmax))
         axs[3].set_xlim((xmin, xmax))
 
-        axs[0].set_ylim((-10, 15))
-        axs[1].set_ylim((-10, 15))
+        axs[0].set_ylim((-10, 20))
+        axs[1].set_ylim((-10, 20))
         axs[2].set_ylim((-1, 4))
         axs[3].set_ylim((-1000, 1000))
         axs[4].set_ylim((-0.5, 1.5))
@@ -750,8 +750,16 @@ class SimulationResults():
             thaw_line.set_data(xgr, zgr - thaw_depth)
 
             # plot water level (in plot 0 & 1)
-            wl_line_bed.set_ydata([wl, wl])
-            wl_line_temp.set_ydata([wl, wl])
+            zs = self.get_var_timestep("zs", output_id)
+            
+                # some older simulations don't have xgr_xb for all datasets
+            try:
+                xgr_xb = self.get_var_timestep("xgr_xb", output_id)
+            except KeyError:
+                xgr_xb = self.get_var_timestep("xgr", output_id)
+                
+            wl_line_bed.set_data([xgr_xb, zs])
+            wl_line_temp.set_data([xgr_xb, zs])
             
             # plot thaw interface (in plot 1)
             thaw_line.set_data(xgr, zgr - thaw_depth)
@@ -771,6 +779,7 @@ class SimulationResults():
             convective_heat_flux_line.set_data(xgr, convective_heat_flux)
             
             # update temperature labels (in plot 1)
+            # L0.get_texts()[0].set_text(f"water level: {zs:.2f} m")
             L0.get_texts()[3].set_text(f"2m temperature: {air_temp - 273.15:.1f} degrees C")
             L0.get_texts()[4].set_text(f"Sea surface temperature: {sea_temp - 273.15:.1f} degrees C")
             

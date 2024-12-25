@@ -10,9 +10,15 @@ __pycache__
 # raw datasets
 database/raw_datasets/era5/*/*.nc
 database/raw_datasets/era5/*.nc
+
 database/raw_datasets/gibbs/*/*
+
 database/raw_datasets/erikson/*/*
+database/raw_datasets/erikson/*.csv
+database/raw_datasets/erikson2/*/*
+
 database/raw_datasets/cmip5/*/*
+
 database/raw_datasets/engelstad/*.nc
 
 # timeseries datasets
@@ -35,13 +41,14 @@ test/*.nc
 # run output (in the runs folder)
 runs/*/results/*/*.txt
 runs/*/results/*.txt
-runs/*/*.dep
+runs/*/results/*.nc
 runs/*/*.png
 runs/*/*.bcf
 runs/*/*.txt
 runs/*/*.bat
-runs/*/*.grd
 runs/*/*.nc
+runs/*/*.dat
+runs/*/*/*gen.ezs
 
 # .env file
 .env

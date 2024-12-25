@@ -1,3 +1,5 @@
+import datetime
+
 import numpy as np
 import pandas as pd
 from scipy.interpolate import LinearNDInterpolator
@@ -243,6 +245,9 @@ def linear_interp_z(abs_xgr, abs_zgr, temp_matrix, abs_xgr_new, abs_zgr_new, wat
         new_temperature_values[i,:] = new_temp_array
     
     return new_temperature_values
+
+def datetime_from_timestamp(t):
+    return datetime.datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M:%S')
     
     
 # def get_time_vector(datasets):

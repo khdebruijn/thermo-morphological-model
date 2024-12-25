@@ -1,14 +1,18 @@
 import os
 from pathlib import Path
 import sys
+import time
 
 from IPython import get_ipython
 import numpy as np
 import matplotlib.pyplot as plt
 
 from utils.results import SimulationResults
+from utils.miscellaneous import datetime_from_timestamp
 
 def main(runid, args, attempt_counter_max=100):
+    
+    t_start = time.time()
     
     # initialize simulation
     print(f"initializing {runid}")
@@ -31,7 +35,7 @@ def main(runid, args, attempt_counter_max=100):
     ##  define kwargs here  ##
     ##########################
     make_animation = False
-    xmin, xmax = 1300, 1400
+    xmin, xmax = float(args[1]), float(args[2])
     fps = frame_num / 120  # for a 120 second animation
     
 
@@ -72,6 +76,9 @@ def main(runid, args, attempt_counter_max=100):
             attempt_counter += 1
         
     print(f"completed {runid}")
+    print(f"Processing started at: {datetime_from_timestamp(t_start)}")
+    print(f"Processing finished at: {datetime_from_timestamp(time.time())}")
+    print(f"Total processing time: {(time.time() - t_start) / 3600:.1f} hours")
     
     return None
     

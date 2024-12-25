@@ -1,0 +1,116 @@
+%% XBeach model: Run C:\Users\bruij_kn\Documents\GitHub\thermo-morphological-model\runs\test5: timestep 120 
+%% Params created on 2024-09-06 14H:09m 
+%% Params created by bruij_kn 
+
+%% General 
+
+wavemodel           = surfbeat
+wbctype             = parametric
+
+%% Grid 
+
+vardx               = 1
+posdwn              = -1
+nx                  = 325
+ny                  = 0
+xori                = 0
+yori                = 0
+alfa                = -91.86
+xfile               = x.grd
+depfile             = bed.dep
+thetamin            = -90
+thetamax            = 90
+thetanaut           = 0
+dtheta              = 180
+dtheta_s            = 180
+
+%% par 
+
+
+%% Bed composition parameters 
+
+D50                 = 0.0019
+D90                 = 0.00285
+
+%% Sediment input 
+
+rhos                = 2650
+
+%% Avalanching 
+
+dryslp              = 0.55
+wetslp              = 0.35
+
+%% Morphology parameters 
+
+wetslp              = 0.35
+morfac              = 1
+morstart            = 0
+ne_layer            = ne_layer.txt
+struct              = 1
+
+%% Flow boundary condition parameters 
+
+front               = abs_1d
+back                = wall
+left                = neumann
+right               = neumann
+
+%% Sediment transport parameters 
+
+facSk               = 0.1
+facAs               = 0.1
+
+%% Model time 
+
+tstop               = 3600
+CFL                 = 0.9
+
+%% Physical processes 
+
+avalanching         = 1
+morphology          = 1
+sedtrans            = 1
+wind                = 0
+
+%% Tide boundary conditions 
+
+tideloc             = 0
+
+%% Initial conditions 
+
+zs0                 = 0.55
+
+%% Output 
+
+outputformat        = netcdf
+tintg               = 100
+tstart              = 0
+
+%% Wave boundary condition parameters 
+
+bcfile              = jonswap.txt
+
+%% hotstart (during a storm, use the previous xbeach timestep as hotstart for current timestep)
+
+writehotstart: 1
+hotstart: 1
+
+%% Output variables 
+
+nglobalvar          = 14
+x
+y
+zb
+zs
+H
+runup
+sedero
+E
+Sxx
+Sxy
+Syy
+thetamean
+vmag
+urms
+
