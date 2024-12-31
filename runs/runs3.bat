@@ -3,29 +3,27 @@
 @REM python main.py val_per3_best
 @REM python main_results.py val_per3_best all 1300 1400
 
-python main.py sa_lvl1_1
-python main.py sa_lvl1_2
-python main.py sa_lvl1_3
-python main.py sa_lvl1_4
-python main.py sa_lvl1_5
-python main.py sa_lvl1_6
-python main.py sa_lvl1_7
-python main.py sa_lvl1_8
-python main.py sa_lvl1_9
-python main.py sa_lvl1_10
-python main.py sa_lvl1_11
-python main.py sa_lvl1_12
-python main.py sa_lvl1_13
-python main.py sa_lvl1_14
-python main.py sa_lvl1_15
-python main.py sa_lvl1_16
+python main.py sa_lvl1_35
+python main.py sa_lvl1_36
+python main.py sa_lvl1_37
+python main.py sa_lvl1_38
+python main.py sa_lvl1_39
+python main.py sa_lvl1_40
 
-python main.py sa_lvl2_1
-python main.py sa_lvl2_2
-python main.py sa_lvl2_3
-python main.py sa_lvl2_4
-python main.py sa_lvl2_5
-python main.py sa_lvl2_6
+python main.py sa_lvl1_41
+python main.py sa_lvl1_42
+python main.py sa_lvl1_43
+python main.py sa_lvl1_44
+python main.py sa_lvl1_45
+python main.py sa_lvl1_46
+python main.py sa_lvl1_47
+python main.py sa_lvl1_48
+python main.py sa_lvl1_49
+python main.py sa_lvl1_50
+python main.py sa_lvl1_51
 
-python main.py sa_lvl3_1
-
+python main.py sa_lvl2_11
+python main.py sa_lvl2_12
+python main.py sa_lvl2_13
+python main.py sa_lvl2_14
+python main.py sa_lvl2_15
