@@ -198,7 +198,7 @@ sensitivity:
   # hydrodynamics
   term_water_level    : 0  # [m] term added to the water level for the entire simulation
   factor_wave_height  : 1  # [-] factor multiplied with the wave height for the entire simulation
-  factor_wave_period  : 0.9  # [-] factor multiplied with the wave height for the entire simulation
+  factor_wave_period  : 0.8  # [-] factor multiplied with the wave height for the entire simulation
 
   # thermodynamics
   factor_latent_heat_flux     : 1  # [-] factor multiplied with the latent heat flux for the entire simulation

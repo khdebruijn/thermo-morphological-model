@@ -98,7 +98,7 @@ thermal:
   with_longwave : True  # include longwave radiation (incoming & outgoining) in thermal computation step
   with_latent   : True  # include latent heat in thermal computation step
   surface_flux_factor : 1   # [-] factor that multiplies with the total surface heat flux, to account for reduced convective transport due to the peat layer
-  surface_flux_angle  : 'xxx'  # [degrees] the threshold angle above which the surface_flux_factor is not applied
+  surface_flux_angle  : 24  # [degrees] the threshold angle above which the surface_flux_factor is not applied
 
   # model properties
   dt              : 36  # [s] timestep used in the thermal model on the temporal subgrid

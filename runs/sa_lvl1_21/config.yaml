@@ -20,7 +20,7 @@ model:
 # wrapper parameters:
 wrapper:
   sea_ice_threshold     : 0.85  # Only run xbeach if sea ice fraction is below threshold, otherwise assume all wave action attenuated
-  xb_threshold          : 0.9   # [m + MSL] threshold value for total water level + R2% (CHECK THIS)
+  xb_threshold          : 0.8   # [m + MSL] threshold value for total water level + R2% (CHECK THIS)
   CFL_thermal           : 0.5   # maximum CFL for thermal module
   CFL_xbeach            : 0.7   # maximum CFL for XBeach module
 

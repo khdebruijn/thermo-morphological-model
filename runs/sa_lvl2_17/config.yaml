@@ -206,4 +206,4 @@ sensitivity:
   factor_shortwave_heat_flux  : 1  # [-] factor multiplied with the shortwave heat flux for the entire simulation
   term_sea_temperature        : 0  # [K] term added to the sea temperature for the entire simulation
   term_2m_air_temperature     : 0  # [K] term added to the 2m air temperature for the entire simulation
-  factor_latent_heat_flux     : 0.9  # [-] factor multiplied with the latent heat flux for the entire simulation
+  factor_latent_heat_flux     : 0.8  # [-] factor multiplied with the latent heat flux for the entire simulation

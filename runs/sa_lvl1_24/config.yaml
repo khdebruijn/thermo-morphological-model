@@ -97,7 +97,7 @@ thermal:
   with_solar    : True  # include short wave solar radiation in thermal computation step
   with_longwave : True  # include longwave radiation (incoming & outgoining) in thermal computation step
   with_latent   : True  # include latent heat in thermal computation step
-  surface_flux_factor : 'xxx'   # [-] factor that multiplies with the total surface heat flux, to account for reduced convective transport due to the peat layer
+  surface_flux_factor : 1.2   # [-] factor that multiplies with the total surface heat flux, to account for reduced convective transport due to the peat layer
   surface_flux_angle  : 20  # [degrees] the threshold angle above which the surface_flux_factor is not applied
 
   # model properties
