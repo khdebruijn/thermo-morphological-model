@@ -55,7 +55,7 @@
 
 :: sensitivity runs
 python results\collect_erosion.py sa_base
-python results\collect_erosion.py sa_base_alt
+@REM python results\collect_erosion.py sa_base_alt
 
 python results\collect_erosion.py sa_lvl1_1
 python results\collect_erosion.py sa_lvl1_2
