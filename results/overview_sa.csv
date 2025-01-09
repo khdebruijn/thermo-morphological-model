@@ -1,88 +1,88 @@
-﻿varied_parameter,level,sublevel,number_low,number_high,baseline_value,unit,variation,new_value_low,new_value_high,start,end,run_id_low,run_id_high
-Bluff height,1,bathymetry,1,2,12,m,+-20%,9.6,14.4,01/01/2017,01/01/2018,sa_lvl1_1,sa_lvl1_2
-Bluff slope,1,bathymetry,3,4,1,-,+-20%,0.8,1.2,01/01/2017,01/01/2018,sa_lvl1_3,sa_lvl1_4
-Beach width,1,bathymetry,5,6,12.5,m,+-20%,10,15,01/01/2017,01/01/2018,sa_lvl1_5,sa_lvl1_6
-Beach slope,1,bathymetry,7,8,0.1,-,+-20%,0.08,0.12,01/01/2017,01/01/2018,sa_lvl1_7,sa_lvl1_8
-Maximum nearshore depth,1,bathymetry,9,10,3,m,+-20%,2.4,3.6,01/01/2017,01/01/2018,sa_lvl1_9,sa_lvl1_10
-Nearshore slope,1,bathymetry,11,12,0.03,-,+-20%,0.024,0.036,01/01/2017,01/01/2018,sa_lvl1_11,sa_lvl1_12
-Maximum offshore depth,1,bathymetry,13,14,5,m,+-20%,4,6,01/01/2017,01/01/2018,sa_lvl1_13,sa_lvl1_14
-Offshore slope,1,bathymetry,15,16,0.007,-,+-20%,0.0056,0.0084,01/01/2017,01/01/2018,sa_lvl1_15,sa_lvl1_16
-Continental flat width,1,bathymetry,17,18,400,m,+-20%,320,480,01/01/2017,01/01/2018,sa_lvl1_17,sa_lvl1_18
-Sea ice threshold,1,model,19,20,0.3,-,+-10%,0.27,0.33,01/01/2017,01/01/2018,sa_lvl1_19,sa_lvl1_20
-R2%-threshold,1,model,21,22,1,m,+-10%,0.9,1.1,01/01/2017,01/01/2018,sa_lvl1_21,sa_lvl1_22
-Surface flux factor,1,model,23,24,1,-,+-10%,0.9,1.1,01/01/2017,01/01/2018,sa_lvl1_23,sa_lvl1_24
-Surface flux angle,1,model,25,26,20,degrees,+-10%,18,22,01/01/2017,01/01/2018,sa_lvl1_25,sa_lvl1_26
-Grid resolution Xbeach,1,model,27,28,40,ppwl,+-10%,36,44,01/01/2017,01/01/2018,sa_lvl1_27,sa_lvl1_28
-Grid resolution thermal module,1,model,29,30,150,nodes,+-10%,135,165,01/01/2017,01/01/2018,sa_lvl1_29,sa_lvl1_30
-Maximum depth thermal module,1,model,31,32,15,m,+-10%,13.5,16.5,01/01/2017,01/01/2018,sa_lvl1_31,sa_lvl1_32
-Thaw threshold,1,model,33,34,3,nodes,+-33%,2,4,01/01/2017,01/01/2018,sa_lvl1_33,sa_lvl1_34
-Inter-storm XBeach activatinos,1,model,35,36,168,h,+-10%,151.2,184.8,01/01/2017,01/01/2018,sa_lvl1_35,sa_lvl1_36
-Critical dry slope,1,physical,37,38,1,-,+-20%,0.8,1.2,01/01/2017,01/01/2018,sa_lvl1_37,sa_lvl1_38
-Critical wet slope,1,physical,39,40,0.1,-,+-20%,0.08,0.12,01/01/2017,01/01/2018,sa_lvl1_39,sa_lvl1_40
-D50,1,physical,41,42,0.036,mm,+-20%,0.0288,0.0432,01/01/2017,01/01/2018,sa_lvl1_41,sa_lvl1_42
-Bed friction coefficient,1,physical,43,44,0.02,-,+-20%,0.016,0.024,01/01/2017,01/01/2018,sa_lvl1_43,sa_lvl1_44
-Longshore transport gradient,1,physical,45,46,0,1/m,+-0.01,-0.01,0.01,01/01/2017,01/01/2018,sa_lvl1_45,sa_lvl1_46
-Particle density sediment,1,physical,47,48,2650,kg/m3,+-20%,2120,3180,01/01/2017,01/01/2018,sa_lvl1_47,sa_lvl1_48
-Ice content,1,physical,49,50,0.65,-,+-20%,0.52,0.78,01/01/2017,01/01/2018,sa_lvl1_49,sa_lvl1_50
-Volumetric heat capacity (frozen soil),1,physical,51,52,4600000,J/K/m3,+-20%,3680000,5520000,01/01/2017,01/01/2018,sa_lvl1_51,sa_lvl1_52
-Volumetric heat capacity (unfrozen soil),1,physical,53,54,7000000,J/K/m3,+-20%,5600000,8400000,01/01/2017,01/01/2018,sa_lvl1_53,sa_lvl1_54
-Thermal conductivity (frozen soil),1,physical,55,56,2.7,W/m/K,+-20%,2.16,3.24,01/01/2017,01/01/2018,sa_lvl1_55,sa_lvl1_56
-Thermal conductivity (unfrozen soil),1,physical,57,58,0.6,W/m/K,+-20%,0.48,0.72,01/01/2017,01/01/2018,sa_lvl1_57,sa_lvl1_58
-Latent heat of fusion,1,physical,59,60,334000,J/kg,+-20%,267200,400800,01/01/2017,01/01/2018,sa_lvl1_59,sa_lvl1_60
-Density water,1,physical,61,62,1000,kg/m3,+-20%,800,1200,01/01/2017,01/01/2018,sa_lvl1_61,sa_lvl1_62
-Melting temperature water,1,physical,63,64,273.15,K,+-1%,270.4185,275.8815,01/01/2017,01/01/2018,sa_lvl1_63,sa_lvl1_64
-Geothermal gradient,1,physical,65,66,0.025,K/m,+-20%,0.02,0.03,01/01/2017,01/01/2018,sa_lvl1_65,sa_lvl1_66
-Latitude,1,physical,67,68,70.13,degrees,+-5%,66.6235,73.6365,01/01/2017,01/01/2018,sa_lvl1_67,sa_lvl1_68
-Water level,2,hydrodynamics,1,2,0,-,+-0.1,-0.1,+0.1,01/01/2017,01/01/2018,sa_lvl2_1,sa_lvl2_2
-Wave height,2,hydrodynamics,3,4,1,-,+-10%,*0.9,*1.1,01/01/2017,01/01/2018,sa_lvl2_3,sa_lvl2_4
-Wave period,2,hydrodynamics,5,6,1,-,+-10%,*0.9,*1.1,01/01/2017,01/01/2018,sa_lvl2_5,sa_lvl2_6
-Convective heat flux,2,thermodynamics,7,8,1,-,+-10%,*0.9,*1.1,01/01/2017,01/01/2018,sa_lvl2_7,sa_lvl2_8
-Longwave heat flux,2,thermodynamics,9,10,1,-,+-10%,*0.9,*1.1,01/01/2017,01/01/2018,sa_lvl2_9,sa_lvl2_10
-Shortwave heat flux,2,thermodynamics,11,12,1,-,+-10%,*0.9,*1.1,01/01/2017,01/01/2018,sa_lvl2_11,sa_lvl2_12
-Sea temperature,2,thermodynamics,13,14,0,-,+-2,-2,+2,01/01/2017,01/01/2018,sa_lvl2_13,sa_lvl2_14
-2m air temperature,2,thermodynamics,15,16,0,-,+-2,-2,+2,01/01/2017,01/01/2018,sa_lvl2_15,sa_lvl2_16
-Latent heat flux,2,thermodynamics,17,18,1,-,+-10%,*0.9,*1.1,01/01/2017,01/01/2018,sa_lvl2_17,sa_lvl2_18
-Thermal module,3,None,1,1,On,-,-1,Off,Off,01/01/2017,01/01/2018,sa_lvl3_1,sa_lvl3_1
-Solar flux calcuator,3,None,2,2,On,-,-1,Off,Off,01/01/2017,01/01/2018,sa_lvl3_2,sa_lvl3_2
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
-,,,,,,,,,,,,,
+﻿varied_parameter,level,sublevel,number_low,number_high,baseline_value,unit,variation,new_value_low,new_value_high,start,end,run_id_low,run_id_high,Exception
+Bluff height,1,bathymetry,1,2,12,m,+-20%,9.6,14.4,01/01/2017,01/01/2018,sa_lvl1_1,sa_lvl1_2,0
+Bluff slope,1,bathymetry,3,4,0.6,-,+-20%,0.48,0.72,01/01/2017,01/01/2018,sa_lvl1_3,sa_lvl1_4,0
+Beach width,1,bathymetry,5,6,12.5,m,+-20%,10,15,01/01/2017,01/01/2018,sa_lvl1_5,sa_lvl1_6,0
+Beach slope,1,bathymetry,7,8,0.1,-,+-20%,0.08,0.12,01/01/2017,01/01/2018,sa_lvl1_7,sa_lvl1_8,0
+Maximum nearshore depth,1,bathymetry,9,10,3,m,+-20%,2.4,3.6,01/01/2017,01/01/2018,sa_lvl1_9,sa_lvl1_10,0
+Nearshore slope,1,bathymetry,11,12,0.03,-,+-20%,0.024,0.036,01/01/2017,01/01/2018,sa_lvl1_11,sa_lvl1_12,0
+Maximum offshore depth,1,bathymetry,13,14,5,m,+-20%,4,6,01/01/2017,01/01/2018,sa_lvl1_13,sa_lvl1_14,0
+Offshore slope,1,bathymetry,15,16,0.007,-,+-20%,0.0056,0.0084,01/01/2017,01/01/2018,sa_lvl1_15,sa_lvl1_16,0
+Continental flat width,1,bathymetry,17,18,400,m,+-20%,320,480,01/01/2017,01/01/2018,sa_lvl1_17,sa_lvl1_18,0
+Sea ice threshold,1,model,19,20,0.3,-,+-20%,0.24,0.36,01/01/2017,01/01/2018,sa_lvl1_19,sa_lvl1_20,0
+R2%-threshold,1,model,21,22,1,m,+-20%,0.8,1.2,01/01/2017,01/01/2018,sa_lvl1_21,sa_lvl1_22,0
+Surface flux factor,1,model,23,24,1,-,+-20%,0.8,1.2,01/01/2017,01/01/2018,sa_lvl1_23,sa_lvl1_24,0
+Surface flux angle,1,model,25,26,20,degrees,+-20%,16,24,01/01/2017,01/01/2018,sa_lvl1_25,sa_lvl1_26,0
+Grid resolution XBeach,1,model,27,28,40,ppwl,+-20%,32,48,01/01/2017,01/01/2018,sa_lvl1_27,sa_lvl1_28,0
+Grid resolution thermal module,1,model,29,30,150,nodes,+-20%,120,180,01/01/2017,01/01/2018,sa_lvl1_29,sa_lvl1_30,0
+Maximum depth thermal module,1,model,31,32,15,m,+-20%,12,18,01/01/2017,01/01/2018,sa_lvl1_31,sa_lvl1_32,0
+Thaw threshold,1,model,33,34,3,nodes,+-33%,2,4,01/01/2017,01/01/2018,sa_lvl1_33,sa_lvl1_34,1
+Inter-storm XBeach activations,1,model,35,36,168,h,+-20%,134.4,201.6,01/01/2017,01/01/2018,sa_lvl1_35,sa_lvl1_36,0
+Critical dry slope,1,physical,37,38,0.6,-,+-20%,0.48,0.72,01/01/2017,01/01/2018,sa_lvl1_37,sa_lvl1_38,0
+Critical wet slope,1,physical,39,40,0.1,-,+-20%,0.08,0.12,01/01/2017,01/01/2018,sa_lvl1_39,sa_lvl1_40,0
+D50,1,physical,41,42,0.036,mm,+-20%,0.0288,0.0432,01/01/2017,01/01/2018,sa_lvl1_41,sa_lvl1_42,0
+Bed friction coefficient,1,physical,43,44,0.02,-,+-20%,0.016,0.024,01/01/2017,01/01/2018,sa_lvl1_43,sa_lvl1_44,0
+Longshore transport gradient,1,physical,45,46,0,1/m,+-0.01,-0.01,0.01,01/01/2017,01/01/2018,sa_lvl1_45,sa_lvl1_46,1
+Particle density sediment,1,physical,47,48,2650,kg/m3,+-20%,2120,3180,01/01/2017,01/01/2018,sa_lvl1_47,sa_lvl1_48,0
+Ice content,1,physical,49,50,0.65,-,+-20%,0.52,0.78,01/01/2017,01/01/2018,sa_lvl1_49,sa_lvl1_50,0
+Volumetric heat capacity (frozen soil),1,physical,51,52,4600000,J/K/m3,+-20%,3680000,5520000,01/01/2017,01/01/2018,sa_lvl1_51,sa_lvl1_52,0
+Volumetric heat capacity (unfrozen soil),1,physical,53,54,7000000,J/K/m3,+-20%,5600000,8400000,01/01/2017,01/01/2018,sa_lvl1_53,sa_lvl1_54,0
+Thermal conductivity (frozen soil),1,physical,55,56,2.7,W/m/K,+-20%,2.16,3.24,01/01/2017,01/01/2018,sa_lvl1_55,sa_lvl1_56,0
+Thermal conductivity (unfrozen soil),1,physical,57,58,0.6,W/m/K,+-20%,0.48,0.72,01/01/2017,01/01/2018,sa_lvl1_57,sa_lvl1_58,0
+Latent heat of fusion water,1,physical,59,60,334000,J/kg,+-20%,267200,400800,01/01/2017,01/01/2018,sa_lvl1_59,sa_lvl1_60,0
+Density water,1,physical,61,62,1000,kg/m3,+-20%,800,1200,01/01/2017,01/01/2018,sa_lvl1_61,sa_lvl1_62,0
+Melting temperature water,1,physical,63,64,273.15,K,+-1%,270.4185,275.8815,01/01/2017,01/01/2018,sa_lvl1_63,sa_lvl1_64,1
+Geothermal gradient,1,physical,65,66,0.025,K/m,+-20%,0.02,0.03,01/01/2017,01/01/2018,sa_lvl1_65,sa_lvl1_66,0
+Latitude,1,physical,67,68,70.13,degrees,+-5%,66.6235,73.6365,01/01/2017,01/01/2018,sa_lvl1_67,sa_lvl1_68,1
+Water level,2,hydrodynamics,1,2,0,-,+-0.1,-0.1,+0.1,01/01/2017,01/01/2018,sa_lvl2_1,sa_lvl2_2,1
+Wave height,2,hydrodynamics,3,4,1,-,+-20%,*0.8,*1.2,01/01/2017,01/01/2018,sa_lvl2_3,sa_lvl2_4,0
+Wave period,2,hydrodynamics,5,6,1,-,+-20%,*0.8,*1.2,01/01/2017,01/01/2018,sa_lvl2_5,sa_lvl2_6,0
+Convective heat flux,2,thermodynamics,7,8,1,-,+-20%,*0.8,*1.2,01/01/2017,01/01/2018,sa_lvl2_7,sa_lvl2_8,0
+Longwave heat flux,2,thermodynamics,9,10,1,-,+-20%,*0.8,*1.2,01/01/2017,01/01/2018,sa_lvl2_9,sa_lvl2_10,0
+Shortwave heat flux,2,thermodynamics,11,12,1,-,+-20%,*0.8,*1.2,01/01/2017,01/01/2018,sa_lvl2_11,sa_lvl2_12,0
+Sea temperature,2,thermodynamics,13,14,0,-,+-2,-2,+2,01/01/2017,01/01/2018,sa_lvl2_13,sa_lvl2_14,1
+2m air temperature,2,thermodynamics,15,16,0,-,+-2,-2,+2,01/01/2017,01/01/2018,sa_lvl2_15,sa_lvl2_16,1
+Latent heat flux,2,thermodynamics,17,18,1,-,+-20%,*0.8,*1.2,01/01/2017,01/01/2018,sa_lvl2_17,sa_lvl2_18,0
+Thermal module,3,None,1,1,On,-,-1,Off,Off,01/01/2017,01/01/2018,sa_lvl3_1,sa_lvl3_1,1
+Solar flux calcuator,3,None,2,2,On,-,-1,Off,Off,01/01/2017,01/01/2018,sa_lvl3_2,sa_lvl3_2,1
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,
