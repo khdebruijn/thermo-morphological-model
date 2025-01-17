@@ -1,1 +1,0 @@
-Each file in the 'ts_datasets' folder contains a time series of a variable present in the file name. All files are csv .txt files, with column names in the first row.
