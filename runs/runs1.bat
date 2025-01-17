@@ -3,8 +3,27 @@
 @REM python main.py val_per1_best
 @REM python main_results.py val_per1_best all 1300 1400
 
-@REM python main.py val_per2_17
-@REM python main_results.py val_per2_17 all 1300 1400
+python main.py sa_lvl1_1
+python main.py sa_lvl1_2
+python main.py sa_lvl1_3
+python main.py sa_lvl1_4
+python main.py sa_lvl1_5
+python main.py sa_lvl1_6
+python main.py sa_lvl1_7
+python main.py sa_lvl1_8
+python main.py sa_lvl1_9
+python main.py sa_lvl1_10
 
-python main.py passion_best
-python main_results.py passion_best all 1300 1400
+python main.py sa_lvl1_11
+python main.py sa_lvl1_12
+python main.py sa_lvl1_13
+python main.py sa_lvl1_14
+python main.py sa_lvl1_15
+python main.py sa_lvl1_16
+python main.py sa_lvl1_17
+
+python main.py sa_lvl2_1
+python main.py sa_lvl2_2
+python main.py sa_lvl2_3
+python main.py sa_lvl2_4
+python main.py sa_lvl2_5

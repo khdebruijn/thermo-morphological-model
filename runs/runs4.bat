@@ -3,28 +3,40 @@
 @REM python main.py val_per3_fast
 @REM python main_results.py val_per3_fast all 1300 1400
 
-python main.py sa_lvl1_24
-python main.py sa_lvl1_25
-python main.py sa_lvl1_26
-python main.py sa_lvl1_27
-python main.py sa_lvl1_28
+@REM python main.py sa_lvl1_52
+@REM python main.py sa_lvl1_53
+@REM python main.py sa_lvl1_54
+@REM python main.py sa_lvl1_55
+@REM python main.py sa_lvl1_56
+@REM python main.py sa_lvl1_57
+@REM python main.py sa_lvl1_58
+@REM python main.py sa_lvl1_59
+
+@REM python main.py sa_lvl1_60
+@REM python main.py sa_lvl1_61
+@REM python main.py sa_lvl1_62
+@REM python main.py sa_lvl1_63
+@REM python main.py sa_lvl1_64
+@REM python main.py sa_lvl1_65
+@REM python main.py sa_lvl1_66
+@REM python main.py sa_lvl1_67
+@REM python main.py sa_lvl1_68
+
+@REM python main.py sa_lvl2_16
+@REM python main.py sa_lvl2_17
+@REM python main.py sa_lvl2_18
+
+@REM python main.py sa_lvl3_1
+@REM python main.py sa_lvl3_2
+
 python main.py sa_lvl1_29
 python main.py sa_lvl1_30
 python main.py sa_lvl1_31
+
 python main.py sa_lvl1_32
-python main.py sa_lvl1_33
-python main.py sa_lvl1_34
 python main.py sa_lvl1_35
 python main.py sa_lvl1_36
-python main.py sa_lvl1_37
-python main.py sa_lvl1_38
-python main.py sa_lvl1_39
 
-python main.py sa_lvl2_7
-python main.py sa_lvl2_8
-python main.py sa_lvl2_9
-python main.py sa_lvl2_10
-python main.py sa_lvl2_11
-python main.py sa_lvl2_12
-
-python main.py sa_lvl3_2
+python main.py sa_lvl2_3
+python main.py sa_lvl2_4
+python main.py sa_lvl2_5

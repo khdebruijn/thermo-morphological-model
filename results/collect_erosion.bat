@@ -155,3 +155,7 @@
 @REM python results\collect_erosion.py val_per1_base
 @REM python results\collect_erosion.py val_per2_base
 @REM python results\collect_erosion.py val_per3_base
+
+python results\collect_erosion.py sa_base_10y
+python results\collect_erosion.py sa_base_10y
+python results\collect_erosion.py sa_base_10y

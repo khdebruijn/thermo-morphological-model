@@ -1,25 +1,34 @@
 :: to execute this batch file, cd to project directory and type "runs\runs.bat"
 
-python main.py sa_lvl1_17
-python main.py sa_lvl1_18
-python main.py sa_lvl1_19
-python main.py sa_lvl1_20
+@REM python main.py sa_lvl1_18
+@REM python main.py sa_lvl1_19
+@REM python main.py sa_lvl1_20
+
+@REM python main.py sa_lvl1_21
+@REM python main.py sa_lvl1_22
+@REM python main.py sa_lvl1_23
+@REM python main.py sa_lvl1_24
+@REM python main.py sa_lvl1_25
+@REM python main.py sa_lvl1_26
+@REM python main.py sa_lvl1_27
+@REM python main.py sa_lvl1_28
+@REM python main.py sa_lvl1_29
+@REM python main.py sa_lvl1_30
+
+@REM python main.py sa_lvl1_31
+@REM python main.py sa_lvl1_32
+@REM python main.py sa_lvl1_33
+@REM python main.py sa_lvl1_34
+
+@REM python main.py sa_lvl2_6
+@REM python main.py sa_lvl2_7
+@REM python main.py sa_lvl2_8
+@REM python main.py sa_lvl2_9
+@REM python main.py sa_lvl2_10
+
+
 python main.py sa_lvl1_21
-python main.py sa_lvl1_22
-python main.py sa_lvl1_23
 
-python main.py sa_lvl1_40
-python main.py sa_lvl1_41
-python main.py sa_lvl1_42
-python main.py sa_lvl1_43
-python main.py sa_lvl1_44
-python main.py sa_lvl1_45
-python main.py sa_lvl1_46
 
-python main.py sa_lvl1_64
-python main.py sa_lvl1_65
-python main.py sa_lvl1_66
-python main.py sa_lvl1_67
-python main.py sa_lvl1_68
-python main.py sa_lvl1_69
-python main.py sa_lvl1_70
+@REM •	Sa_lvl1_19 – Sa_lvl1_32 + sa_lvl1_35 + sa_lvl1_36
+@REM •	Sa_lvl2_3 – SA_lvl2_12 + sa_lvl2_17 + sa_lvl2_18

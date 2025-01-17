@@ -37,7 +37,7 @@ bathymetry:
   with_schematized_bathymetry : True  # whether or not to generate a schematized bathymetry upon initialization
   bluff_flat_length           : 100  # [m] length of the flat attached to the crest of the bluff
   bluff_height                : 12  # [m] height of the bluff
-  bluff_slope                 : 1  # [-] slope of the bluff, i.e., height/width
+  bluff_slope                 : 0.6  # [-] slope of the bluff, i.e., height/width
   beach_width                 : 12.5  # [m] width of the beach
   beach_slope                 : 0.1  # [-] slope of the beach, i.e., height/width
   nearshore_max_depth         : 3  # [m] maximum depth of the nearshore
@@ -73,7 +73,7 @@ xbeach:
   rho_sea_water : 1025  # [kg/m3] density (sea) water
 
   # sediment properties
-  dryslp      : 1.0  # [dz/dx] Critical avalanching slope above water (dz/dx and dz/dy) (placeholder)
+  dryslp      : 0.6  # [dz/dx] Critical avalanching slope above water (dz/dx and dz/dy) (placeholder)
   wetslp      : 0.1  # [dz/dx] Critical avalanching slope below water (dz/dx and dz/dy) (placeholder)
   D50         : 0.000036  # [m] mean grain size, value from Nando (personal communication)
   rho_solid   : 2650  # [kg/m3] density of sediment particles
@@ -201,7 +201,7 @@ sensitivity:
   factor_wave_period  : 1  # [-] factor multiplied with the wave height for the entire simulation
 
   # thermodynamics
-  factor_convective_heat_flux : 1.1  # [-] factor multiplied with the convective heat flux (both submerged and above water) for the entire simulation
+  factor_convective_heat_flux : 1.2  # [-] factor multiplied with the convective heat flux (both submerged and above water) for the entire simulation
   factor_longwave_heat_flux   : 1  # [-] factor multiplied with the longwave heat flux for the entire simulation
   factor_shortwave_heat_flux  : 1  # [-] factor multiplied with the shortwave heat flux for the entire simulation
   term_sea_temperature        : 0  # [K] term added to the sea temperature for the entire simulation
