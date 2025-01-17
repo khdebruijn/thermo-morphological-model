@@ -1,12 +1,18 @@
 DESCRIPTION OF NOTEBOOKS IN THIS FOLDER
-"cmip5_generate_timeseries.ipynb": Currently not used. Will be used to generate timeseries in future.
+"check_number_of_storms.ipynb": Checks how many times XBeach is expected to be activated based on different R2% thresholds
 "compare_erikson_gibbs.ipynb": Currently used to generate a bathymetry file ('bed.dep') and grid file ('x.grd'). It also visualizes the beach transect locations, and bathymetry transect locations. The notebook uses sediment sizes to determine potential equillibrium profiles, and in general just looks at what data is useable. It currently does not save anything.
+"engelstad_and_nederhoff_waves_to_timeseries.ipynb": Converts data from Engelstad (2023) and Nederhoff (2023) to a csv timeseries, which is useable by the model.
 "era5_first_analysis.ipynb": Currently used to open era5 datasets to get a first feel for the dataset.
 "era5_generate_timeseries.ipynb": Used to generate model-useable timeseries from era5 data.
 "era5_get.ipynb": Used to obtain era5 data from the web client.
 "era5_retrieve.py": Used to obtain era5 data from the web client (by: Kees Nederhoff).
 "erikson_first_analysis.ipynb": Currently used to open erikson datasets to get a first feel for the dataset.
+"erikson_ground_tmep.ipynb": Used to have a look at the Erikson (2020) ground temperature data.
+"erikson_storm_correlation.ipynb": Used to check if there is any correlation between hydrodynamic conditions and water level in the erikson / engelstad datasets.
 "erikson_storm_to_timeseries.ipynb": Used to convert the erikson storm dataset into a useable timeseries for the model.
+"erikson_transects.ipynb": Used to generate bathymetric transects from depth measurements by Erikson (2020)
 "generate_bathymetry.ipynb": Calculates distances relative to shoreline/bluff edge baseline and orientations of the transect, and calculates the grid based on this (without interpolated points).
+"gibbs_figures.ipynb": used to create figures from the bluff retreat data from Gibbs (2021)
 "gibbs_first_analysis.ipynb": This notebook visualizes the gibbs data, which consists of shoreline and bluff edge positions through the years with respect to a baseline.
 "gibbs_generate_timeseries.ipynb": This notebook generates timeseries for the bluff edges and shoreline positions.
+"schem_bath_vs_transects.ipynb": Used to compare schematized and measured bathymetry.
