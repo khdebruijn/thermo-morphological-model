@@ -666,7 +666,7 @@ class SimulationResults():
         xticks = np.arange(0, 8760, 730)
         xtick_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         axs[4].set_xticks(xticks, xtick_labels)
-        axs[4].set_xticklabels(xtick_labels, rotation=10)
+        axs[4].set_xticklabels(xtick_labels)
         current_timestep_line, = axs[4].plot([0, 0], [-2, 2], color='r', label='current timestep')
 
         # some visual stuff
@@ -717,8 +717,9 @@ class SimulationResults():
             timestamp = datetime.fromtimestamp(self.timestamps[np.where(output_id==self.timestep_ids)][0] * 10**-9)
                             
             # set current timestep id as figure title
-            fig.suptitle(f'timestep = {output_id} \n({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
-                        
+            fig.suptitle(f'{timestamp - timedelta(hours=9)} AKST')
+            # fig.suptitle(f'timestep = {output_id} \n({timestamp} UTC / {timestamp - timedelta(hours=9)} AKST / {timestamp - timedelta(hours=8)} AKDT)')
+
             # get necessary variables
             xgr = self.get_var_timestep("xgr", output_id)
             zgr = self.get_var_timestep("zgr", output_id)
