@@ -40,40 +40,38 @@ def main(runid, args, attempt_counter_max=100):
     
 
     while attempt_counter < attempt_counter_max:
+            
+        if "bed" in args:
+            results.bed_level_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
+            args.remove('bed')
+            plt.close('all')
         
-        try:
+        if "heat" in args:
+            results.heat_forcing_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
+            args.remove('heat')
+            plt.close('all')
         
-            if "bed" in args:
-                results.bed_level_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
-                args.remove('bed')
-                plt.close('all')
-            
-            if "heat" in args:
-                results.heat_forcing_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
-                args.remove('heat')
-                plt.close('all')
-            
-            if "temp_heat" in args:
-                results.temperature_heatforcing_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
-                args.remove('temp_heat')
-                plt.close('all')
-            
-            if "temp" in args:
-                results.temperature_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
-                args.remove('temp')
-                plt.close('all')
-                
-            if "all" in args:
-                results.bed_temperature_thawdepth_heatforcing_xbtimes_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
-                args.remove('all')
-                plt.close('all')
-            
-            break
-    
-        except ValueError:
+        if "temp_heat" in args:
+            results.temperature_heatforcing_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
+            args.remove('temp_heat')
+            plt.close('all')
+        
+        if "temp" in args:
+            results.temperature_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
+            args.remove('temp')
             plt.close('all')
             
-            attempt_counter += 1
+        if "all" in args:
+            results.bed_temperature_thawdepth_heatforcing_xbtimes_animation(fps=fps, make_animation=make_animation, xmin=xmin, xmax=xmax)
+            args.remove('all')
+            plt.close('all')
+            break
+        
+        
+
+        plt.close('all')
+        
+        attempt_counter += 1
         
     print(f"completed {runid}")
     print(f"Processing started at: {datetime_from_timestamp(t_start)}")
