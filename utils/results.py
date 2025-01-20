@@ -665,8 +665,8 @@ class SimulationResults():
         axs[4].plot(np.arange(len(self.xbeach_times)), self.xbeach_times, color='k')
         xticks = np.arange(0, 8760 + 730, 730)
         xtick_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        axs[4].set_xticks(xticks, xtick_labels)
-        axs[4].set_xticklabels(rot=10)
+        axs[4].set_xticks(xticks)
+        axs[4].set_xticklabels(xtick_labels, rot=10)
         current_timestep_line, = axs[4].plot([0, 0], [-2, 2], color='r', label='current timestep')
 
         # some visual stuff
